@@ -1182,7 +1182,7 @@
 
 <!-- Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModalOnOverlay(event)">
-  <div class="modal">
+  <div class="modal" onkeydown="handleModalKey(event)">
     <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-title" id="modalTitle">비행 기록 입력</div>
@@ -1216,11 +1216,11 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">출발시간 (Local)</label>
-          <input type="text" class="form-input" id="fDepTime" placeholder="1630" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this)" />
+          <input type="text" class="form-input" id="fDepTime" placeholder="1630" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this); autoCalcTotal()" />
         </div>
         <div class="form-group">
           <label class="form-label">도착시간 (Local)</label>
-          <input type="text" class="form-input" id="fArrTime" placeholder="1820" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this)" />
+          <input type="text" class="form-input" id="fArrTime" placeholder="1820" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this); autoCalcTotal()" />
         </div>
       </div>
 
@@ -1229,7 +1229,7 @@
           <label class="form-label">기종</label>
           <select class="form-input" id="fAcType">
             <option value="B737-800">B737-800</option>
-            <option value="B737-8">B737-8 MAX</option>
+            <option value="B737-8 MAX">B737-8 MAX</option>
             <option value="A320">A320</option>
             <option value="A321">A321</option>
             <option value="Q400">Q400</option>
@@ -1786,6 +1786,17 @@ function toHHMM(mins) {
   const h = Math.floor(Math.abs(mins) / 60);
   const m = Math.abs(mins) % 60;
   return `${h}:${String(m).padStart(2,'0')}`;
+}
+
+// 출발/도착시간 변경 시 총 비행시간 자동계산
+function autoCalcTotal() {
+  const dep = (document.getElementById('fDepTime')?.value || '').trim();
+  const arr = (document.getElementById('fArrTime')?.value || '').trim();
+  if (!dep || !arr) return;
+  const dur = calcDuration(dep, arr);
+  if (dur > 0) {
+    document.getElementById('fTotal').value = toHHMM(dur);
+  }
 }
 
 function calcDuration(dep, arr) {
@@ -2469,7 +2480,10 @@ function editEntry(id) {
   document.getElementById('fArr').value = f.arr || '';
   document.getElementById('fDepTime').value = f.depTime || '';
   document.getElementById('fArrTime').value = f.arrTime || '';
-  document.getElementById('fAcType').value = f.acType || 'B737-800';
+  // B38M/7M8 등 구형 저장값 정규화
+  const _acNorm = {'B737-8':'B737-8 MAX','-8 MAX':'B737-8 MAX','B737-8MAX':'B737-8 MAX','-800':'B737-800'};
+  const _acVal = _acNorm[f.acType] || f.acType || 'B737-800';
+  document.getElementById('fAcType').value = _acVal;
   document.getElementById('fReg').value = f.reg || '';
   document.getElementById('fTotal').value = f.total || '';
   document.getElementById('fNight').value = f.night || '';
@@ -2499,6 +2513,30 @@ function closeModal() {
 function closeModalOnOverlay(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
 }
+
+// 모달 내 키보드: Enter → 다음 필드로 이동 (blur 트리거로 자동계산 포함), ESC → 닫기
+function handleModalKey(e) {
+  const tag = e.target.tagName;
+  if (e.key === 'Enter' && tag !== 'TEXTAREA' && tag !== 'SELECT' && tag !== 'BUTTON') {
+    e.preventDefault();
+    // 현재 필드 blur → onblur 핸들러(formatTimeInput, autoCalcTotal) 실행
+    e.target.blur();
+    // 다음 포커스 가능한 form-input으로 이동
+    const inputs = [...document.querySelectorAll('#modalOverlay .form-input, #modalOverlay select, #modalOverlay button.submit-btn')];
+    const idx = inputs.indexOf(e.target);
+    if (idx >= 0 && idx < inputs.length - 1) inputs[idx + 1].focus();
+  } else if (e.key === 'Escape') {
+    closeModal();
+  }
+}
+
+// ESC로 열린 모달 닫기 (전체 페이지)
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (document.getElementById('modalOverlay').classList.contains('show')) closeModal();
+    if (document.getElementById('ccModalOverlay').classList.contains('show')) closeCrewConnex();
+  }
+});
 
 function saveEntry() {
   const date = document.getElementById('fDate').value;
@@ -2903,8 +2941,8 @@ function parseJejuAirEpaper(text, filename, lines) {
 
   function mapAcType(s) {
     const u = s.toUpperCase();
-    if (u === '7M8' || u === 'B38M') return '-8 MAX';
-    if (u === 'B738' || u === 'B737') return '-800';
+    if (u === '7M8' || u === 'B38M') return 'B737-8 MAX';
+    if (u === 'B738' || u === 'B737') return 'B737-800';
     if (u.includes('A321')) return 'A321';
     if (u.includes('A320')) return 'A320';
     if (u.includes('Q400')) return 'Q400';
@@ -3166,7 +3204,7 @@ function importSelectedFlights() {
   const idxs = [...document.querySelectorAll('.cc-flight-check:checked')].map(cb => +cb.dataset.idx);
   if (!idxs.length) { showToast('가져올 비행을 선택해주세요'); return; }
 
-  const acTypeMap = { 'B737-8':'B737-8','B737-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
+  const acTypeMap = { 'B737-8 MAX':'B737-8 MAX','B737-8':'B737-8 MAX','-8 MAX':'B737-8 MAX','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
   const added = [];
 
   for (const i of idxs) {
@@ -3193,7 +3231,7 @@ function importSelectedFlights() {
 
 function importCcFlight(idx) {
   const f = _ccData.flights[idx];
-  const acTypeMap = { 'B737-8':'B737-8','B737-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
+  const acTypeMap = { 'B737-8 MAX':'B737-8 MAX','B737-8':'B737-8 MAX','-8 MAX':'B737-8 MAX','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
   // CC 모달을 완전히 닫지 않고 숨기기만 — 저장/닫기 후 복귀하기 위해
   _ccOrigin = true;
   document.getElementById('ccModalOverlay').classList.remove('show');
@@ -3230,8 +3268,8 @@ function parseCrewConnexText(rawText) {
   }
 
   const AC_MAP = {
-    '7M8': '-8 MAX', 'B38M': '-8 MAX',
-    '738': '-800', 'B738': '-800',
+    '7M8': 'B737-8 MAX', 'B38M': 'B737-8 MAX',
+    '738': 'B737-800', 'B738': 'B737-800',
     'A321': 'A321', 'A320': 'A320', 'Q400': 'Q400',
   };
 

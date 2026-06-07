@@ -1,0 +1,5 @@
+.claude/
+*.bak
+debug.html
+DailyNewsBriefing_Final.js
+sample-data.js
