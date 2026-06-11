@@ -1037,9 +1037,11 @@
   <div id="tab-logbook" class="tab-pane active">
     <div class="section-header">
       <span class="section-title">비행 기록</span>
-      <div style="display:flex;gap:8px">
-        <button class="add-btn" style="background:rgba(16,58,100,0.6);border:1px solid rgba(59,130,246,0.35);gap:5px" onclick="openCrewConnex()">🌐 CC Import</button>
-        <button class="add-btn" onclick="openModal()">+ 수동 입력</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="add-btn" style="background:rgba(16,58,100,0.6);border:1px solid rgba(59,130,246,0.35)" onclick="openCrewConnex()">🌐 CC</button>
+        <button class="add-btn" style="background:rgba(30,80,30,0.6);border:1px solid rgba(34,197,94,0.35)" onclick="toggleRangePanel()">📊 합산</button>
+        <button class="add-btn" style="background:rgba(80,40,10,0.6);border:1px solid rgba(251,146,60,0.35)" onclick="openPrintModal()">🖨 인쇄</button>
+        <button class="add-btn" onclick="openModal()">+ 입력</button>
       </div>
     </div>
     <div style="position:relative;margin-bottom:12px">
@@ -1052,6 +1054,37 @@
     <div id="monthNav" style="display:none;overflow-x:auto;white-space:nowrap;padding:0 0 10px 0;margin-bottom:4px;scrollbar-width:none">
       <div id="monthNavInner" style="display:inline-flex;gap:6px"></div>
     </div>
+    <!-- 기간 합산 패널 -->
+    <div id="rangePanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;display:none">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📊 기간 비행시간 합산</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="rangeFrom" class="form-input" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px" />
+        <span style="color:var(--text3);font-size:13px">~</span>
+        <input type="date" id="rangeTo" class="form-input" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px" />
+        <button onclick="calcRangeSum()" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">합산</button>
+      </div>
+      <div id="rangeSumResult" style="margin-top:10px;display:none">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px">
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">총 비행</div>
+            <div id="rsTotal" style="font-size:16px;font-weight:700;color:var(--accent)">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">야간</div>
+            <div id="rsNight" style="font-size:16px;font-weight:700;color:#6366f1">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">계기</div>
+            <div id="rsIfr" style="font-size:16px;font-weight:700;color:#22d3ee">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">편수</div>
+            <div id="rsCount" style="font-size:16px;font-weight:700;color:var(--text2)">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="flightList">
       <div class="empty-state">
         <span class="empty-icon">🛫</span>
@@ -1336,6 +1369,21 @@
   </div>
 </div>
 
+<!-- Print Modal -->
+<div class="modal-overlay" id="printModalOverlay" onclick="if(event.target===this)closePrintModal()">
+  <div class="modal" style="max-height:80vh">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">🖨 월별 비행 인쇄</div>
+      <button class="modal-close" onclick="closePrintModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:14px">인쇄할 월을 선택하세요</div>
+      <div id="printMonthList" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
 <!-- CrewConnex Import Modal -->
 <div class="modal-overlay" id="ccModalOverlay" onclick="closeCcOnOverlay(event)">
   <div class="modal">
@@ -1357,13 +1405,11 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">아이디</label>
-            <input type="text" class="form-input" id="ccUsername" placeholder="아이디"
-              onkeydown="if(event.key==='Enter')loginCrewConnex()" />
+            <input type="text" class="form-input" id="ccUsername" placeholder="아이디" />
           </div>
           <div class="form-group">
             <label class="form-label">비밀번호</label>
-            <input type="password" class="form-input" id="ccPassword" placeholder="비밀번호"
-              onkeydown="if(event.key==='Enter')loginCrewConnex()" />
+            <input type="password" class="form-input" id="ccPassword" placeholder="비밀번호" />
           </div>
         </div>
         <button class="submit-btn" onclick="loginCrewConnex()" id="ccLoginBtn">🔍 비행 데이터 가져오기</button>
@@ -1473,14 +1519,10 @@ async function signInWithGoogle() {
     // Popup 우선 시도 (redirect보다 모바일에서 안정적)
     await auth.signInWithPopup(provider);
   } catch(e) {
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      // 팝업 차단된 경우 redirect 방식으로 fallback
-      try {
-        await auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
-      } catch(e2) {
-        alert('로그인 실패: ' + e2.message);
-      }
-    } else if (e.code !== 'auth/cancelled-popup-request') {
+    if (e.code === 'auth/popup-blocked') {
+      // iOS Safari 등 팝업 차단 환경 — redirect 대신 안내 메시지
+      alert('팝업이 차단되었습니다.\n\niOS Safari: 설정 → Safari → 팝업 차단 끄기\nChrome: 주소창 팝업 허용 후 다시 시도해주세요.');
+    } else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
       alert('로그인 실패: ' + e.message);
     }
   } finally {
@@ -1693,20 +1735,14 @@ function setSyncStatus(msg) {
   });
 })();
 
-// redirect fallback 결과 처리
+// redirect 결과 처리 (구형 redirect 세션 혹시 남아있을 경우 대비 — 에러는 조용히 무시)
 auth.getRedirectResult().then((result) => {
   if (result && result.user) {
     console.log('redirect 로그인 성공:', result.user.email);
   }
 }).catch(e => {
-  const ignore = ['auth/no-auth-event', 'auth/null-user', 'auth/user-cancelled'];
-  if (!ignore.includes(e.code)) {
-    console.error('getRedirectResult 오류:', e.code, e.message);
-    // unauthorized-domain 에러면 Firebase Console 안내
-    if (e.code === 'auth/unauthorized-domain') {
-      alert('⚠ Firebase 설정 필요\nFirebase Console → Authentication → 승인된 도메인에\n"pilot-logbook.netlify.app" 추가가 필요합니다.');
-    }
-  }
+  // iOS sessionStorage 파티셔닝 등으로 인한 에러는 조용히 무시
+  console.log('getRedirectResult 무시:', e.code);
 });
 
 // Auth 상태 감지
@@ -1786,6 +1822,135 @@ function toHHMM(mins) {
   const h = Math.floor(Math.abs(mins) / 60);
   const m = Math.abs(mins) % 60;
   return `${h}:${String(m).padStart(2,'0')}`;
+}
+
+// ── 기간 합산 ─────────────────────────────────────────────────────
+function toggleRangePanel() {
+  const p = document.getElementById('rangePanel');
+  const isHidden = p.style.display === 'none' || p.style.display === '';
+  p.style.display = isHidden ? 'block' : 'none';
+  if (isHidden && !document.getElementById('rangeFrom').value) {
+    // 기본값: 이번달 1일 ~ 오늘
+    const today = new Date();
+    const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0');
+    document.getElementById('rangeFrom').value = `${y}-${m}-01`;
+    document.getElementById('rangeTo').value   = today.toISOString().slice(0,10);
+  }
+}
+
+function calcRangeSum() {
+  const from = document.getElementById('rangeFrom').value;
+  const to   = document.getElementById('rangeTo').value;
+  if (!from || !to) { showToast('날짜를 선택해주세요'); return; }
+  const sel = flights.filter(f => f.date >= from && f.date <= to);
+  if (!sel.length) { showToast('해당 기간에 비행이 없습니다'); return; }
+  let total = 0, night = 0, ifr = 0;
+  sel.forEach(f => {
+    const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    total += dur;
+    night += parseHHMM(f.night);
+    ifr   += parseHHMM(f.ifr);
+  });
+  document.getElementById('rsTotal').textContent = toHHMM(total);
+  document.getElementById('rsNight').textContent = toHHMM(night);
+  document.getElementById('rsIfr').textContent   = toHHMM(ifr);
+  document.getElementById('rsCount').textContent = sel.length + '편';
+  document.getElementById('rangeSumResult').style.display = 'block';
+}
+
+// ── 월별 인쇄 ─────────────────────────────────────────────────────
+function openPrintModal() {
+  if (!flights.length) { showToast('비행 기록이 없습니다'); return; }
+  // 월 목록 생성 (최신순)
+  const months = [...new Set(flights.map(f => f.date.slice(0,7)))].sort().reverse();
+  const list = document.getElementById('printMonthList');
+  list.innerHTML = months.map(m => {
+    const [y, mo] = m.split('-');
+    const cnt = flights.filter(f => f.date.startsWith(m)).length;
+    return `<button onclick="printMonth('${m}')" style="display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;color:var(--text1);font-size:14px;cursor:pointer;text-align:left">
+      <span>${y}년 ${parseInt(mo)}월</span>
+      <span style="font-size:12px;color:var(--text3)">${cnt}편 →</span>
+    </button>`;
+  }).join('');
+  document.getElementById('printModalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePrintModal() {
+  document.getElementById('printModalOverlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function printMonth(ym) {
+  const [y, mo] = ym.split('-');
+  const label = `${y}년 ${parseInt(mo)}월`;
+  const sel = flights.filter(f => f.date.startsWith(ym)).sort((a,b) => a.date.localeCompare(b.date));
+  let total=0, night=0, ifr=0, to=0, ldg=0;
+  sel.forEach(f => {
+    total += f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    night += parseHHMM(f.night);
+    ifr   += parseHHMM(f.ifr);
+    to    += parseInt(f.takeoffs||f.toCnt||0)||0;
+    ldg   += parseInt(f.landings||f.ldCnt||0)||0;
+  });
+  const rows = sel.map((f,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${f.date}</td>
+      <td>${f.flight||''}</td>
+      <td>${f.dep||''}</td>
+      <td>${f.arr||''}</td>
+      <td>${f.depTime||''}</td>
+      <td>${f.arrTime||''}</td>
+      <td>${f.acType||''}</td>
+      <td>${f.reg||''}</td>
+      <td>${f.dutyCode||''}</td>
+      <td style="font-weight:600">${f.total || toHHMM(calcDuration(f.depTime,f.arrTime))}</td>
+      <td>${f.night||''}</td>
+      <td>${f.ifr||''}</td>
+      <td>${f.takeoffs||f.toCnt||''}</td>
+      <td>${f.landings||f.ldCnt||''}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+  <title>파일럿 로그북 - ${label}</title>
+  <style>
+    body { font-family: 'Malgun Gothic', Arial, sans-serif; font-size: 11px; margin: 20px; color: #111; }
+    h2 { font-size: 16px; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #555; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #1e3a5f; color: #fff; padding: 6px 4px; text-align: center; font-size: 10px; }
+    td { padding: 5px 4px; border-bottom: 1px solid #ddd; text-align: center; }
+    tr:nth-child(even) td { background: #f5f8ff; }
+    .summary { margin-top: 14px; display: flex; gap: 24px; font-size: 12px; }
+    .summary b { font-size: 14px; color: #1e3a5f; }
+    @media print { body { margin: 10mm; } }
+  </style></head><body>
+  <h2>파일럿 로그북 — ${label}</h2>
+  <div class="subtitle">Kyungtae Kang · 출력일: ${new Date().toLocaleDateString('ko-KR')}</div>
+  <table>
+    <thead><tr>
+      <th>#</th><th>날짜</th><th>편명</th><th>출발</th><th>도착</th>
+      <th>출발시간</th><th>도착시간</th><th>기종</th><th>등록부호</th><th>Duty</th>
+      <th>총비행</th><th>야간</th><th>계기</th><th>T/O</th><th>LDG</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="summary">
+    <div>편수: <b>${sel.length}</b></div>
+    <div>총 비행: <b>${toHHMM(total)}</b></div>
+    <div>야간: <b>${toHHMM(night)}</b></div>
+    <div>계기: <b>${toHHMM(ifr)}</b></div>
+    <div>이륙: <b>${to}</b></div>
+    <div>착륙: <b>${ldg}</b></div>
+  </div>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  closePrintModal();
 }
 
 // 출발/도착시간 변경 시 총 비행시간 자동계산
@@ -2535,6 +2700,7 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     if (document.getElementById('modalOverlay').classList.contains('show')) closeModal();
     if (document.getElementById('ccModalOverlay').classList.contains('show')) closeCrewConnex();
+    if (document.getElementById('printModalOverlay').classList.contains('show')) closePrintModal();
   }
 });
 
