@@ -1944,12 +1944,13 @@ function printMonth(ym) {
     <div>이륙: <b>${to}</b></div>
     <div>착륙: <b>${ldg}</b></div>
   </div>
-  <script>window.onload=()=>{window.print();}<\/script>
   </body></html>`;
 
   const w = window.open('', '_blank');
+  if (!w) { alert('팝업이 차단되었습니다. 팝업을 허용해주세요.'); return; }
   w.document.write(html);
   w.document.close();
+  setTimeout(() => { try { w.print(); } catch(e) {} }, 400);
   closePrintModal();
 }
 
@@ -3434,8 +3435,8 @@ function parseCrewConnexText(rawText) {
   }
 
   const AC_MAP = {
-    '7M8': 'B737-8 MAX', 'B38M': 'B737-8 MAX',
-    '738': 'B737-800', 'B738': 'B737-800',
+    '7M8': '-8 MAX', 'B38M': '-8 MAX',
+    '738': '-800', 'B738': '-800',
     'A321': 'A321', 'A320': 'A320', 'Q400': 'Q400',
   };
 
@@ -3508,13 +3509,4 @@ function parseCrewConnexText(rawText) {
     // dutyCode 없는 flight 보완
     if (!f.dutyCode) {
       f.dutyCode = (f.role === 'PIC' || f.role === 'INST') ? 'C' : 'F';
-      changed = true;
-    }
-  });
-  if (changed) saveData();
-})();
-
-renderFlights();
-</script>
-</body>
-</html>
+      chan
