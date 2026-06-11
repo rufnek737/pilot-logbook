@@ -3509,4 +3509,13 @@ function parseCrewConnexText(rawText) {
     // dutyCode 없는 flight 보완
     if (!f.dutyCode) {
       f.dutyCode = (f.role === 'PIC' || f.role === 'INST') ? 'C' : 'F';
-      chan
+      changed = true;
+    }
+  });
+  if (changed) saveData();
+})();
+
+renderFlights();
+</script>
+</body>
+</html>
