@@ -1262,7 +1262,7 @@
           <label class="form-label">기종</label>
           <select class="form-input" id="fAcType">
             <option value="B737-800">B737-800</option>
-            <option value="B737-8 MAX">B737-8 MAX</option>
+            <option value="B737-8">B737-8</option>
             <option value="A320">A320</option>
             <option value="A321">A321</option>
             <option value="Q400">Q400</option>
@@ -2647,7 +2647,7 @@ function editEntry(id) {
   document.getElementById('fDepTime').value = f.depTime || '';
   document.getElementById('fArrTime').value = f.arrTime || '';
   // B38M/7M8 등 구형 저장값 정규화
-  const _acNorm = {'B737-8':'B737-8 MAX','-8 MAX':'B737-8 MAX','B737-8MAX':'B737-8 MAX','-800':'B737-800'};
+  const _acNorm = {'B737-8 MAX':'B737-8','B737-8MAX':'B737-8','-8 MAX':'B737-8','B737-8':'B737-8','-800':'B737-800'};
   const _acVal = _acNorm[f.acType] || f.acType || 'B737-800';
   document.getElementById('fAcType').value = _acVal;
   document.getElementById('fReg').value = f.reg || '';
@@ -2835,7 +2835,7 @@ async function processExcel(file) {
 
     const acMap = {
       '738':'B737-800','73H':'B737-800',
-      '7M8':'B737-8 MAX','B38M':'B737-8 MAX',
+      '7M8':'B737-8','B38M':'B737-8',
       '320':'A320','321':'A321'
     };
 
@@ -3108,7 +3108,7 @@ function parseJejuAirEpaper(text, filename, lines) {
 
   function mapAcType(s) {
     const u = s.toUpperCase();
-    if (u === '7M8' || u === 'B38M') return 'B737-8 MAX';
+    if (u === '7M8' || u === 'B38M') return 'B737-8';
     if (u === 'B738' || u === 'B737') return 'B737-800';
     if (u.includes('A321')) return 'A321';
     if (u.includes('A320')) return 'A320';
@@ -3371,7 +3371,7 @@ function importSelectedFlights() {
   const idxs = [...document.querySelectorAll('.cc-flight-check:checked')].map(cb => +cb.dataset.idx);
   if (!idxs.length) { showToast('가져올 비행을 선택해주세요'); return; }
 
-  const acTypeMap = { 'B737-8 MAX':'B737-8 MAX','B737-8':'B737-8 MAX','-8 MAX':'B737-8 MAX','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
+  const acTypeMap = { 'B737-8 MAX':'B737-8','B737-8MAX':'B737-8','-8 MAX':'B737-8','B737-8':'B737-8','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
   const added = [];
 
   for (const i of idxs) {
@@ -3398,7 +3398,7 @@ function importSelectedFlights() {
 
 function importCcFlight(idx) {
   const f = _ccData.flights[idx];
-  const acTypeMap = { 'B737-8 MAX':'B737-8 MAX','B737-8':'B737-8 MAX','-8 MAX':'B737-8 MAX','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
+  const acTypeMap = { 'B737-8 MAX':'B737-8','B737-8MAX':'B737-8','-8 MAX':'B737-8','B737-8':'B737-8','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
   // CC 모달을 완전히 닫지 않고 숨기기만 — 저장/닫기 후 복귀하기 위해
   _ccOrigin = true;
   document.getElementById('ccModalOverlay').classList.remove('show');
@@ -3509,6 +3509,11 @@ function parseCrewConnexText(rawText) {
     // dutyCode 없는 flight 보완
     if (!f.dutyCode) {
       f.dutyCode = (f.role === 'PIC' || f.role === 'INST') ? 'C' : 'F';
+      changed = true;
+    }
+    // acType 정규화: B737-8 MAX → B737-8 통일
+    if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') {
+      f.acType = 'B737-8';
       changed = true;
     }
   });
