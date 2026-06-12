@@ -1587,7 +1587,11 @@ function subscribeToFirestore(uid) {
 
     if (snap.exists) {
       const incoming = snap.data().flights || [];
-      incoming.forEach(f => { if (!f.id) f.id = uid + '_' + Math.random().toString(36).slice(2); });
+      let _snapChanged = false;
+      incoming.forEach(f => {
+        if (!f.id) { f.id = simpleUid(); _snapChanged = true; }
+        if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') { f.acType = 'B737-8'; _snapChanged = true; }
+      });
 
       // 현재 포커스된 textarea 내용 보존 (아직 blur 안 됨)
       const activeNotes = {};
@@ -1605,6 +1609,7 @@ function subscribeToFirestore(uid) {
 
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
       renderFlights();
+      if (_snapChanged) saveData(); // id/acType 수정사항 Firestore에 즉시 반영
       const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
       setSyncStatus('✓ ' + t + ' 동기화됨');
     } else {
@@ -1630,9 +1635,14 @@ document.addEventListener('visibilitychange', () => {
         // 내가 쓴 게 더 최신이면 무시
         if (Date.now() - _lastSavedAt < 3000) return;
         const incoming = snap.data().flights || [];
-        incoming.forEach(f => { if (!f.id) f.id = Math.random().toString(36).slice(2); });
+        let _visChanged = false;
+        incoming.forEach(f => {
+          if (!f.id) { f.id = simpleUid(); _visChanged = true; }
+          if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') { f.acType = 'B737-8'; _visChanged = true; }
+        });
         flights = incoming;
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
+        if (_visChanged) saveData(); // id/acType 수정사항 Firestore에 즉시 반영
         renderFlights();
         setSyncStatus('✓ 포그라운드 동기화');
       }).catch(() => {});
