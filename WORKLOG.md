@@ -13,6 +13,41 @@
 
 ---
 
+### Bug Fix: 수정 버튼 동작 안 함 (모든 비행)
+- **원인**: Firestore `onSnapshot` / `visibilitychange` 재동기화 시 id 없는 비행에 매번 새 랜덤 id 부여 후 Firestore 미저장 → 탭 전환(출력 팝업 복귀 등) 후 id 불일치로 `editEntry` silent fail
+- **수정**: `onSnapshot` / `visibilitychange` 핸들러에서 id 신규 부여 시 즉시 `saveData()` 호출 → Firestore에 안정적인 id 영구 저장
+
+---
+
+### Bug Fix: 기종 B737-8 / B737-8 MAX 혼재
+- **원인**: CC 임포트 acTypeMap은 'B737-8 MAX'로 저장, 구형 데이터는 'B737-8'로 저장 → 출력물에 두 이름 혼재
+- **수정**: 전체 'B737-8'로 통일
+  - 드롭다운 옵션 `B737-8 MAX` → `B737-8`
+  - `acTypeMap`, `_acNorm`, `mapAcType`, `AC_MAP` 전부 'B737-8' 반환으로 변경
+  - `migrateData` / `onSnapshot` / `visibilitychange`에 acType 정규화 추가 → 기존 Firestore 데이터 자동 변환
+
+---
+
+### Feature: 출력물 전체 영문화
+- 해외 이직 서류 제출용 영문 출력물로 변경
+- 제목: `파일럿 로그북 — 2026년 6월` → `Pilot Logbook — June 2026`
+- 출력일: `출력일: 2026. 6. 12.` → `Printed: 12 Jun 2026`
+- 컬럼 헤더: 날짜/편명/출발/도착/출발시간/도착시간/기종/등록부호/Duty/총비행/야간/계기/T/O/LDG
+  → Date/Flight/From/To/STD/STA/A/C Type/Registration/Duty/Block/Night/IFR/T/O/LDG
+- 합계: 편수/총비행/야간/계기/이륙/착륙 → Sectors/Total Block/Night/IFR/T/O/LDG
+- 폰트: Malgun Gothic → Arial (범용)
+
+---
+
+### Feature: 이륙/착륙 PF/PM 선택
+- 기존 '착륙 횟수(숫자)' 입력 → **이륙(T/O)** / **착륙(LDG)** PF/PM 셀렉트로 교체
+- 옵션: `PF — 본인 조작` / `PM — 상대방 조작` / `— 해당없음`
+- 비행 카드: 착륙 숫자 대신 T/O PF/PM + LDG PF/PM 표시
+- 통계/출력물/90일 화폐 체크: PF만 카운트
+- `migrateData`에서 구형 `landings`/`takeoffs` 필드 → `toPf`/`ldgPf` 자동 변환
+
+---
+
 ### Bug Fix: CrewConnex Enter키 자동 로딩 방지
 - 아이디/비밀번호 입력 후 Enter 시 자동으로 데이터 로딩되던 문제 수정
 - `onkeydown` 핸들러 제거 → **"비행 데이터 가져오기" 버튼 클릭 시에만 실행**
