@@ -4,6 +4,15 @@
 
 ## 2026-06-12
 
+### Bug Fix: Live Server SyntaxError 1984:1 수정 (루트 원인 해결)
+- **원인**: `printMonth()` 함수 내 template literal에 `</body></html>` 리터럴 존재
+- Live Server가 `</body>` 감지 → template literal 중간에 `</script>` 포함한 live-reload JS 삽입
+- → 메인 `<script>` 블록이 1983행에서 강제 종료 → 1984:1 "Unexpected end of input"
+- **수정**: `</body></html>\`` → `<\/body><\/html>\`` (이스케이프 처리)
+- **결과**: `node --check` JS 문법 정상 확인, GitHub 커밋 완료 (906ed5d)
+
+---
+
 ### Bug Fix: CrewConnex Enter키 자동 로딩 방지
 - 아이디/비밀번호 입력 후 Enter 시 자동으로 데이터 로딩되던 문제 수정
 - `onkeydown` 핸들러 제거 → **"비행 데이터 가져오기" 버튼 클릭 시에만 실행**
