@@ -1893,7 +1893,8 @@ function closePrintModal() {
 
 function printMonth(ym) {
   const [y, mo] = ym.split('-');
-  const label = `${y}년 ${parseInt(mo)}월`;
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const label = `${monthNames[parseInt(mo)-1]} ${y}`;
   const sel = flights.filter(f => f.date.startsWith(ym)).sort((a,b) => a.date.localeCompare(b.date));
   let total=0, night=0, ifr=0, to=0, ldg=0;
   sel.forEach(f => {
@@ -1922,10 +1923,11 @@ function printMonth(ym) {
       <td>${f.landings||f.ldCnt||''}</td>
     </tr>`).join('');
 
-  const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-  <title>파일럿 로그북 - ${label}</title>
+  const printDate = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+  <title>Pilot Logbook - ${label}</title>
   <style>
-    body { font-family: 'Malgun Gothic', Arial, sans-serif; font-size: 11px; margin: 20px; color: #111; }
+    body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #111; }
     h2 { font-size: 16px; margin-bottom: 4px; }
     .subtitle { font-size: 12px; color: #555; margin-bottom: 16px; }
     table { width: 100%; border-collapse: collapse; }
@@ -1936,23 +1938,23 @@ function printMonth(ym) {
     .summary b { font-size: 14px; color: #1e3a5f; }
     @media print { body { margin: 10mm; } }
   </style></head><body>
-  <h2>파일럿 로그북 — ${label}</h2>
-  <div class="subtitle">Kyungtae Kang · 출력일: ${new Date().toLocaleDateString('ko-KR')}</div>
+  <h2>Pilot Logbook — ${label}</h2>
+  <div class="subtitle">Kyungtae Kang · Printed: ${printDate}</div>
   <table>
     <thead><tr>
-      <th>#</th><th>날짜</th><th>편명</th><th>출발</th><th>도착</th>
-      <th>출발시간</th><th>도착시간</th><th>기종</th><th>등록부호</th><th>Duty</th>
-      <th>총비행</th><th>야간</th><th>계기</th><th>T/O</th><th>LDG</th>
+      <th>#</th><th>Date</th><th>Flight</th><th>From</th><th>To</th>
+      <th>STD</th><th>STA</th><th>A/C Type</th><th>Registration</th><th>Duty</th>
+      <th>Block</th><th>Night</th><th>IFR</th><th>T/O</th><th>LDG</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="summary">
-    <div>편수: <b>${sel.length}</b></div>
-    <div>총 비행: <b>${toHHMM(total)}</b></div>
-    <div>야간: <b>${toHHMM(night)}</b></div>
-    <div>계기: <b>${toHHMM(ifr)}</b></div>
-    <div>이륙: <b>${to}</b></div>
-    <div>착륙: <b>${ldg}</b></div>
+    <div>Sectors: <b>${sel.length}</b></div>
+    <div>Total Block: <b>${toHHMM(total)}</b></div>
+    <div>Night: <b>${toHHMM(night)}</b></div>
+    <div>IFR: <b>${toHHMM(ifr)}</b></div>
+    <div>T/O: <b>${to}</b></div>
+    <div>LDG: <b>${ldg}</b></div>
   </div>
   <\/body><\/html>`;
 
