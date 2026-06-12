@@ -1303,8 +1303,12 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">착륙 횟수</label>
-          <input type="number" class="form-input" id="fLandings" value="1" min="0" max="20" />
+          <label class="form-label">이륙 (T/O)</label>
+          <select class="form-input" id="fToPf">
+            <option value="PF">PF — 본인 이륙</option>
+            <option value="PM">PM — 상대방 이륙</option>
+            <option value="">— 해당없음</option>
+          </select>
         </div>
       </div>
 
@@ -1348,12 +1352,19 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">주간 착륙</label>
-          <input type="number" class="form-input" id="fDayLdg" value="1" min="0" />
+          <label class="form-label">착륙 (LDG)</label>
+          <select class="form-input" id="fLdgPf">
+            <option value="PF">PF — 본인 착륙</option>
+            <option value="PM">PM — 상대방 착륙</option>
+            <option value="">— 해당없음</option>
+          </select>
         </div>
         <div class="form-group">
-          <label class="form-label">야간 착륙</label>
-          <input type="number" class="form-input" id="fNightLdg" value="0" min="0" />
+          <label class="form-label">오토랜딩 (ALD)</label>
+          <select class="form-input" id="fAldDup">
+            <option value="N">N — 일반 착륙</option>
+            <option value="Y">Y — 오토랜딩</option>
+          </select>
         </div>
       </div>
 
@@ -1901,8 +1912,8 @@ function printMonth(ym) {
     total += f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
     night += parseHHMM(f.night);
     ifr   += parseHHMM(f.ifr);
-    to    += parseInt(f.takeoffs||f.toCnt||0)||0;
-    ldg   += parseInt(f.landings||f.ldCnt||0)||0;
+    to  += (f.toPf !== undefined ? f.toPf === 'PF' : (parseInt(f.takeoffs||f.toCnt||0)>0)) ? 1 : 0;
+    ldg += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||0)>0)) ? 1 : 0;
   });
   const rows = sel.map((f,i) => `
     <tr>
@@ -1919,8 +1930,8 @@ function printMonth(ym) {
       <td style="font-weight:600">${f.total || toHHMM(calcDuration(f.depTime,f.arrTime))}</td>
       <td>${f.night||''}</td>
       <td>${f.ifr||''}</td>
-      <td>${f.takeoffs||f.toCnt||''}</td>
-      <td>${f.landings||f.ldCnt||''}</td>
+      <td>${f.toPf !== undefined ? f.toPf : (parseInt(f.takeoffs||f.toCnt||0)>0?'PF':'PM')}</td>
+      <td>${f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||0)>0?'PF':'PM')}</td>
     </tr>`).join('');
 
   const printDate = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
@@ -2293,8 +2304,12 @@ function flightCard(f) {
         <div class="card-stat-lbl">계기</div>
       </div>
       <div class="card-stat">
-        <div class="card-stat-val">${f.landings || 1}</div>
-        <div class="card-stat-lbl">착륙</div>
+        <div class="card-stat-val" style="font-size:11px">${f.toPf !== undefined ? f.toPf : (parseInt(f.takeoffs||f.toCnt||1)>0?'PF':'PM')}</div>
+        <div class="card-stat-lbl">T/O</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val" style="font-size:11px">${f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||1)>0?'PF':'PM')}</div>
+        <div class="card-stat-lbl">LDG</div>
       </div>
     </div>
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
@@ -2321,7 +2336,7 @@ function updateStats() {
     sic += cr.sic;
     night   += parseHHMM(f.night) || 0;
     ifr     += parseHHMM(f.ifr)   || 0;
-    landings += parseInt(f.landings) || 1;
+    landings += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||1)>0)) ? 1 : 0;
     if (f.ald === 'Y') ald++;
 
     const fDate = new Date(f.date);
@@ -2540,7 +2555,8 @@ function renderAirportChart() {
 
   const map = {};
   fs.forEach(f => {
-    if (f.arr) map[f.arr] = (map[f.arr]||0) + (parseInt(f.landings)||1);
+    const _isLdgPf = f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||1)>0);
+    if (f.arr && _isLdgPf) map[f.arr] = (map[f.arr]||0) + 1;
   });
   const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const max = Math.max(...entries.map(e=>e[1]), 1);
@@ -2573,7 +2589,7 @@ function renderCurrency() {
     const d = new Date(f.date);
     const diff = (now-d)/(1000*60*60*24);
     if (diff<=90) {
-      ldg90       += parseInt(f.landings) || 1;
+      ldg90 += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||1)>0)) ? 1 : 0;
       ldg90Day    += parseInt(f.dayLdg)   || 0;
       ldg90Night  += parseInt(f.nightLdg) || 0;
       if (f.ald === 'Y') ald90++;
@@ -2631,9 +2647,8 @@ function openModal(prefill) {
   document.getElementById('fRole').value      = 'PIC';
   document.getElementById('fDutyCode').value  = 'C';
   document.getElementById('fAld').value       = 'N';
-  document.getElementById('fLandings').value  = '1';
-  document.getElementById('fDayLdg').value    = '1';
-  document.getElementById('fNightLdg').value  = '0';
+  document.getElementById('fToPf').value   = 'PF';
+  document.getElementById('fLdgPf').value   = 'PF';
 
   if (prefill) {
     Object.entries(prefill).forEach(([k,v]) => {
@@ -2669,9 +2684,11 @@ function editEntry(id) {
   document.getElementById('fRole').value      = f.role      || 'SIC';
   document.getElementById('fDutyCode').value  = f.dutyCode  || 'C';
   document.getElementById('fAld').value       = f.ald       || 'N';
-  document.getElementById('fLandings').value  = f.landings  || '1';
-  document.getElementById('fDayLdg').value    = f.dayLdg    || '1';
-  document.getElementById('fNightLdg').value  = f.nightLdg  || '0';
+  // T/O PF/PM: 신규 필드 우선, 구형(takeoffs/landings)에서 폴백
+  const _toPf  = f.toPf  !== undefined ? f.toPf  : (parseInt(f.takeoffs||f.toCnt||1)>0 ? 'PF' : 'PM');
+  const _ldgPf = f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||1)>0 ? 'PF' : 'PM');
+  document.getElementById('fToPf').value   = _toPf;
+  document.getElementById('fLdgPf').value  = _ldgPf;
   document.getElementById('fRemarks').value   = f.remarks   || '';
   document.getElementById('modalOverlay').classList.add('show');
   document.body.style.overflow = 'hidden';
@@ -2744,9 +2761,8 @@ function saveEntry() {
     dutyCode:  document.getElementById('fDutyCode').value,
     dutyCodeManual: true,  // 수동 저장 → PDF 재업로드 시 덮어쓰기 방지
     ald:       document.getElementById('fAld').value,
-    landings:  document.getElementById('fLandings').value,
-    dayLdg:    document.getElementById('fDayLdg').value,
-    nightLdg:  document.getElementById('fNightLdg').value,
+    toPf:     document.getElementById('fToPf').value,
+    ldgPf:    document.getElementById('fLdgPf').value,
     remarks:   document.getElementById('fRemarks').value,
   };
 
@@ -2916,8 +2932,8 @@ async function processExcel(file) {
         night: fNight,
         ifr: fIfr,
         dutyCode, role,
-        takeoffs: String(takeoffs),
-        landings: String(landings),
+        toPf: takeoffs > 0 ? 'PF' : 'PM',
+        ldgPf: landings > 0 ? 'PF' : 'PM',
         dayLdg: String(dayLdg),
         remarks,
         source: 'excel'
@@ -3184,7 +3200,7 @@ function parseJejuAirEpaper(text, filename, lines) {
       role,
       dutyCode,
       ald: aldVal,
-      landings: hasLanding ? '1' : '0',
+      ldgPf: hasLanding ? 'PF' : 'PM',
       dayLdg:   (hasLanding && !isNight) ? '1' : '0',
       nightLdg: (hasLanding &&  isNight) ? '1' : '0',
       remarks: '',
@@ -3395,7 +3411,7 @@ function importSelectedFlights() {
       dep: f.from, arr: f.to, depTime: f.stdLocal, arrTime: f.staLocal,
       acType: acTypeMap[f.acType] || 'B737-800', reg: f.acReg || '', total: f.blh,
       night: '', ifr: '', role: 'PIC', dutyCode: 'C',
-      dutyCodeManual: false, ald: '', landings: '', dayLdg: '', nightLdg: '',
+      dutyCodeManual: false, ald: '', toPf: 'PF', ldgPf: 'PF',
       remarks: crewStr,
     });
   }
@@ -3526,6 +3542,15 @@ function parseCrewConnexText(rawText) {
     // acType 정규화: B737-8 MAX → B737-8 통일
     if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') {
       f.acType = 'B737-8';
+      changed = true;
+    }
+    // 구형 landings/takeoffs → toPf/ldgPf 변환
+    if (f.toPf === undefined && (f.takeoffs !== undefined || f.toCnt !== undefined)) {
+      f.toPf = parseInt(f.takeoffs||f.toCnt||0) > 0 ? 'PF' : 'PM';
+      changed = true;
+    }
+    if (f.ldgPf === undefined && (f.landings !== undefined || f.ldCnt !== undefined)) {
+      f.ldgPf = parseInt(f.landings||f.ldCnt||0) > 0 ? 'PF' : 'PM';
       changed = true;
     }
   });
