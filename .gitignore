@@ -3,3 +3,26 @@
 debug.html
 DailyNewsBriefing_Final.js
 sample-data.js
+
+# Local Netlify folder
+.netlify
+
+# Node modules
+node_modules/
+
+# Android build outputs (소스만 커밋)
+android/.gradle/
+android/app/build/
+android/build/
+android/.idea/
+*.keystore
+!debug.keystore
+
+# iOS build outputs
+ios/App/Pods/
+ios/App/App.xcworkspace/
+ios/.xcode.env.local
+
+# Capacitor generated (sync로 재생성 가능)
+www/cordova.js
+www/cordova_plugins.js

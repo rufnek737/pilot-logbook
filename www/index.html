@@ -1,0 +1,3550 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pilot Logbook" />
+  <meta name="theme-color" content="#0a1440" />
+  <link rel="manifest" href="manifest.json" />
+  <!-- PWA Icons -->
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+  <!-- iOS Splash Screens -->
+  <link rel="apple-touch-startup-image" href="splash-430x932.png"
+        media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
+  <link rel="apple-touch-startup-image" href="splash-390x844.png"
+        media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
+  <title>Pilot Logbook</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Firebase v10 compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --surface: #111827;
+      --surface2: #1f2937;
+      --surface3: #374151;
+      --accent: #3b82f6;
+      --accent2: #1d4ed8;
+      --accent-glow: rgba(59,130,246,0.3);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f9fafb;
+      --text2: #9ca3af;
+      --text3: #6b7280;
+      --border: #1f2937;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+      padding: 16px 20px 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(59,130,246,0.2);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent), #60a5fa);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    .logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text2);
+      letter-spacing: 0.5px;
+    }
+    .header-badge {
+      background: rgba(59,130,246,0.15);
+      border: 1px solid rgba(59,130,246,0.3);
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── Stats Bar ── */
+    .stats-bar {
+      background: var(--surface);
+      padding: 16px 20px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-bar::-webkit-scrollbar { display: none; }
+    .stats-grid {
+      display: flex;
+      gap: 12px;
+      min-width: max-content;
+    }
+    .stat-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      min-width: 100px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+    .stat-label {
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .stat-card.accent .stat-value { color: var(--accent); }
+    .stat-card.success .stat-value { color: var(--success); }
+    .stat-card.warning .stat-value { color: var(--warning); }
+
+    /* ── Tab Bar ── */
+    .tab-bar {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 4px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 8px;
+      background: none;
+      border: none;
+      color: var(--text3);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-btn.active {
+      color: var(--accent);
+    }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 16px; right: 16px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+    }
+
+    /* ── Content ── */
+    .content {
+      padding: 16px 16px 100px;
+    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Upload Section ── */
+    .upload-section {
+      margin-bottom: 20px;
+    }
+    .upload-zone {
+      border: 2px dashed rgba(59,130,246,0.4);
+      border-radius: var(--radius);
+      padding: 32px 20px;
+      text-align: center;
+      background: rgba(59,130,246,0.04);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(59,130,246,0.1);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .upload-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .upload-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .upload-sub {
+      font-size: 13px;
+      color: var(--text3);
+    }
+    .upload-btn {
+      margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    /* ── Progress ── */
+    .parse-progress {
+      display: none;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .parse-progress.show { display: block; }
+    .progress-label {
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .progress-bar-wrap {
+      background: var(--surface3);
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+      border-radius: 4px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+    .parse-result {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--success);
+    }
+
+    /* ── Flight Cards ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .add-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .month-group { margin-bottom: 24px; }
+    .month-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      padding-left: 4px;
+    }
+
+    .flight-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+      position: relative;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .flight-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 3px 0 0 3px;
+    }
+    .flight-card.night::before { background: var(--warning); }
+    .flight-card.sim::before { background: var(--text3); }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .card-date {
+      font-size: 11px;
+      color: var(--text3);
+      margin-bottom: 2px;
+    }
+    .card-flt {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .card-ac {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+    .card-badges {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+    }
+    .badge-pic { background: rgba(59,130,246,0.2); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
+    .badge-sic { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-night { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-sim { background: rgba(107,114,128,0.2); color: var(--text3); border: 1px solid rgba(107,114,128,0.3); }
+    .badge-ald { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+    .badge-part { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-nocount { background: rgba(107,114,128,0.15); color: var(--text3); border: 1px solid rgba(107,114,128,0.2); }
+    .notes-ta { width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:8px; padding:8px 10px; color:var(--text1); font-size:12px; font-family:inherit; resize:none; outline:none; min-height:32px; max-height:96px; overflow-y:auto; transition:border-color .2s, min-height .2s; }
+    .notes-ta:focus { border-color:rgba(59,130,246,0.5); min-height:56px; }
+    .notes-ta::placeholder { color:var(--text3); }
+
+    .route-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .apt {
+      text-align: center;
+      min-width: 60px;
+    }
+    .apt-code {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .apt-time {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+    .route-line {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .route-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .route-track {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--accent), var(--surface3));
+    }
+    .route-plane { font-size: 14px; color: var(--accent); }
+    .route-track2 {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--surface3), var(--accent));
+    }
+
+    .card-footer {
+      display: flex;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .card-stat {
+      flex: 1;
+      text-align: center;
+    }
+    .card-stat-val {
+      font-size: 14px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .card-stat-lbl {
+      font-size: 9px;
+      color: var(--text3);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .card-actions {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      display: none;
+      gap: 8px;
+    }
+    .flight-card:active .card-actions { display: flex; }
+    .action-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .action-edit { background: rgba(59,130,246,0.2); color: var(--accent); }
+    .action-delete { background: rgba(239,68,68,0.2); color: var(--danger); }
+
+    /* ── Empty State ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text3);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; display: block; }
+    .empty-title { font-size: 16px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
+    .empty-sub { font-size: 14px; line-height: 1.6; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 200;
+      align-items: flex-end;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--surface);
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      border-radius: 20px 20px 0 0;
+      padding: 0 0 env(safe-area-inset-bottom);
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .modal-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--surface3);
+      border-radius: 2px;
+      margin: 12px auto 8px;
+    }
+    .modal-header {
+      padding: 8px 20px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title { font-size: 16px; font-weight: 700; }
+    .modal-close {
+      width: 30px;
+      height: 30px;
+      background: var(--surface2);
+      border: none;
+      border-radius: 50%;
+      color: var(--text2);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-body { padding: 16px 20px; }
+
+    /* ── Form ── */
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .form-row.single { grid-template-columns: 1fr; }
+    .form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 15px;
+      font-family: inherit;
+      -webkit-appearance: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    select.form-input { cursor: pointer; }
+
+    .form-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 16px 0 10px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .checkbox-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+    .checkbox-item label {
+      font-size: 13px;
+      color: var(--text2);
+      cursor: pointer;
+    }
+
+    .submit-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .submit-btn:active { opacity: 0.9; transform: scale(0.99); }
+
+    /* ── Charts Tab ── */
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .chart-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      margin-bottom: 14px;
+    }
+    .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .bar-label { font-size: 12px; color: var(--text3); width: 36px; text-align: right; flex-shrink: 0; }
+    .bar-track {
+      flex: 1;
+      height: 20px;
+      background: var(--surface2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      color: white;
+      min-width: 32px;
+      transition: width 0.6s ease;
+    }
+    .bar-val { font-size: 12px; color: var(--text2); flex-shrink: 0; width: 40px; text-align: right; }
+
+    .donut-wrap {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .donut-svg { flex-shrink: 0; }
+    .donut-legend { flex: 1; }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .legend-text { font-size: 12px; color: var(--text2); }
+    .legend-val { margin-left: auto; font-size: 12px; font-weight: 600; }
+
+    /* ── Currency Tab ── */
+    .currency-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .currency-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .currency-icon.ok { background: rgba(16,185,129,0.15); }
+    .currency-icon.warn { background: rgba(245,158,11,0.15); }
+    .currency-icon.fail { background: rgba(239,68,68,0.15); }
+    .currency-info { flex: 1; min-width: 0; }
+    .currency-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .currency-detail { font-size: 12px; color: var(--text3); }
+    .currency-status {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+    .status-ok { background: rgba(16,185,129,0.15); color: var(--success); }
+    .status-warn { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .status-fail { background: rgba(239,68,68,0.15); color: var(--danger); }
+
+    /* ── Floating Action ── */
+    .fab {
+      position: fixed;
+      bottom: 24px;
+      right: 20px;
+      width: 54px;
+      height: 54px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px var(--accent-glow), 0 8px 32px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.15s;
+    }
+    .fab:active { transform: scale(0.93); }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      z-index: 300;
+      opacity: 0;
+      transition: all 0.3s;
+      white-space: nowrap;
+      box-shadow: var(--shadow);
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+    /* ── Parsed Preview ── */
+    .parse-preview {
+      display: none;
+      background: var(--surface2);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .parse-preview.show { display: block; }
+    .preview-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--success);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .preview-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .preview-item:last-child { border-bottom: none; }
+    .preview-dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; flex-shrink: 0; }
+
+    @media (max-width: 380px) {
+      .apt-code { font-size: 18px; }
+      .card-stat-val { font-size: 12px; }
+    }
+
+    /* ── Firebase Auth ── */
+    #authOverlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #authOverlay.hidden { display: none; }
+    .auth-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 40px 32px; text-align: center;
+      max-width: 320px; width: 90%;
+    }
+    .auth-logo { font-size: 48px; margin-bottom: 16px; }
+    .auth-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .auth-sub { font-size: 13px; color: var(--text3); margin-bottom: 28px; line-height: 1.6; }
+    .google-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; padding: 14px; border-radius: 12px;
+      background: #fff; color: #1f2937;
+      border: none; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .google-btn:hover { opacity: .9; }
+    .google-btn svg { flex-shrink: 0; }
+    .user-chip {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface2); border-radius: 20px;
+      padding: 4px 10px 4px 4px; font-size: 12px; cursor: pointer;
+    }
+    .user-chip img { width: 24px; height: 24px; border-radius: 50%; }
+    #syncStatus { font-size: 10px; color: var(--text3); text-align: right; padding: 4px 16px 0; }
+
+    /* ── CrewConnex Modal ── */
+    .cc-tab-btn {
+      flex: 1;
+      padding: 10px 8px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cc-tab-btn.active {
+      background: var(--accent);
+      color: white;
+      border: 1px solid rgba(59,130,246,0.5);
+    }
+    .cc-tab-btn:not(.active) {
+      background: var(--surface2);
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .cc-flight-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .cc-flight-item:last-child { margin-bottom: 0; }
+    .cc-route {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+    .cc-import-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Pull-to-refresh ── */
+    #ptr-indicator {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      height: 0; overflow: hidden;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      font-size: 13px; color: var(--text2); font-weight: 600;
+      transition: height .15s ease;
+    }
+    #ptr-indicator.visible { height: 52px; }
+    #ptr-indicator.refreshing { height: 52px; }
+    .ptr-spinner {
+      width: 18px; height: 18px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: ptr-spin .7s linear infinite;
+    }
+    @keyframes ptr-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- Auth Overlay -->
+<div id="authOverlay">
+  <!-- 인앱 브라우저 경고 (카카오톡 등) -->
+  <div id="inAppWarning" style="display:none;position:fixed;inset:0;background:#0a0e1a;z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center">
+    <div style="font-size:48px;margin-bottom:16px">✈️</div>
+    <div style="font-size:20px;font-weight:700;color:#f9fafb;margin-bottom:8px">파일럿 로그북</div>
+    <div style="font-size:14px;color:#9ca3af;margin-bottom:24px;line-height:1.7">
+      카카오톡 내장 브라우저에서는<br>Google 로그인이 지원되지 않습니다.
+    </div>
+    <div style="background:#1f2937;border-radius:16px;padding:20px;width:100%;max-width:320px;margin-bottom:24px">
+      <div style="font-size:13px;color:#6b7280;margin-bottom:12px">아래 방법으로 열어주세요</div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:#f9fafb;text-align:left">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="background:#3b82f6;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">1</span>
+          <span>우측 하단 <strong>···</strong> (더보기) 또는<br>우측 상단 <strong>⋮</strong> 메뉴 탭하기</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="background:#3b82f6;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">2</span>
+          <span><strong>"다른 브라우저로 열기"</strong> 또는<br><strong>"Safari로 열기" / "Chrome으로 열기"</strong> 선택</span>
+        </div>
+      </div>
+    </div>
+    <button onclick="copyAndOpenExternal()"
+      style="background:#3b82f6;color:#fff;border:none;border-radius:12px;padding:14px 28px;font-size:15px;font-weight:700;cursor:pointer;width:100%;max-width:320px">
+      🔗 링크 복사하기
+    </button>
+    <div id="copyDone" style="display:none;margin-top:8px;font-size:12px;color:#10b981">✓ 클립보드에 복사됐습니다</div>
+  </div>
+
+  <div class="auth-card" id="authCard">
+    <div class="auth-logo">✈</div>
+    <div class="auth-title">파일럿 로그북</div>
+    <div class="auth-sub">Google 계정으로 로그인하면<br>모든 기기에서 데이터가 동기화됩니다.</div>
+    <button class="google-btn" onclick="signInWithGoogle()">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/><path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.3-7.7 2.3-6.2 0-11.5-4.2-13.4-9.9l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
+      Google로 로그인
+    </button>
+  </div>
+</div>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-top">
+    <div class="logo">
+      <div class="logo-icon">✈</div>
+      <div>
+        <div class="logo-text">파일럿 로그북</div>
+        <div class="logo-sub">PILOT ELECTRONIC LOGBOOK</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="header-badge" id="totalFlightsLabel">0 비행</div>
+      <div class="user-chip" id="userChip" style="display:none" onclick="signOutUser()">
+        <img id="userPhoto" src="" alt="" />
+        <span id="userName"></span>
+      </div>
+    </div>
+  </div>
+</header>
+<div id="syncStatus"></div>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+  <div class="stats-grid">
+    <div class="stat-card accent">
+      <div class="stat-value" id="statTotalHours">0:00</div>
+      <div class="stat-label">총 비행시간</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-value" id="statPicHours">0:00</div>
+      <div class="stat-label">PIC</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statSicHours">0:00</div>
+      <div class="stat-label">SIC</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-value" id="statNightHours">0:00</div>
+      <div class="stat-label">야간</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statLandings">0</div>
+      <div class="stat-label">착륙</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statLast90">0:00</div>
+      <div class="stat-label">최근 90일</div>
+    </div>
+    <div class="stat-card accent">
+      <div class="stat-value" id="statIfrHours">0:00</div>
+      <div class="stat-label">계기</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statAld">0</div>
+      <div class="stat-label">오토랜딩</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('logbook',this)">📋 로그북</button>
+  <button class="tab-btn" onclick="switchTab('upload',this)">📄 업로드</button>
+  <button class="tab-btn" onclick="switchTab('charts',this)">📊 통계</button>
+  <button class="tab-btn" onclick="switchTab('currency',this)">✅ 자격</button>
+</div>
+
+<!-- Pull-to-refresh indicator -->
+<div id="ptr-indicator">
+  <div class="ptr-spinner" id="ptrSpinner" style="display:none"></div>
+  <span id="ptrText">↓ 당겨서 새로고침</span>
+</div>
+
+<!-- Content -->
+<div class="content" id="mainContent">
+
+  <!-- Logbook Tab -->
+  <div id="tab-logbook" class="tab-pane active">
+    <div class="section-header">
+      <span class="section-title">비행 기록</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="add-btn" style="background:rgba(16,58,100,0.6);border:1px solid rgba(59,130,246,0.35)" onclick="openCrewConnex()">🌐 CC</button>
+        <button class="add-btn" style="background:rgba(30,80,30,0.6);border:1px solid rgba(34,197,94,0.35)" onclick="toggleRangePanel()">📊 합산</button>
+        <button class="add-btn" style="background:rgba(80,40,10,0.6);border:1px solid rgba(251,146,60,0.35)" onclick="openPrintModal()">🖨 인쇄</button>
+        <button class="add-btn" onclick="openModal()">+ 입력</button>
+      </div>
+    </div>
+    <div style="position:relative;margin-bottom:12px">
+      <input type="search" id="searchInput" placeholder="🔍  메모·편명·공항·날짜 검색..." autocomplete="off"
+        oninput="renderFlights()"
+        style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 16px 10px 40px;color:var(--text1);font-size:13px;outline:none;-webkit-appearance:none;appearance:none"/>
+      <svg style="position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <div id="searchCount" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text3);display:none"></div>
+    </div>
+    <div id="monthNav" style="display:none;overflow-x:auto;white-space:nowrap;padding:0 0 10px 0;margin-bottom:4px;scrollbar-width:none">
+      <div id="monthNavInner" style="display:inline-flex;gap:6px"></div>
+    </div>
+    <!-- 기간 합산 패널 -->
+    <div id="rangePanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;display:none">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📊 기간 비행시간 합산</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="date" id="rangeFrom" class="form-input" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px" />
+        <span style="color:var(--text3);font-size:13px">~</span>
+        <input type="date" id="rangeTo" class="form-input" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px" />
+        <button onclick="calcRangeSum()" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">합산</button>
+      </div>
+      <div id="rangeSumResult" style="margin-top:10px;display:none">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px">
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">총 비행</div>
+            <div id="rsTotal" style="font-size:16px;font-weight:700;color:var(--accent)">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">야간</div>
+            <div id="rsNight" style="font-size:16px;font-weight:700;color:#6366f1">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">계기</div>
+            <div id="rsIfr" style="font-size:16px;font-weight:700;color:#22d3ee">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">편수</div>
+            <div id="rsCount" style="font-size:16px;font-weight:700;color:var(--text2)">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="flightList">
+      <div class="empty-state">
+        <span class="empty-icon">🛫</span>
+        <div class="empty-title">비행 기록이 없습니다</div>
+        <div class="empty-sub">상단 업로드 탭에서 제주항공<br>ePaper PDF를 업로드하거나<br>직접 입력해 주세요.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload Tab -->
+  <div id="tab-upload" class="tab-pane">
+    <div class="upload-section">
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" accept=".pdf,.xlsx,.xls" id="pdfInput" onchange="handleFileSelect(event)" />
+        <span class="upload-icon">📑</span>
+        <div class="upload-title">비행 기록 업로드</div>
+        <div class="upload-sub">PDF 또는 Excel 파일을 끌어다 놓거나 탭하여 선택</div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px">
+          <button class="upload-btn" onclick="document.getElementById('pdfInput').click()" style="margin:0">
+            📂 파일 선택
+          </button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">ePaper PDF · flightHistory Excel (.xlsx)</div>
+      </div>
+    </div>
+
+    <div style="margin:12px 0;padding:12px 16px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="font-size:12px;color:var(--text2);line-height:1.6">
+        <span style="color:var(--danger);font-weight:700">⚠ 기존 데이터 초기화</span><br>
+        dutyCode가 잘못 저장된 경우 삭제 후 PDF를 다시 업로드하세요.
+      </div>
+      <button onclick="resetAllData()" style="flex-shrink:0;background:rgba(239,68,68,0.15);color:var(--danger);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">🗑 전체 삭제</button>
+    </div>
+
+    <div class="parse-progress" id="parseProgress">
+      <div class="progress-label">
+        <span id="progressText">PDF 분석 중...</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="parse-result" id="parseResult"></div>
+    </div>
+
+    <div class="parse-preview" id="parsePreview">
+      <div class="preview-title">✅ 파싱 결과 미리보기</div>
+      <div id="previewList"></div>
+      <button id="goLogbookBtn" onclick="switchTab('logbook', document.querySelectorAll('.tab-btn')[0])"
+        style="display:none;width:100%;margin-top:12px;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.3px">
+        📋 로그북에서 확인하기 →
+      </button>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">📋 지원 형식 안내</div>
+      <div style="font-size:13px; color:var(--text2); line-height:1.8;">
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
+          <span style="color:var(--success);flex-shrink:0">✓</span>
+          <span><strong>제주항공 ePaper</strong> — 월별 비행 스케줄 PDF</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
+          <span style="color:var(--success);flex-shrink:0">✓</span>
+          <span>편명, 출발지/도착지, 시간, 기종 자동 추출</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
+          <span style="color:var(--success);flex-shrink:0">✓</span>
+          <span>등록부호(HL-XXXX) 자동 인식</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <span style="color:var(--text3);flex-shrink:0">i</span>
+          <span style="color:var(--text3)">파싱 후 각 항목을 직접 수정할 수 있습니다</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Tab -->
+  <div id="tab-charts" class="tab-pane">
+    <!-- 연도 선택 -->
+    <div id="chartYearNav" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;margin-bottom:4px"></div>
+
+    <!-- 선택 연도 요약 -->
+    <div class="chart-card" style="padding:12px 16px">
+      <div id="chartSummary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center"></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title" id="monthlyChartTitle">월별 비행시간</div>
+      <div class="bar-chart" id="monthlyChart">
+        <div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">데이터 없음</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="donutTitle">구분별 시간</div>
+      <div class="donut-wrap">
+        <svg class="donut-svg" width="100" height="100" viewBox="0 0 100 100" id="donutSvg">
+          <circle cx="50" cy="50" r="35" fill="none" stroke="#1f2937" stroke-width="18"/>
+          <circle cx="50" cy="50" r="35" fill="none" stroke="#374151" stroke-width="18"
+            stroke-dasharray="0 220" stroke-dashoffset="55" style="transition:stroke-dasharray 0.6s"/>
+        </svg>
+        <div class="donut-legend" id="donutLegend">
+          <div style="text-align:center;color:var(--text3);font-size:12px;padding:10px">데이터 없음</div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">공항별 착륙 횟수</div>
+      <div id="airportChart">
+        <div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">데이터 없음</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Currency Tab -->
+  <div id="tab-currency" class="tab-pane">
+    <div style="margin-bottom:16px;">
+      <div class="section-title" style="margin-bottom:12px;">자격 유지 현황</div>
+      <div id="currencyList">
+        <div style="text-align:center;color:var(--text3);font-size:13px;padding:40px">비행 기록을 입력하면 자격 현황이 표시됩니다</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="openModal()" title="비행 추가">＋</button>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnOverlay(event)">
+  <div class="modal" onkeydown="handleModalKey(event)">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">비행 기록 입력</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId" />
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">날짜</label>
+          <input type="date" class="form-input" id="fDate" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">편명</label>
+          <input type="text" class="form-input" id="fFlight" placeholder="7C1001" style="text-transform:uppercase" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">출발지 (ICAO/IATA)</label>
+          <input type="text" class="form-input" id="fDep" placeholder="GMP" maxlength="4" style="text-transform:uppercase" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">도착지 (ICAO/IATA)</label>
+          <input type="text" class="form-input" id="fArr" placeholder="CJU" maxlength="4" style="text-transform:uppercase" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">출발시간 (Local)</label>
+          <input type="text" class="form-input" id="fDepTime" placeholder="1630" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this); autoCalcTotal()" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">도착시간 (Local)</label>
+          <input type="text" class="form-input" id="fArrTime" placeholder="1820" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this); autoCalcTotal()" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">기종</label>
+          <select class="form-input" id="fAcType">
+            <option value="B737-800">B737-800</option>
+            <option value="B737-8">B737-8</option>
+            <option value="A320">A320</option>
+            <option value="A321">A321</option>
+            <option value="Q400">Q400</option>
+            <option value="OTHER">기타</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">등록부호</label>
+          <input type="text" class="form-input" id="fReg" placeholder="HL8000" style="text-transform:uppercase" />
+        </div>
+      </div>
+
+      <div class="form-section-title">비행 시간</div>
+
+      <div class="form-row triple">
+        <div class="form-group">
+          <label class="form-label">총 비행 (h:mm)</label>
+          <input type="text" class="form-input" id="fTotal" placeholder="130" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this)" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">야간 (h:mm)</label>
+          <input type="text" class="form-input" id="fNight" placeholder="050" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this)" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">계기 (h:mm)</label>
+          <input type="text" class="form-input" id="fIfr" placeholder="050" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this)" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">역할 (Fallback)</label>
+          <select class="form-input" id="fRole">
+            <option value="PIC">PIC (기장)</option>
+            <option value="SIC">SIC (부기장)</option>
+            <option value="INST">교관</option>
+            <option value="DUAL">교육생</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">이륙 (T/O)</label>
+          <select class="form-input" id="fToPf">
+            <option value="PF">PF — 본인 이륙</option>
+            <option value="PM">PM — 상대방 이륙</option>
+            <option value="">— 해당없음</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Duty Code</label>
+          <select class="form-input" id="fDutyCode">
+            <option value="C">C — PIC 기장 (전체 PIC)</option>
+            <option value="F">F — F/O 부기장 (전체 SIC)</option>
+            <option value="H">H — Check Airman as PIC (전체 PIC)</option>
+            <option value="L">L — Instructor as PIC (전체 PIC)</option>
+            <option value="K">K — Check Airman MOLT (산정불가)</option>
+            <option value="2C">2C — 2 SET 기장 Duty (전체 PIC)</option>
+            <option value="2F">2F — 2 SET F/O Duty (전체 SIC)</option>
+            <option value="2NC">2NC — 2 SET 기장 Non-Duty (산정불가)</option>
+            <option value="2NF">2NF — 2 SET F/O Non-Duty (산정불가)</option>
+            <option value="C1">C1 — 2 SET 기장 PIC (½ PIC)</option>
+            <option value="F1">F1 — 2 SET F/O with PIC (½ SIC)</option>
+            <option value="C2">C2 — 2 SET 기장 Non-PIC (½ PIC)</option>
+            <option value="F2">F2 — 2 SET F/O with Capt Non-PIC (½ SIC)</option>
+            <option value="PC">PC — 2 CAPTAIN PIC (SIC 시간)</option>
+            <option value="NC">NC — 2 CAPTAIN Non-PIC (SIC 시간)</option>
+            <option value="3PC">3PC — 3 SET 기장 PIC (⅔ PIC)</option>
+            <option value="3NC">3NC — 3 SET 기장 Non-PIC (⅓ PIC + ⅓ SIC)</option>
+            <option value="3F">3F — 3 SET F/O (⅔ SIC)</option>
+            <option value="Y">Y — Auditor (산정불가)</option>
+            <option value="D">D — Observer (산정불가)</option>
+            <option value="EX">EX — Extra Crew (산정불가)</option>
+            <option value="R">R — Route Trainee</option>
+            <option value="S">S — Student (Local FLT)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">오토랜딩 (ALD)</label>
+          <select class="form-input" id="fAld">
+            <option value="N">N — 일반 착륙</option>
+            <option value="Y">Y — 오토랜딩</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">착륙 (LDG)</label>
+          <select class="form-input" id="fLdgPf">
+            <option value="PF">PF — 본인 착륙</option>
+            <option value="PM">PM — 상대방 착륙</option>
+            <option value="">— 해당없음</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">오토랜딩 (ALD)</label>
+          <select class="form-input" id="fAldDup">
+            <option value="N">N — 일반 착륙</option>
+            <option value="Y">Y — 오토랜딩</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-section-title">비고</div>
+      <div class="form-row single">
+        <div class="form-group">
+          <input type="text" class="form-input" id="fRemarks" placeholder="특이사항 (선택)" />
+        </div>
+      </div>
+
+      <button class="submit-btn" onclick="saveEntry()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Print Modal -->
+<div class="modal-overlay" id="printModalOverlay" onclick="if(event.target===this)closePrintModal()">
+  <div class="modal" style="max-height:80vh">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">🖨 월별 비행 인쇄</div>
+      <button class="modal-close" onclick="closePrintModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:14px">인쇄할 월을 선택하세요</div>
+      <div id="printMonthList" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CrewConnex Import Modal -->
+<div class="modal-overlay" id="ccModalOverlay" onclick="closeCcOnOverlay(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">🌐 CrewConnex 가져오기</div>
+      <button class="modal-close" onclick="closeCrewConnex()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Tab buttons -->
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button id="ccTabAuto" class="cc-tab-btn active" onclick="ccSwitchTab('auto')">자동 로그인</button>
+        <button id="ccTabText" class="cc-tab-btn"        onclick="ccSwitchTab('text')">텍스트 붙여넣기</button>
+      </div>
+
+      <!-- Auto-login pane -->
+      <div id="ccPaneAuto">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">아이디</label>
+            <input type="text" class="form-input" id="ccUsername" placeholder="아이디" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">비밀번호</label>
+            <input type="password" class="form-input" id="ccPassword" placeholder="비밀번호" />
+          </div>
+        </div>
+        <button class="submit-btn" onclick="loginCrewConnex()" id="ccLoginBtn">🔍 비행 데이터 가져오기</button>
+        <div id="ccStatus" style="margin-top:10px;font-size:13px;color:var(--text2);min-height:18px;text-align:center"></div>
+      </div>
+
+      <!-- Text-paste pane -->
+      <div id="ccPaneText" style="display:none">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.7">
+          crewconnex.jejuair.net → 체크인 화면에서 <strong style="color:var(--text2)">전체 텍스트 선택 → 복사</strong> 후 아래에 붙여넣기 하세요.
+        </div>
+        <textarea id="ccPastedText" class="form-input"
+          style="width:100%;min-height:110px;font-size:12px;resize:vertical;line-height:1.5"
+          placeholder="페이지 전체 텍스트를 여기에 붙여넣으세요..."></textarea>
+        <button class="submit-btn" onclick="parseCcText()" style="margin-top:10px">📋 파싱하기</button>
+      </div>
+
+      <!-- Results -->
+      <div id="ccResultWrap" style="display:none;margin-top:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px">추출된 비행 목록</div>
+          <button onclick="ccSwitchTab('auto')" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;text-decoration:underline">↩ 다시 검색</button>
+        </div>
+        <div id="ccFlightItems"></div>
+
+        <!-- Crew info -->
+        <div id="ccCrewWrap" style="display:none;margin-top:12px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">편조</div>
+          <div id="ccCrewText" style="font-size:12px;color:var(--text2);line-height:1.8"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Firebase 설정 ───────────────────────────────────────────────
+// ⚠️  아래 값을 Firebase 콘솔에서 복사한 본인 프로젝트 config로 교체하세요
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBv5fLXkedjrr9yb_-JLz5ot9GZKyoQ3XE",
+  authDomain:        "pilot-logbook-22bb8.firebaseapp.com",
+  projectId:         "pilot-logbook-22bb8",
+  storageBucket:     "pilot-logbook-22bb8.firebasestorage.app",
+  messagingSenderId: "824870554939",
+  appId:             "1:824870554939:web:cbe8be4c5d4fac57dd7b1e",
+  measurementId:     "G-6X0CVJPYNM"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+const db = firebase.firestore();
+
+let currentUser = null;
+let _unsubSnapshot = null;
+let _saveTimer = null;
+let _lastSavedAt = 0;  // 마지막 Firestore 저장 시각 (ms)
+
+// ── 인앱 브라우저 감지 ───────────────────────────────────────────
+const ua = navigator.userAgent.toLowerCase();
+const isKakaoTalk  = ua.includes('kakaotalk') || ua.includes('kakaoapp');
+const isLine       = ua.includes('line/');
+const isInstagram  = ua.includes('instagram');
+const isFacebook   = ua.includes('fbav') || ua.includes('fban');
+const isNaverApp   = ua.includes('naver') && ua.includes('inapp');
+const isInAppBrowser = isKakaoTalk || isLine || isInstagram || isFacebook || isNaverApp;
+
+const isStandalone = window.navigator.standalone === true
+  || window.matchMedia('(display-mode: standalone)').matches;
+
+// 인앱 브라우저이면 경고 화면 표시
+if (isInAppBrowser) {
+  const warning = document.getElementById('inAppWarning');
+  const card    = document.getElementById('authCard');
+  if (warning) { warning.style.display = 'flex'; }
+  if (card)    { card.style.display = 'none'; }
+}
+
+function copyAndOpenExternal() {
+  const url = 'https://pilot-logbook.netlify.app';
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => {
+      document.getElementById('copyDone').style.display = 'block';
+    });
+  } else {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    document.getElementById('copyDone').style.display = 'block';
+  }
+}
+
+// ── Google 로그인 / 로그아웃 ─────────────────────────────────────
+async function signInWithGoogle() {
+  const btn = document.querySelector('.google-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '로그인 중...'; }
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
+    // Popup 우선 시도 (redirect보다 모바일에서 안정적)
+    await auth.signInWithPopup(provider);
+  } catch(e) {
+    if (e.code === 'auth/popup-blocked') {
+      // iOS Safari 등 팝업 차단 환경 — redirect 대신 안내 메시지
+      alert('팝업이 차단되었습니다.\n\niOS Safari: 설정 → Safari → 팝업 차단 끄기\nChrome: 주소창 팝업 허용 후 다시 시도해주세요.');
+    } else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+      alert('로그인 실패: ' + e.message);
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/><path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.3-7.7 2.3-6.2 0-11.5-4.2-13.4-9.9l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg> Google로 로그인`; }
+  }
+}
+
+async function signOutUser() {
+  if (!confirm('로그아웃 하시겠습니까?')) return;
+  if (_unsubSnapshot) { _unsubSnapshot(); _unsubSnapshot = null; }
+  await auth.signOut();
+}
+
+// ── Firestore 저장 ───────────────────────────────────────────────
+async function saveToFirestore(uid) {
+  if (!uid) return;
+  setSyncStatus('☁ 저장 중...');
+  try {
+    await db.collection('users').doc(uid).collection('data').doc('flights')
+      .set({ flights: JSON.parse(JSON.stringify(flights)),
+             updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    _lastSavedAt = Date.now();
+    const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+    setSyncStatus('✓ ' + t + ' 저장됨');
+  } catch(e) {
+    console.error('Firestore 저장 실패:', e);
+    setSyncStatus('⚠ 저장 실패: ' + e.code);
+  }
+}
+
+// 일반 변경사항은 1.5초 debounce, 메모는 즉시 저장
+function scheduleFirestoreSave(immediate = false) {
+  clearTimeout(_saveTimer);
+  _saveTimer = null;
+  if (!currentUser) return;
+  if (immediate) {
+    saveToFirestore(currentUser.uid);
+  } else {
+    _saveTimer = setTimeout(() => {
+      _saveTimer = null;
+      if (currentUser) saveToFirestore(currentUser.uid);
+    }, 1500);
+  }
+}
+
+// ── saveData: localStorage + Firestore ──────────────────────────
+function saveData(immediate = false) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
+  scheduleFirestoreSave(immediate);
+}
+
+// ── Firestore 실시간 리스너 ───────────────────────────────────────
+function subscribeToFirestore(uid) {
+  if (_unsubSnapshot) _unsubSnapshot();
+  setSyncStatus('☁ 연결 중...');
+
+  const ref = db.collection('users').doc(uid).collection('data').doc('flights');
+
+  _unsubSnapshot = ref.onSnapshot({ includeMetadataChanges: false }, snap => {
+    // 내가 방금 저장한 직후 1초 이내면 echo — 무시
+    if (Date.now() - _lastSavedAt < 1000) return;
+
+    if (snap.exists) {
+      const incoming = snap.data().flights || [];
+      let _snapChanged = false;
+      incoming.forEach(f => {
+        if (!f.id) { f.id = simpleUid(); _snapChanged = true; }
+        if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') { f.acType = 'B737-8'; _snapChanged = true; }
+      });
+
+      // 현재 포커스된 textarea 내용 보존 (아직 blur 안 됨)
+      const activeNotes = {};
+      document.querySelectorAll('textarea.notes-ta').forEach(ta => {
+        const fid = ta.id.replace('notes-', '');
+        const focused = document.activeElement === ta;
+        if (focused && ta.value.trim()) activeNotes[fid] = ta.value.trim();
+      });
+
+      flights = incoming;
+      Object.entries(activeNotes).forEach(([fid, val]) => {
+        const idx = flights.findIndex(f => f.id === fid);
+        if (idx >= 0) flights[idx].remarks = val;
+      });
+
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
+      renderFlights();
+      if (_snapChanged) saveData(); // id/acType 수정사항 Firestore에 즉시 반영
+      const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+      setSyncStatus('✓ ' + t + ' 동기화됨');
+    } else {
+      // Firestore 문서 없음 → 로컬 데이터 올리기
+      if (flights.length > 0) saveToFirestore(uid);
+      else renderFlights();
+      setSyncStatus('✓ 준비 완료');
+    }
+  }, err => {
+    console.error('Firestore 리스너 오류:', err);
+    setSyncStatus('⚠ 오프라인 — ' + err.code);
+    renderFlights();
+  });
+}
+
+// 앱이 백그라운드에서 돌아올 때 강제 동기화 (아이폰 사파리 대응)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && currentUser && !_saveTimer) {
+    db.collection('users').doc(currentUser.uid).collection('data').doc('flights')
+      .get({ source: 'server' })
+      .then(snap => {
+        if (!snap.exists) return;
+        // 내가 쓴 게 더 최신이면 무시
+        if (Date.now() - _lastSavedAt < 3000) return;
+        const incoming = snap.data().flights || [];
+        let _visChanged = false;
+        incoming.forEach(f => {
+          if (!f.id) { f.id = simpleUid(); _visChanged = true; }
+          if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') { f.acType = 'B737-8'; _visChanged = true; }
+        });
+        flights = incoming;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
+        if (_visChanged) saveData(); // id/acType 수정사항 Firestore에 즉시 반영
+        renderFlights();
+        setSyncStatus('✓ 포그라운드 동기화');
+      }).catch(() => {});
+  }
+});
+
+function setSyncStatus(msg) {
+  const el = document.getElementById('syncStatus');
+  if (el) el.textContent = msg;
+}
+
+// ── Pull-to-refresh ──────────────────────────────────────────────
+(function initPullToRefresh() {
+  const THRESHOLD = 72;   // px — 이 이상 당기면 새로고침 실행
+  const MAX_PULL  = 100;
+
+  let startY = 0, pulling = false, refreshing = false;
+  const indicator = document.getElementById('ptr-indicator');
+  const ptrText   = document.getElementById('ptrText');
+  const ptrSpinner = document.getElementById('ptrSpinner');
+  const content    = document.getElementById('mainContent');
+
+  function setHeight(h) {
+    indicator.style.height = h + 'px';
+  }
+
+  document.addEventListener('touchstart', e => {
+    if (refreshing) return;
+    // 스크롤이 최상단일 때만 활성화
+    if (window.scrollY > 0) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!pulling || refreshing) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) { pulling = false; return; }
+
+    const h = Math.min(dy * 0.45, MAX_PULL);
+    setHeight(h);
+    indicator.classList.add('visible');
+    ptrText.textContent = h >= THRESHOLD * 0.45 ? '↑ 놓아서 새로고침' : '↓ 당겨서 새로고침';
+    ptrText.style.display = 'inline';
+    ptrSpinner.style.display = 'none';
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!pulling || refreshing) return;
+    pulling = false;
+
+    const curH = parseInt(indicator.style.height) || 0;
+    if (curH >= THRESHOLD * 0.45) {
+      // 새로고침 실행
+      refreshing = true;
+      setHeight(52);
+      ptrText.style.display = 'none';
+      ptrSpinner.style.display = 'block';
+
+      const doRefresh = async () => {
+        if (currentUser) {
+          // pending 저장이 있으면 먼저 flush
+          if (_saveTimer) {
+            clearTimeout(_saveTimer);
+            _saveTimer = null;
+            await saveToFirestore(currentUser.uid);
+          }
+          // Firestore에서 최신 데이터 강제 로드
+          try {
+            const snap = await db.collection('users').doc(currentUser.uid)
+              .collection('data').doc('flights')
+              .get({ source: 'server' });
+            if (snap.exists) {
+              const data = snap.data().flights || [];
+              data.forEach(f => { if (!f.id) f.id = uid(); });
+              flights = data;
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(flights));
+              renderFlights();
+              setSyncStatus('✓ ' + new Date().toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'}) + ' 새로고침 완료');
+            }
+          } catch(e) {
+            setSyncStatus('⚠ 새로고침 실패');
+          }
+        }
+        // 인디케이터 닫기
+        setTimeout(() => {
+          indicator.classList.remove('visible', 'refreshing');
+          setHeight(0);
+          ptrText.style.display = 'inline';
+          ptrSpinner.style.display = 'none';
+          refreshing = false;
+        }, 600);
+      };
+      doRefresh();
+    } else {
+      // 임계값 미달 — 닫기
+      indicator.classList.remove('visible');
+      setHeight(0);
+    }
+  });
+})();
+
+// redirect 결과 처리 (구형 redirect 세션 혹시 남아있을 경우 대비 — 에러는 조용히 무시)
+auth.getRedirectResult().then((result) => {
+  if (result && result.user) {
+    console.log('redirect 로그인 성공:', result.user.email);
+  }
+}).catch(e => {
+  // iOS sessionStorage 파티셔닝 등으로 인한 에러는 조용히 무시
+  console.log('getRedirectResult 무시:', e.code);
+});
+
+// Auth 상태 감지
+auth.onAuthStateChanged(user => {
+  currentUser = user;
+  const overlay = document.getElementById('authOverlay');
+  const chip    = document.getElementById('userChip');
+  if (user) {
+    overlay.classList.add('hidden');
+    chip.style.display = 'flex';
+    document.getElementById('userPhoto').src  = user.photoURL || '';
+    document.getElementById('userName').textContent = user.displayName?.split(' ')[0] || '';
+    subscribeToFirestore(user.uid);
+  } else {
+    overlay.classList.remove('hidden');
+    chip.style.display = 'none';
+    setSyncStatus('');
+  }
+});
+
+// ─── PDF.js setup ───────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─── State ──────────────────────────────────────────────────────
+const STORAGE_KEY = 'pilotLogbook';
+
+function loadData() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch(e) {
+    console.warn('localStorage 읽기 실패:', e);
+    return [];
+  }
+}
+
+
+
+let flights = loadData();
+let editingId = null;
+
+function parseHHMM(s) {
+  if (!s) return 0;
+  const m = String(s).match(/^(\d+):(\d{2})$/);
+  if (m) return parseInt(m[1]) * 60 + parseInt(m[2]);
+  const f = parseFloat(s);
+  if (!isNaN(f)) return Math.round(f * 60);
+  return 0;
+}
+
+// 시간 입력 자동 포맷: 0050→00:50 / 150→1:50 / 050→0:50
+function formatTimeInput(el) {
+  const raw = el.value.replace(/[^\d]/g, '');
+  if (!raw) return;
+  let h, m;
+  if (raw.length >= 4) {
+    h = parseInt(raw.slice(0, raw.length - 2), 10);
+    m = parseInt(raw.slice(-2), 10);
+  } else if (raw.length === 3) {
+    h = parseInt(raw[0], 10);
+    m = parseInt(raw.slice(1), 10);
+  } else if (raw.length === 2) {
+    h = 0;
+    m = parseInt(raw, 10);
+  } else {
+    h = parseInt(raw, 10);
+    m = 0;
+  }
+  if (m > 59) m = 59;
+  // 4자리 이상 입력이면 시(h) 앞에 0 패딩 유지 (0050→00:50)
+  const hStr = raw.length >= 4 ? String(h).padStart(2, '0') : String(h);
+  el.value = `${hStr}:${String(m).padStart(2, '0')}`;
+}
+
+function toHHMM(mins) {
+  if (!mins || isNaN(mins)) return '0:00';
+  const h = Math.floor(Math.abs(mins) / 60);
+  const m = Math.abs(mins) % 60;
+  return `${h}:${String(m).padStart(2,'0')}`;
+}
+
+// ── 기간 합산 ─────────────────────────────────────────────────────
+function toggleRangePanel() {
+  const p = document.getElementById('rangePanel');
+  const isHidden = p.style.display === 'none' || p.style.display === '';
+  p.style.display = isHidden ? 'block' : 'none';
+  if (isHidden && !document.getElementById('rangeFrom').value) {
+    // 기본값: 이번달 1일 ~ 오늘
+    const today = new Date();
+    const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0');
+    document.getElementById('rangeFrom').value = `${y}-${m}-01`;
+    document.getElementById('rangeTo').value   = today.toISOString().slice(0,10);
+  }
+}
+
+function calcRangeSum() {
+  const from = document.getElementById('rangeFrom').value;
+  const to   = document.getElementById('rangeTo').value;
+  if (!from || !to) { showToast('날짜를 선택해주세요'); return; }
+  const sel = flights.filter(f => f.date >= from && f.date <= to);
+  if (!sel.length) { showToast('해당 기간에 비행이 없습니다'); return; }
+  let total = 0, night = 0, ifr = 0;
+  sel.forEach(f => {
+    const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    total += dur;
+    night += parseHHMM(f.night);
+    ifr   += parseHHMM(f.ifr);
+  });
+  document.getElementById('rsTotal').textContent = toHHMM(total);
+  document.getElementById('rsNight').textContent = toHHMM(night);
+  document.getElementById('rsIfr').textContent   = toHHMM(ifr);
+  document.getElementById('rsCount').textContent = sel.length + '편';
+  document.getElementById('rangeSumResult').style.display = 'block';
+}
+
+// ── 월별 인쇄 ─────────────────────────────────────────────────────
+function openPrintModal() {
+  if (!flights.length) { showToast('비행 기록이 없습니다'); return; }
+  // 월 목록 생성 (최신순)
+  const months = [...new Set(flights.map(f => f.date.slice(0,7)))].sort().reverse();
+  const list = document.getElementById('printMonthList');
+  list.innerHTML = months.map(m => {
+    const [y, mo] = m.split('-');
+    const cnt = flights.filter(f => f.date.startsWith(m)).length;
+    return `<button onclick="printMonth('${m}')" style="display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;color:var(--text1);font-size:14px;cursor:pointer;text-align:left">
+      <span>${y}년 ${parseInt(mo)}월</span>
+      <span style="font-size:12px;color:var(--text3)">${cnt}편 →</span>
+    </button>`;
+  }).join('');
+  document.getElementById('printModalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePrintModal() {
+  document.getElementById('printModalOverlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function printMonth(ym) {
+  const [y, mo] = ym.split('-');
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const label = `${monthNames[parseInt(mo)-1]} ${y}`;
+  const sel = flights.filter(f => f.date.startsWith(ym)).sort((a,b) => a.date.localeCompare(b.date));
+  let total=0, night=0, ifr=0, to=0, ldg=0;
+  sel.forEach(f => {
+    total += f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    night += parseHHMM(f.night);
+    ifr   += parseHHMM(f.ifr);
+    to  += (f.toPf !== undefined ? f.toPf === 'PF' : (parseInt(f.takeoffs||f.toCnt||0)>0)) ? 1 : 0;
+    ldg += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||0)>0)) ? 1 : 0;
+  });
+  const rows = sel.map((f,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${f.date}</td>
+      <td>${f.flight||''}</td>
+      <td>${f.dep||''}</td>
+      <td>${f.arr||''}</td>
+      <td>${f.depTime||''}</td>
+      <td>${f.arrTime||''}</td>
+      <td>${f.acType||''}</td>
+      <td>${f.reg||''}</td>
+      <td>${f.dutyCode||''}</td>
+      <td style="font-weight:600">${f.total || toHHMM(calcDuration(f.depTime,f.arrTime))}</td>
+      <td>${f.night||''}</td>
+      <td>${f.ifr||''}</td>
+      <td>${f.toPf !== undefined ? f.toPf : (parseInt(f.takeoffs||f.toCnt||0)>0?'PF':'PM')}</td>
+      <td>${f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||0)>0?'PF':'PM')}</td>
+    </tr>`).join('');
+
+  const printDate = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+  <title>Pilot Logbook - ${label}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #111; }
+    h2 { font-size: 16px; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #555; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #1e3a5f; color: #fff; padding: 6px 4px; text-align: center; font-size: 10px; }
+    td { padding: 5px 4px; border-bottom: 1px solid #ddd; text-align: center; }
+    tr:nth-child(even) td { background: #f5f8ff; }
+    .summary { margin-top: 14px; display: flex; gap: 24px; font-size: 12px; }
+    .summary b { font-size: 14px; color: #1e3a5f; }
+    @media print { body { margin: 10mm; } }
+  </style></head><body>
+  <h2>Pilot Logbook — ${label}</h2>
+  <div class="subtitle">Kyungtae Kang · Printed: ${printDate}</div>
+  <table>
+    <thead><tr>
+      <th>#</th><th>Date</th><th>Flight</th><th>From</th><th>To</th>
+      <th>STD</th><th>STA</th><th>A/C Type</th><th>Registration</th><th>Duty</th>
+      <th>Block</th><th>Night</th><th>IFR</th><th>T/O</th><th>LDG</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="summary">
+    <div>Sectors: <b>${sel.length}</b></div>
+    <div>Total Block: <b>${toHHMM(total)}</b></div>
+    <div>Night: <b>${toHHMM(night)}</b></div>
+    <div>IFR: <b>${toHHMM(ifr)}</b></div>
+    <div>T/O: <b>${to}</b></div>
+    <div>LDG: <b>${ldg}</b></div>
+  </div>
+  <\/body><\/html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { alert('팝업이 차단되었습니다. 팝업을 허용해주세요.'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => { try { w.print(); } catch(e) {} }, 400);
+  closePrintModal();
+}
+
+// 출발/도착시간 변경 시 총 비행시간 자동계산
+function autoCalcTotal() {
+  const dep = (document.getElementById('fDepTime')?.value || '').trim();
+  const arr = (document.getElementById('fArrTime')?.value || '').trim();
+  if (!dep || !arr) return;
+  const dur = calcDuration(dep, arr);
+  if (dur > 0) {
+    document.getElementById('fTotal').value = toHHMM(dur);
+  }
+}
+
+function calcDuration(dep, arr) {
+  if (!dep || !arr) return 0;
+  const [dh, dm] = dep.split(':').map(Number);
+  const [ah, am] = arr.split(':').map(Number);
+  let d = (ah * 60 + am) - (dh * 60 + dm);
+  if (d <= 0) d += 24 * 60;
+  return d;
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+// onSnapshot 핸들러 내부에서 uid()가 아직 선언 전일 수 있으므로 별칭
+const simpleUid = uid;
+
+// ─── Duty Code → 인정 비행시간 계산 (SP.5.1 기준) ────────────────
+// 반환: { pic: 분, sic: 분 }
+function calcCreditedTime(f) {
+  const block = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+  const dc = (f.dutyCode || '').toUpperCase();
+  switch (dc) {
+    case 'C': case '2C': case 'H': case 'L': case 'PC':
+      return { pic: block, sic: 0 };
+    case 'C1': case 'C2':
+      return { pic: Math.round(block / 2), sic: 0 };
+    case '3PC':
+      return { pic: Math.round(block * 2 / 3), sic: 0 };
+    case '3NC':
+      return { pic: Math.round(block / 3), sic: Math.round(block * 2 / 3) };
+    case 'F': case '2F': case 'NC':
+      return { pic: 0, sic: block };
+    case 'F1': case 'F2':
+      return { pic: 0, sic: Math.round(block / 2) };
+    case '3F':
+      return { pic: 0, sic: Math.round(block * 2 / 3) };
+    case 'R':
+      return { pic: 0, sic: 0, total: block };
+    case 'K': case 'Y': case 'O':
+    case '2NC': case '2NF': case 'D': case 'EX': case 'M':
+      return { pic: 0, sic: 0 };
+    default:
+      if (f.role === 'PIC' || f.role === 'INST') return { pic: block, sic: 0 };
+      return { pic: 0, sic: block };
+  }
+}
+
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ─── Tab ────────────────────────────────────────────────────────
+function scrollToMonth(mo) {
+  // 월 키로 페이지 인덱스 찾기
+  const sorted = [...flights].sort((a,b) => b.date.localeCompare(a.date));
+  const keys = [...new Set(sorted.map(f => f.date.slice(0,7)))];
+  const idx = keys.indexOf(mo);
+  if (idx >= 0) goMonthPage(idx);
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'charts') renderCharts();
+  if (name === 'currency') renderCurrency();
+}
+
+// ─── Render Flights ─────────────────────────────────────────────
+// 현재 페이지 (월 기준, 0 = 가장 최근 월)
+let currentMonthPage = 0;
+
+function renderFlights() {
+  const el = document.getElementById('flightList');
+  if (!flights.length) {
+    el.innerHTML = `<div class="empty-state">
+      <span class="empty-icon">🛫</span>
+      <div class="empty-title">비행 기록이 없습니다</div>
+      <div class="empty-sub">상단 업로드 탭에서 제주항공<br>ePaper PDF를 업로드하거나<br>직접 입력해 주세요.</div>
+    </div>`;
+    document.getElementById('monthNav').style.display = 'none';
+    return;
+  }
+
+  // 검색 중이면 전체 표시 (페이지네이션 없음)
+  const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+  if (q) {
+    const visible = flights.filter(f => [f.date, f.flight, f.dep, f.arr, f.acType, f.reg, f.dutyCode, f.remarks]
+        .map(v => (v||'').toLowerCase()).some(v => v.includes(q)));
+    const countEl = document.getElementById('searchCount');
+    if (countEl) { countEl.textContent = `${visible.length}건`; countEl.style.display = 'block'; }
+    if (!visible.length) {
+      el.innerHTML = `<div class="empty-state"><span class="empty-icon">🔍</span><div class="empty-title">"${q}" 검색 결과 없음</div></div>`;
+      document.getElementById('monthNav').style.display = 'none';
+      updateStats(); return;
+    }
+    el.innerHTML = visible.sort((a,b) => b.date.localeCompare(a.date)).map(f => flightCard(f)).join('');
+    document.getElementById('monthNav').style.display = 'none';
+    updateStats(); return;
+  }
+  const countEl = document.getElementById('searchCount');
+  if (countEl) countEl.style.display = 'none';
+
+  // 월별 그룹 (최신순)
+  const sorted = [...flights].sort((a,b) => b.date.localeCompare(a.date));
+  const groups = {};
+  sorted.forEach(f => {
+    const k = f.date.slice(0,7);
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(f);
+  });
+  const monthKeys = Object.keys(groups); // 최신순 정렬됨
+
+  // 현재 페이지 범위 보정
+  if (currentMonthPage >= monthKeys.length) currentMonthPage = 0;
+  if (currentMonthPage < 0) currentMonthPage = monthKeys.length - 1;
+
+  const curMo = monthKeys[currentMonthPage];
+  const [y, m] = curMo.split('-');
+  const curArr = groups[curMo];
+
+  // 상단 월 네비게이션 칩 (클릭 시 해당 월 페이지로 이동)
+  const monthNav = document.getElementById('monthNav');
+  const monthNavInner = document.getElementById('monthNavInner');
+  if (monthNav && monthNavInner) {
+    monthNav.style.display = 'block';
+    const yearGroups = {};
+    monthKeys.forEach((k, idx) => {
+      const yr = k.slice(0,4);
+      if (!yearGroups[yr]) yearGroups[yr] = [];
+      yearGroups[yr].push({ mo: k, idx });
+    });
+    // 첫 진입 시에만 현재 월 연도 자동 펼침
+    const curYear = curMo.slice(0,4);
+    if (!window._navOpenYears) {
+      window._navOpenYears = new Set([curYear]);
+    }
+
+    monthNavInner.innerHTML = Object.entries(yearGroups).sort((a,b)=>b[0].localeCompare(a[0])).map(([year, items]) => {
+      const isOpen = window._navOpenYears.has(year);
+      const hasActive = items.some(({mo}) => mo === curMo);
+      const totalCnt = items.reduce((s, {mo}) => s + groups[mo].length, 0);
+      return `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0">
+        <button onclick="toggleNavYear('${year}')"
+          style="background:${hasActive ? 'var(--accent)' : 'var(--surface2)'};
+                 border:1px solid ${hasActive ? 'var(--accent)' : 'var(--border)'};
+                 border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700;
+                 color:${hasActive ? '#fff' : 'var(--text1)'};cursor:pointer;white-space:nowrap">
+          ${year} <span style="font-size:10px;opacity:0.7">${isOpen ? '▲' : '▼'}</span>
+        </button>
+        <span id="ynav-${year}" style="display:${isOpen ? 'inline-flex' : 'none'};gap:4px;align-items:center;flex-wrap:nowrap">
+          ${items.map(({ mo, idx }) => {
+            const mNum = parseInt(mo.slice(5));
+            const cnt = groups[mo].length;
+            const isActive = mo === curMo;
+            return `<button onclick="goMonthPage(${idx})" id="mnav-${mo}"
+              style="background:${isActive ? 'var(--accent)' : 'var(--surface3)'};
+                     border:1px solid ${isActive ? 'var(--accent)' : 'transparent'};
+                     border-radius:16px;padding:4px 9px;font-size:12px;
+                     color:${isActive ? '#fff' : 'var(--text2)'};cursor:pointer;white-space:nowrap;flex-shrink:0">
+              ${mNum}월<span style="font-size:10px;opacity:0.6"> ${cnt}</span>
+            </button>`;
+          }).join('')}
+        </span>
+      </span>`;
+    }).join('<span style="color:var(--border);padding:0 4px;flex-shrink:0">│</span>');
+  }
+
+  // 현재 월 비행 카드 렌더링
+  el.innerHTML = `<div class="month-group">
+    <div class="month-label">${y}년 ${parseInt(m)}월 · ${curArr.length}편</div>
+    ${curArr.map(f => flightCard(f)).join('')}
+  </div>`;
+
+  // 하단 페이지네이션
+  const totalPages = monthKeys.length;
+  if (totalPages > 1) {
+    const prevMo = currentMonthPage > 0 ? monthKeys[currentMonthPage - 1] : null;
+    const nextMo = currentMonthPage < totalPages - 1 ? monthKeys[currentMonthPage + 1] : null;
+
+    // 페이지 번호 범위: 현재 중심으로 최대 5개
+    const half = 2;
+    let pStart = Math.max(0, currentMonthPage - half);
+    let pEnd   = Math.min(totalPages - 1, currentMonthPage + half);
+    if (pEnd - pStart < 4) {
+      if (pStart === 0) pEnd = Math.min(totalPages - 1, 4);
+      else pStart = Math.max(0, pEnd - 4);
+    }
+
+    const pageNums = [];
+    for (let i = pStart; i <= pEnd; i++) {
+      const [py, pm] = monthKeys[i].split('-');
+      const label = `${py.slice(2)}.${pm}`;
+      pageNums.push(`<button onclick="goMonthPage(${i})"
+        style="min-width:44px;padding:6px 8px;border-radius:8px;font-size:12px;cursor:pointer;
+               background:${i === currentMonthPage ? 'var(--accent)' : 'var(--surface2)'};
+               border:1px solid ${i === currentMonthPage ? 'var(--accent)' : 'var(--border)'};
+               color:${i === currentMonthPage ? '#fff' : 'var(--text2)'}">
+        ${label}
+      </button>`);
+    }
+
+    el.innerHTML += `
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:16px 0 8px;flex-wrap:wrap">
+        <button onclick="goMonthPage(${currentMonthPage - 1})" ${!prevMo ? 'disabled' : ''}
+          style="padding:6px 12px;border-radius:8px;font-size:13px;cursor:pointer;
+                 background:var(--surface2);border:1px solid var(--border);color:${prevMo ? 'var(--text1)' : 'var(--text3)'};opacity:${prevMo ? 1 : 0.4}">
+          ‹ 이전
+        </button>
+        ${pStart > 0 ? `<button onclick="goMonthPage(0)" style="min-width:44px;padding:6px 8px;border-radius:8px;font-size:12px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);color:var(--text2)">${monthKeys[0].slice(2,4)}.${monthKeys[0].slice(5)}</button><span style="color:var(--text3)">…</span>` : ''}
+        ${pageNums.join('')}
+        ${pEnd < totalPages - 1 ? `<span style="color:var(--text3)">…</span><button onclick="goMonthPage(${totalPages-1})" style="min-width:44px;padding:6px 8px;border-radius:8px;font-size:12px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);color:var(--text2)">${monthKeys[totalPages-1].slice(2,4)}.${monthKeys[totalPages-1].slice(5)}</button>` : ''}
+        <button onclick="goMonthPage(${currentMonthPage + 1})" ${!nextMo ? 'disabled' : ''}
+          style="padding:6px 12px;border-radius:8px;font-size:13px;cursor:pointer;
+                 background:var(--surface2);border:1px solid var(--border);color:${nextMo ? 'var(--text1)' : 'var(--text3)'};opacity:${nextMo ? 1 : 0.4}">
+          다음 ›
+        </button>
+      </div>`;
+  }
+
+  updateStats();
+}
+
+function goMonthPage(idx) {
+  currentMonthPage = idx;
+  renderFlights();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleNavYear(year) {
+  if (!window._navOpenYears) window._navOpenYears = new Set();
+  if (window._navOpenYears.has(year)) {
+    window._navOpenYears.delete(year);
+  } else {
+    window._navOpenYears.add(year);
+  }
+  renderFlights();
+}
+
+function dutyCodeBadgeClass(dc) {
+  if (!dc) return 'badge-sic';
+  const fullPic  = ['C','2C','H','L','PC'];
+  const fullSic  = ['F','2F','NC'];
+  const part     = ['C1','C2','F1','F2','3PC','3NC','3F'];
+  if (fullPic.includes(dc))  return 'badge-pic';
+  if (fullSic.includes(dc))  return 'badge-sic';
+  if (part.includes(dc))     return 'badge-part';
+  return 'badge-nocount';
+}
+
+function flightCard(f) {
+  const isNight = parseHHMM(f.night) > 0;
+  const isSim   = f.role === 'SIM';
+
+  // 배지: duty code 우선, 없으면 role
+  const dc = f.dutyCode || '';
+  const dcLabel = dc || f.role || 'SIC';
+  const dcClass = dc ? dutyCodeBadgeClass(dc) : (f.role === 'PIC' || f.role === 'INST' ? 'badge-pic' : 'badge-sic');
+  const dcBadge = `<span class="badge ${dcClass}">${dcLabel}</span>`;
+  const nightBadge = isNight ? `<span class="badge badge-night">야간</span>` : '';
+  const aldBadge   = f.ald === 'Y' ? `<span class="badge badge-ald">ALD</span>` : '';
+
+  const duration = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+  const cr = calcCreditedTime(f);
+  const creditLabel = cr.pic > 0
+    ? `<span style="color:var(--accent)">${toHHMM(cr.pic)}</span>`
+    : (cr.sic > 0 ? `<span style="color:var(--success)">${toHHMM(cr.sic)}</span>`
+                  : `<span style="color:var(--text3)">—</span>`);
+
+  return `<div class="flight-card ${isNight?'night':''} ${isSim?'sim':''}">
+    <div class="card-top">
+      <div>
+        <div class="card-date">${f.date}</div>
+        <div class="card-flt">${f.flight || '—'}</div>
+        <div class="card-ac">${f.acType || ''} ${f.reg ? '· '+f.reg : ''}</div>
+      </div>
+      <div class="card-badges">${dcBadge}${nightBadge}${aldBadge}</div>
+    </div>
+    <div class="route-row">
+      <div class="apt">
+        <div class="apt-code">${f.dep || '???'}</div>
+        <div class="apt-time">${f.depTime || '--:--'}</div>
+      </div>
+      <div class="route-line">
+        <div class="route-dot"></div>
+        <div class="route-track"></div>
+        <div class="route-plane">✈</div>
+        <div class="route-track2"></div>
+        <div class="route-dot"></div>
+      </div>
+      <div class="apt">
+        <div class="apt-code">${f.arr || '???'}</div>
+        <div class="apt-time">${f.arrTime || '--:--'}</div>
+      </div>
+    </div>
+    <div class="card-footer">
+      <div class="card-stat">
+        <div class="card-stat-val" style="color:var(--accent)">${toHHMM(duration)}</div>
+        <div class="card-stat-lbl">비행시간</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val">${creditLabel}</div>
+        <div class="card-stat-lbl">인정시간</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val">${toHHMM(parseHHMM(f.night)||0)}</div>
+        <div class="card-stat-lbl">야간</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val">${toHHMM(parseHHMM(f.ifr)||0)}</div>
+        <div class="card-stat-lbl">계기</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val" style="font-size:11px">${f.toPf !== undefined ? f.toPf : (parseInt(f.takeoffs||f.toCnt||1)>0?'PF':'PM')}</div>
+        <div class="card-stat-lbl">T/O</div>
+      </div>
+      <div class="card-stat">
+        <div class="card-stat-val" style="font-size:11px">${f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||1)>0?'PF':'PM')}</div>
+        <div class="card-stat-lbl">LDG</div>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <textarea class="notes-ta" id="notes-${f.id}" placeholder="메모 (부기장, 특이사항 등...)" onblur="saveNotes('${f.id}',this.value)">${escHtml(f.remarks||'')}</textarea>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="editEntry('${f.id}')" style="flex:1;background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;">✏️ 수정</button>
+      <button onclick="deleteEntry('${f.id}')" style="flex:1;background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;">🗑 삭제</button>
+    </div>
+  </div>`;
+}
+
+// ─── Stats ──────────────────────────────────────────────────────
+function updateStats() {
+  let total=0, pic=0, sic=0, night=0, ifr=0, landings=0, ald=0;
+  const now = new Date();
+  let last90 = 0;
+
+  flights.forEach(f => {
+    const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    total += dur;
+    const cr = calcCreditedTime(f);
+    pic += cr.pic;
+    sic += cr.sic;
+    night   += parseHHMM(f.night) || 0;
+    ifr     += parseHHMM(f.ifr)   || 0;
+    landings += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||1)>0)) ? 1 : 0;
+    if (f.ald === 'Y') ald++;
+
+    const fDate = new Date(f.date);
+    const diff = (now - fDate) / (1000*60*60*24);
+    if (diff <= 90) last90 += dur;
+  });
+
+  document.getElementById('statTotalHours').textContent = toHHMM(total);
+  document.getElementById('statPicHours').textContent   = toHHMM(pic);
+  document.getElementById('statSicHours').textContent   = toHHMM(sic);
+  document.getElementById('statNightHours').textContent = toHHMM(night);
+  document.getElementById('statIfrHours').textContent   = toHHMM(ifr);
+  document.getElementById('statLandings').textContent   = landings;
+  document.getElementById('statAld').textContent        = ald;
+  document.getElementById('statLast90').textContent     = toHHMM(last90);
+  document.getElementById('totalFlightsLabel').textContent = `${flights.length} 비행`;
+}
+
+// ─── Charts ─────────────────────────────────────────────────────
+let chartYear = 'all'; // 'all' 또는 '2024' 등 연도 문자열
+
+function getChartFlights() {
+  if (chartYear === 'all') return flights;
+  return flights.filter(f => f.date && f.date.startsWith(chartYear));
+}
+
+function renderCharts() {
+  // 연도 선택 버튼 렌더링
+  const years = [...new Set(flights.map(f => f.date ? f.date.slice(0,4) : null).filter(Boolean))].sort();
+  const nav = document.getElementById('chartYearNav');
+  if (nav) {
+    const allYears = ['all', ...years];
+    nav.innerHTML = allYears.map(y => {
+      const isActive = chartYear === y;
+      const label = y === 'all' ? '전체' : y + '년';
+      return `<button onclick="setChartYear('${y}')"
+        style="flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:${isActive?'700':'400'};
+               cursor:pointer;white-space:nowrap;
+               background:${isActive ? 'var(--accent)' : 'var(--surface2)'};
+               border:1px solid ${isActive ? 'var(--accent)' : 'var(--border)'};
+               color:${isActive ? '#fff' : 'var(--text2)'}">
+        ${label}
+      </button>`;
+    }).join('');
+  }
+
+  renderChartSummary();
+  renderMonthlyChart();
+  renderDonut();
+  renderAirportChart();
+}
+
+function setChartYear(y) {
+  chartYear = y;
+  renderCharts();
+}
+
+function renderChartSummary() {
+  const fs = getChartFlights();
+  const el = document.getElementById('chartSummary');
+  if (!el) return;
+  let total=0, pic=0, sic=0, night=0, ldg=0;
+  fs.forEach(f => {
+    const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    total += dur;
+    const cr = calcCreditedTime(f);
+    pic += cr.pic; sic += cr.sic;
+    night += parseHHMM(f.night) || 0;
+    ldg += parseInt(f.landings) || 0;
+  });
+  const label = chartYear === 'all' ? '전체' : chartYear + '년';
+  el.innerHTML = [
+    { lbl: '비행편수', val: fs.length + '편', color: 'var(--text1)' },
+    { lbl: '총 비행시간', val: toHHMM(total), color: 'var(--accent)' },
+    { lbl: 'PIC', val: toHHMM(pic), color: '#3b82f6' },
+    { lbl: 'SIC', val: toHHMM(sic), color: '#10b981' },
+    { lbl: '야간', val: toHHMM(night), color: '#f59e0b' },
+    { lbl: '착륙', val: ldg + '회', color: 'var(--text2)' },
+  ].map(s => `<div>
+    <div style="font-size:16px;font-weight:700;color:${s.color}">${s.val}</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:2px">${s.lbl}</div>
+  </div>`).join('');
+}
+
+function renderMonthlyChart() {
+  const el = document.getElementById('monthlyChart');
+  const fs = getChartFlights();
+  if (!fs.length) { el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">데이터 없음</div>'; return; }
+
+  const titleEl = document.getElementById('monthlyChartTitle');
+
+  const map = {};
+  fs.forEach(f => {
+    const k = f.date.slice(0,7);
+    const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    map[k] = (map[k]||0) + dur;
+  });
+
+  let entries = Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]));
+
+  // 전체 선택 시 연도별로 접어서 보여줌 (연도 소계 행 + 월 표시)
+  if (chartYear === 'all') {
+    if (titleEl) titleEl.textContent = '연도별 비행시간';
+    const yearMap = {};
+    entries.forEach(([k,v]) => {
+      const y = k.slice(0,4);
+      if (!yearMap[y]) yearMap[y] = { total: 0, months: [] };
+      yearMap[y].total += v;
+      yearMap[y].months.push([k, v]);
+    });
+    const allVals = Object.values(yearMap).map(y => y.total);
+    const maxY = Math.max(...allVals, 1);
+    el.innerHTML = Object.entries(yearMap).sort((a,b)=>b[0].localeCompare(a[0])).map(([yr, data]) => {
+      const pct = Math.round(data.total / maxY * 100);
+      const maxM = Math.max(...data.months.map(m=>m[1]), 1);
+      const monthRows = data.months.map(([k,v]) => {
+        const mNum = parseInt(k.slice(5));
+        return `<div class="bar-row" style="margin-left:12px;opacity:0.85">
+          <div class="bar-label" style="font-size:11px">${mNum}월</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${Math.round(v/maxM*100)}%;background:var(--accent-glow)">${toHHMM(v)}</div>
+          </div>
+          <div class="bar-val" style="font-size:11px">${toHHMM(v)}</div>
+        </div>`;
+      }).join('');
+      return `<details style="margin-bottom:8px">
+        <summary style="cursor:pointer;list-style:none;margin-bottom:4px">
+          <div class="bar-row">
+            <div class="bar-label" style="font-weight:700;color:var(--text1)">${yr}년</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${pct}%">${toHHMM(data.total)}</div>
+            </div>
+            <div class="bar-val">${toHHMM(data.total)}</div>
+          </div>
+        </summary>
+        ${monthRows}
+      </details>`;
+    }).join('');
+  } else {
+    // 특정 연도: 12개월 전체 표시
+    if (titleEl) titleEl.textContent = chartYear + '년 월별 비행시간';
+    const max = Math.max(...entries.map(e=>e[1]), 1);
+    // 1~12월 전체 슬롯
+    const allMonths = Array.from({length:12}, (_,i) => {
+      const m = String(i+1).padStart(2,'0');
+      const k = `${chartYear}-${m}`;
+      return [k, map[k] || 0];
+    });
+    el.innerHTML = allMonths.map(([k,v]) => {
+      const mNum = parseInt(k.slice(5));
+      const pct = Math.round(v/max*100);
+      return `<div class="bar-row">
+        <div class="bar-label">${mNum}월</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${pct}%;${v===0?'background:var(--surface3);min-width:0':''}">${v>0?toHHMM(v):''}</div>
+        </div>
+        <div class="bar-val" style="color:${v>0?'var(--text1)':'var(--text3)'}">${v>0?toHHMM(v):'—'}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function renderDonut() {
+  const fs = getChartFlights();
+  let pic=0, sic=0, night=0;
+  fs.forEach(f => {
+    const cr = calcCreditedTime(f);
+    pic  += cr.pic;
+    sic  += cr.sic;
+    night += parseHHMM(f.night) || 0;
+  });
+
+  const total = pic + sic || 1;
+  const r = 35, circ = 2*Math.PI*r;
+  const segments = [
+    { val: pic, color: '#3b82f6', label: 'PIC' },
+    { val: sic, color: '#10b981', label: 'SIC' },
+  ];
+
+  let offset = 0;
+  const svgParts = segments.map(s => {
+    const frac = s.val / total;
+    const dash = frac * circ;
+    const gap = circ - dash;
+    const el = `<circle cx="50" cy="50" r="${r}" fill="none" stroke="${s.color}"
+      stroke-width="18" stroke-dasharray="${dash} ${gap}"
+      stroke-dashoffset="${-offset + circ*0.25}"
+      style="transition:all 0.6s"/>`;
+    offset += dash;
+    return el;
+  });
+
+  document.getElementById('donutSvg').innerHTML =
+    `<circle cx="50" cy="50" r="${r}" fill="none" stroke="#1f2937" stroke-width="18"/>` +
+    svgParts.join('') +
+    `<text x="50" y="46" text-anchor="middle" fill="#f9fafb" font-size="10" font-weight="700">${toHHMM(total)}</text>
+    <text x="50" y="58" text-anchor="middle" fill="#6b7280" font-size="8">Total</text>`;
+
+  document.getElementById('donutLegend').innerHTML = segments.map(s => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${s.color}"></div>
+      <span class="legend-text">${s.label}</span>
+      <span class="legend-val" style="color:${s.color}">${toHHMM(s.val)}</span>
+    </div>`).join('') +
+    `<div class="legend-item">
+      <div class="legend-dot" style="background:#f59e0b"></div>
+      <span class="legend-text">야간</span>
+      <span class="legend-val" style="color:#f59e0b">${toHHMM(night)}</span>
+    </div>`;
+}
+
+function renderAirportChart() {
+  const el = document.getElementById('airportChart');
+  const fs = getChartFlights();
+  if (!fs.length) { el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">데이터 없음</div>'; return; }
+
+  const map = {};
+  fs.forEach(f => {
+    const _isLdgPf = f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||1)>0);
+    if (f.arr && _isLdgPf) map[f.arr] = (map[f.arr]||0) + 1;
+  });
+  const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const max = Math.max(...entries.map(e=>e[1]), 1);
+
+  el.innerHTML = `<div class="bar-chart">${entries.map(([apt,cnt]) => `
+    <div class="bar-row">
+      <div class="bar-label">${apt}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${Math.round(cnt/max*100)}%">${cnt}</div>
+      </div>
+      <div class="bar-val">${cnt}회</div>
+    </div>`).join('')}</div>`;
+}
+
+// ─── Currency ────────────────────────────────────────────────────
+function renderCurrency() {
+  const el = document.getElementById('currencyList');
+  if (!flights.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px">비행 기록을 입력하면 자격 현황이 표시됩니다</div>';
+    return;
+  }
+
+  const now = new Date();
+  const sorted = [...flights].sort((a,b)=>b.date.localeCompare(a.date));
+
+  // 최근 90일 집계
+  let ldg90=0, ldg90Day=0, ldg90Night=0, ald90=0;
+  let hrs90=0, pic90=0, sic90=0, ifr90=0;
+  sorted.forEach(f => {
+    const d = new Date(f.date);
+    const diff = (now-d)/(1000*60*60*24);
+    if (diff<=90) {
+      ldg90 += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||1)>0)) ? 1 : 0;
+      ldg90Day    += parseInt(f.dayLdg)   || 0;
+      ldg90Night  += parseInt(f.nightLdg) || 0;
+      if (f.ald === 'Y') ald90++;
+      const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+      hrs90 += dur;
+      ifr90 += parseHHMM(f.ifr) || 0;
+      const cr = calcCreditedTime(f);
+      pic90 += cr.pic; sic90 += cr.sic;
+    }
+  });
+
+  // 최종 비행일
+  const lastFlight = sorted[0];
+  const lastDate = new Date(lastFlight.date);
+  const daysSince = Math.floor((now-lastDate)/(1000*60*60*24));
+
+  function card(icon, name, detail, status, cls) {
+    return `<div class="currency-card">
+      <div class="currency-icon ${cls}">${icon}</div>
+      <div class="currency-info">
+        <div class="currency-name">${name}</div>
+        <div class="currency-detail">${detail}</div>
+      </div>
+      <div class="currency-status status-${cls}">${status}</div>
+    </div>`;
+  }
+
+  const ldgOk    = ldg90 >= 3;
+  const hrsOk    = hrs90 >= 60;
+  const recencyOk = daysSince <= 90;
+  const ifrOk    = ifr90 >= 60;
+  const aldOk    = ald90 >= 1;
+
+  el.innerHTML =
+    card('🛬', '최근 90일 착륙 (3회)',      `최근 90일: ${ldg90}회 (주간 ${ldg90Day} / 야간 ${ldg90Night})`, ldgOk?'충족':'미달', ldgOk?'ok':'fail') +
+    card('⏱', '최근 90일 비행시간',          `${toHHMM(hrs90)} (PIC ${toHHMM(pic90)} / SIC ${toHHMM(sic90)})`, hrsOk?'충족':'확인', hrsOk?'ok':'warn') +
+    card('📅', '최종 비행일',                 `${daysSince}일 전 (${lastFlight.date})`, recencyOk?'유효':'확인', recencyOk?'ok':'warn') +
+    card('🌙', '야간 착륙',                   `최근 90일: ${ldg90Night}회 야간`, ldg90Night>=1?'충족':'미달', ldg90Night>=1?'ok':'warn') +
+    card('📡', '계기비행 시간 (최근 90일)',    `${toHHMM(ifr90)} (기준 60:00)`, ifrOk?'충족':'확인', ifrOk?'ok':'warn') +
+    card('🟣', '오토랜딩 (최근 90일)',         `${ald90}회`, aldOk?'충족':'없음', aldOk?'ok':'warn');
+}
+
+// ─── Modal ───────────────────────────────────────────────────────
+function openModal(prefill) {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '비행 기록 입력';
+  document.getElementById('editId').value = '';
+  // reset
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('fDate').value = today;
+  ['fFlight','fDep','fArr','fDepTime','fArrTime','fReg','fTotal','fNight','fIfr','fRemarks'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('fAcType').value    = 'B737-800';
+  document.getElementById('fRole').value      = 'PIC';
+  document.getElementById('fDutyCode').value  = 'C';
+  document.getElementById('fAld').value       = 'N';
+  document.getElementById('fToPf').value   = 'PF';
+  document.getElementById('fLdgPf').value   = 'PF';
+
+  if (prefill) {
+    Object.entries(prefill).forEach(([k,v]) => {
+      const el = document.getElementById(k);
+      if (el && v !== undefined) el.value = v;
+    });
+  }
+
+  document.getElementById('modalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function editEntry(id) {
+  const f = flights.find(x => x.id === id);
+  if (!f) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = '비행 기록 수정';
+  document.getElementById('editId').value = id;
+  document.getElementById('fDate').value = f.date || '';
+  document.getElementById('fFlight').value = f.flight || '';
+  document.getElementById('fDep').value = f.dep || '';
+  document.getElementById('fArr').value = f.arr || '';
+  document.getElementById('fDepTime').value = f.depTime || '';
+  document.getElementById('fArrTime').value = f.arrTime || '';
+  // B38M/7M8 등 구형 저장값 정규화
+  const _acNorm = {'B737-8 MAX':'B737-8','B737-8MAX':'B737-8','-8 MAX':'B737-8','B737-8':'B737-8','-800':'B737-800'};
+  const _acVal = _acNorm[f.acType] || f.acType || 'B737-800';
+  document.getElementById('fAcType').value = _acVal;
+  document.getElementById('fReg').value = f.reg || '';
+  document.getElementById('fTotal').value = f.total || '';
+  document.getElementById('fNight').value = f.night || '';
+  document.getElementById('fIfr').value = f.ifr || '';
+  document.getElementById('fRole').value      = f.role      || 'SIC';
+  document.getElementById('fDutyCode').value  = f.dutyCode  || 'C';
+  document.getElementById('fAld').value       = f.ald       || 'N';
+  // T/O PF/PM: 신규 필드 우선, 구형(takeoffs/landings)에서 폴백
+  const _toPf  = f.toPf  !== undefined ? f.toPf  : (parseInt(f.takeoffs||f.toCnt||1)>0 ? 'PF' : 'PM');
+  const _ldgPf = f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||1)>0 ? 'PF' : 'PM');
+  document.getElementById('fToPf').value   = _toPf;
+  document.getElementById('fLdgPf').value  = _ldgPf;
+  document.getElementById('fRemarks').value   = f.remarks   || '';
+  document.getElementById('modalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+  if (_ccOrigin) {
+    _ccOrigin = false;
+    document.getElementById('ccModalOverlay').classList.add('show');
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
+  }
+}
+
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+// 모달 내 키보드: Enter → 다음 필드로 이동 (blur 트리거로 자동계산 포함), ESC → 닫기
+function handleModalKey(e) {
+  const tag = e.target.tagName;
+  if (e.key === 'Enter' && tag !== 'TEXTAREA' && tag !== 'SELECT' && tag !== 'BUTTON') {
+    e.preventDefault();
+    // 현재 필드 blur → onblur 핸들러(formatTimeInput, autoCalcTotal) 실행
+    e.target.blur();
+    // 다음 포커스 가능한 form-input으로 이동
+    const inputs = [...document.querySelectorAll('#modalOverlay .form-input, #modalOverlay select, #modalOverlay button.submit-btn')];
+    const idx = inputs.indexOf(e.target);
+    if (idx >= 0 && idx < inputs.length - 1) inputs[idx + 1].focus();
+  } else if (e.key === 'Escape') {
+    closeModal();
+  }
+}
+
+// ESC로 열린 모달 닫기 (전체 페이지)
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (document.getElementById('modalOverlay').classList.contains('show')) closeModal();
+    if (document.getElementById('ccModalOverlay').classList.contains('show')) closeCrewConnex();
+    if (document.getElementById('printModalOverlay').classList.contains('show')) closePrintModal();
+  }
+});
+
+function saveEntry() {
+  const date = document.getElementById('fDate').value;
+  const dep = document.getElementById('fDep').value.toUpperCase().trim();
+  const arr = document.getElementById('fArr').value.toUpperCase().trim();
+  if (!date) { showToast('날짜를 입력해 주세요'); return; }
+
+  const depTime = document.getElementById('fDepTime').value;
+  const arrTime = document.getElementById('fArrTime').value;
+  let total = document.getElementById('fTotal').value;
+  if (!total && depTime && arrTime) {
+    total = toHHMM(calcDuration(depTime, arrTime));
+  }
+
+  const entry = {
+    id: editingId || uid(),
+    date,
+    flight: document.getElementById('fFlight').value.toUpperCase().trim(),
+    dep, arr, depTime, arrTime,
+    acType: document.getElementById('fAcType').value,
+    reg: document.getElementById('fReg').value.toUpperCase().trim(),
+    total,
+    night: document.getElementById('fNight').value,
+    ifr: document.getElementById('fIfr').value,
+    role:      document.getElementById('fRole').value,
+    dutyCode:  document.getElementById('fDutyCode').value,
+    dutyCodeManual: true,  // 수동 저장 → PDF 재업로드 시 덮어쓰기 방지
+    ald:       document.getElementById('fAld').value,
+    toPf:     document.getElementById('fToPf').value,
+    ldgPf:    document.getElementById('fLdgPf').value,
+    remarks:   document.getElementById('fRemarks').value,
+  };
+
+  if (editingId) {
+    const idx = flights.findIndex(x => x.id === editingId);
+    if (idx >= 0) {
+      const inlineNotes = document.getElementById('notes-' + editingId);
+      if (inlineNotes && !entry.remarks) entry.remarks = flights[idx].remarks || '';
+      flights[idx] = entry;
+    }
+  } else {
+    flights.push(entry);
+  }
+
+  saveData();
+  renderFlights();
+  closeModal();
+  showToast(editingId ? '수정되었습니다' : '비행 기록이 저장되었습니다 ✈');
+}
+
+
+function saveNotes(id, val) {
+  const idx = flights.findIndex(f => f.id === id);
+  if (idx < 0) return;
+  const trimmed = val.trim();
+  if (flights[idx].remarks === trimmed) return;
+  flights[idx].remarks = trimmed;
+  saveData(true);  // immediate=true → Firestore 즉시 저장
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function resetAllData() {
+  if (!confirm(`저장된 비행 기록 ${flights.length}개를 모두 삭제합니다.\nPDF를 다시 업로드하면 정확한 dutyCode로 저장됩니다.\n\n계속하시겠습니까?`)) return;
+  flights = [];
+  saveData();
+  renderFlights();
+  showToast('전체 데이터가 삭제됐습니다. PDF를 다시 업로드해 주세요.');
+}
+
+function deleteEntry(id) {
+  if (!confirm('이 비행 기록을 삭제할까요?')) return;
+  flights = flights.filter(x => x.id !== id);
+  saveData();
+  renderFlights();
+  showToast('삭제되었습니다');
+}
+
+// ─── PDF Upload & Parsing ────────────────────────────────────────
+const uploadZone = document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  if (file.name.match(/\.xlsx?$/i)) processExcel(file);
+  else if (file.type === 'application/pdf' || file.name.match(/\.pdf$/i)) processPDF(file);
+  else showToast('PDF 또는 Excel(.xlsx) 파일만 업로드할 수 있습니다');
+});
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.name.match(/\.xlsx?$/i)) processExcel(file);
+  else processPDF(file);
+  e.target.value = '';
+}
+
+async function processExcel(file) {
+  const progress = document.getElementById('parseProgress');
+  const bar      = document.getElementById('progressBar');
+  const pct      = document.getElementById('progressPct');
+  const txt      = document.getElementById('progressText');
+  const result   = document.getElementById('parseResult');
+  const preview  = document.getElementById('parsePreview');
+  const previewList = document.getElementById('previewList');
+
+  progress.classList.add('show');
+  preview.classList.remove('show');
+  bar.style.width = '20%'; pct.textContent = '20%';
+  txt.textContent = 'Excel 파일 읽는 중...';
+  result.textContent = '';
+
+  try {
+    if (typeof XLSX === 'undefined') throw new Error('SheetJS 라이브러리 로드 실패. 인터넷 연결 확인 후 새로고침 하세요.');
+
+    const ab = await file.arrayBuffer();
+    bar.style.width = '50%'; pct.textContent = '50%';
+    txt.textContent = '데이터 파싱 중...';
+
+    const wb   = XLSX.read(ab, { type: 'array' });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    const acMap = {
+      '738':'B737-800','73H':'B737-800',
+      '7M8':'B737-8','B38M':'B737-8',
+      '320':'A320','321':'A321'
+    };
+
+    function fmtTime(v) {
+      if (!v) return '';
+      const s = String(v).replace(/[^0-9]/g,'').padStart(4,'0');
+      return s.slice(0,2) + ':' + s.slice(2,4);
+    }
+    function fmtDate(v) {
+      if (!v) return '';
+      const s = String(v).replace(/[^0-9]/g,'');
+      if (s.length === 8) return s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8);
+      return s;
+    }
+    function excelDutyToRole(dc) {
+      const d = (dc||'').toUpperCase();
+      if (['C','2C','H','L','PC','3PC','C1','C2'].includes(d)) return 'PIC';
+      if (['F','2F','NC','3F','3NC','F1','F2'].includes(d))    return 'SIC';
+      if (['R','S'].includes(d))                                return 'SIC';
+      if (['K'].includes(d))                                    return 'INST';
+      return 'PIC';
+    }
+
+    const parsed = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const rawDate = r[2];
+      const dep = String(r[11]||'').trim();
+      const arr = String(r[12]||'').trim();
+      if (!rawDate || !dep || !arr) continue;
+
+      const date     = fmtDate(rawDate);
+      if (!date) continue;
+      const depTime  = fmtTime(r[3]);
+      const fltNo    = String(r[4]||'').trim();
+      const reg      = String(r[5]||'').trim();
+      const empNo    = String(r[6]||'').trim();
+      const empName  = String(r[7]||'').trim();
+      const empCls   = String(r[8]||'').trim();
+      const rawDuty  = String(r[10]||'').trim();
+      const rawAc    = String(r[1]||'').trim();
+      const fTotal   = String(r[14]||'').trim();
+      const fNight   = String(r[15]||'').trim();
+      const fIfr     = String(r[16]||'').trim();
+      const toCnt    = String(r[17]||'').trim();
+      const ldCnt    = String(r[18]||'').trim();
+
+      const dutyCode  = rawDuty || 'C';
+      const role      = excelDutyToRole(dutyCode);
+      const isMonitor = ['3NC','3F','R','S','O','D','Y','K','EX','2NC','2NF','M'].includes(dutyCode.toUpperCase());
+      const takeoffs  = (toCnt === 'Y') ? 1 : 0;
+      const landings  = (ldCnt === 'Y') ? 1 : 0;
+      const dayLdg    = isMonitor ? 0 : landings;
+      const acType    = acMap[rawAc] || rawAc;
+      const remarks   = empName ? (empCls ? empCls+' ' : '') + empName + '(' + empNo + ')' : '';
+
+      // 앱이 사용하는 필드명으로 저장 (flight, not fltNo)
+      parsed.push({
+        id: uid(),
+        date,
+        depTime,
+        flight: fltNo,   // ← 앱 필드명
+        dep, arr,
+        reg, acType,
+        total: fTotal,
+        night: fNight,
+        ifr: fIfr,
+        dutyCode, role,
+        toPf: takeoffs > 0 ? 'PF' : 'PM',
+        ldgPf: landings > 0 ? 'PF' : 'PM',
+        dayLdg: String(dayLdg),
+        remarks,
+        source: 'excel'
+      });
+    }
+
+    if (parsed.length === 0) throw new Error('파싱된 비행 데이터가 없습니다. 파일 형식을 확인하세요.');
+
+    bar.style.width = '75%'; pct.textContent = '75%';
+    txt.textContent = '기존 데이터와 합치는 중...';
+
+    // 기존 flights 배열과 dedup 후 병합 (date+flight+dep+arr 기준)
+    const existingKeys = new Set(flights.map(f => `${f.date}_${f.flight}_${f.dep}${f.arr}`));
+    const newFlights = parsed.filter(f => !existingKeys.has(`${f.date}_${f.flight}_${f.dep}${f.arr}`));
+    const skipped = parsed.length - newFlights.length;
+    const saved   = newFlights.length;
+
+    if (saved > 0) {
+      flights = [...flights, ...newFlights].sort((a,b) => b.date.localeCompare(a.date));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
+      if (currentUser) await saveToFirestore(currentUser.uid);
+    }
+
+    bar.style.width = '100%'; pct.textContent = '100%';
+    result.innerHTML = `✅ <strong>${saved}편</strong> 저장 완료${skipped > 0 ? ` (${skipped}편 중복 건너뜀)` : ''}`;
+
+    previewList.innerHTML = parsed.slice(0,10).map(f =>
+      `<div class="preview-item">
+        <span class="preview-date">${f.date}</span>
+        <span class="preview-route">${f.dep}→${f.arr}</span>
+        <span class="preview-flt">${f.flight}</span>
+        <span class="preview-time">${f.total}</span>
+        <span class="badge ${dutyCodeBadgeClass(f.dutyCode)}">${f.dutyCode}</span>
+      </div>`
+    ).join('') + (parsed.length > 10 ? `<div style="text-align:center;color:var(--text3);font-size:12px;padding:8px">외 ${parsed.length-10}편...</div>` : '');
+    preview.classList.add('show');
+
+    // 로그북 바로가기 버튼 표시
+    document.getElementById('goLogbookBtn').style.display = 'block';
+
+    renderFlights();
+
+  } catch(err) {
+    bar.style.width = '100%';
+    result.textContent = '❌ 오류: ' + err.message;
+    console.error('processExcel error:', err);
+  }
+}
+
+async function processPDF(file) {
+  const progress = document.getElementById('parseProgress');
+  const bar = document.getElementById('progressBar');
+  const pct = document.getElementById('progressPct');
+  const txt = document.getElementById('progressText');
+  const result = document.getElementById('parseResult');
+  const preview = document.getElementById('parsePreview');
+  const previewList = document.getElementById('previewList');
+
+  progress.classList.add('show');
+  preview.classList.remove('show');
+  bar.style.width = '10%';
+  pct.textContent = '10%';
+  txt.textContent = 'PDF 로딩 중...';
+  result.textContent = '';
+
+  try {
+    const ab = await file.arrayBuffer();
+    bar.style.width = '25%'; pct.textContent = '25%';
+    txt.textContent = '페이지 분석 중...';
+
+    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    const totalPages = pdf.numPages;
+    let allLines = [];
+
+    for (let p = 1; p <= totalPages; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+
+      // Y좌표 기준으로 텍스트 아이템을 묶어 실제 줄을 재구성
+      const yGroups = {};
+      tc.items.forEach(item => {
+        const y = Math.round(item.transform[5]);
+        const key = Object.keys(yGroups).find(k => Math.abs(parseInt(k) - y) <= 3);
+        if (key !== undefined) yGroups[key].push({ str: item.str, x: Math.round(item.transform[4]) });
+        else yGroups[y] = [{ str: item.str, x: Math.round(item.transform[4]) }];
+      });
+
+      // Y 내림차순(위→아래), 같은 줄 내부는 X 오름차순(좌→우)
+      const pageLines = Object.entries(yGroups)
+        .sort((a, b) => parseInt(b[0]) - parseInt(a[0]))
+        .map(([, items]) => items.sort((a, b) => a.x - b.x).map(i => i.str).join(' ').replace(/\s+/g, ' ').trim())
+        .filter(l => l.length > 0);
+
+      allLines.push(...pageLines);
+      const prog = 25 + Math.round((p / totalPages) * 50);
+      bar.style.width = prog + '%'; pct.textContent = prog + '%';
+    }
+
+    txt.textContent = '비행 데이터 추출 중...';
+    bar.style.width = '80%'; pct.textContent = '80%';
+
+    const allText = allLines.join('\n');
+    const parsed = parseJejuAirEpaper(allText, file.name, allLines);
+
+    bar.style.width = '100%'; pct.textContent = '100%';
+    txt.textContent = '완료';
+
+    if (parsed.length === 0) {
+      result.style.color = 'var(--warning)';
+      result.textContent = '⚠ 자동 파싱된 비행 기록이 없습니다. 수동 입력을 이용해 주세요.';
+      showToast('파싱 결과 없음 — 수동 입력을 이용해 주세요');
+      return;
+    }
+
+    // 신규 / 업데이트 분류
+    const fkey = f => `${f.date}-${f.flight}-${f.dep}-${f.arr}`;
+    const existingMap = new Map(flights.map(f => [fkey(f), f]));
+    const newOnes = parsed.filter(f => !existingMap.has(fkey(f)));
+    const updates = parsed.filter(f =>  existingMap.has(fkey(f)));
+
+    result.style.color = 'var(--success)';
+    result.textContent = `✅ ${parsed.length}개 추출 / 신규 ${newOnes.length}개 / 업데이트 ${updates.length}개`;
+
+    // Preview
+    const previewItems = [...newOnes, ...updates].slice(0, 8);
+    previewList.innerHTML = previewItems.map(f => {
+      const isUpd = existingMap.has(fkey(f));
+      return `<div class="preview-item">
+        <div class="preview-dot" style="background:${isUpd ? 'var(--warning)' : 'var(--accent)'}"></div>
+        <span>${f.date} ${f.flight} ${f.dep}→${f.arr} ${f.total||''}${isUpd ? ' <span style="color:var(--warning);font-size:10px">업데이트</span>' : ''}</span>
+      </div>`;
+    }).join('') +
+    (parsed.length > 8 ? `<div class="preview-item"><div class="preview-dot" style="background:var(--text3)"></div><span style="color:var(--text3)">외 ${parsed.length-8}건...</span></div>` : '');
+    preview.classList.add('show');
+
+    console.log(`[파싱결과] 전체=${parsed.length} 신규=${newOnes.length} 업데이트=${updates.length}`);
+    if (parsed.length > 0) {
+      console.log('[파싱샘플]', parsed[0]);
+      const codes = [...new Set(parsed.map(f => f.dutyCode))];
+      console.log('[dutyCode 목록]', codes);
+    }
+
+    if (newOnes.length === 0 && updates.length === 0) {
+      showToast('파싱된 기록이 없습니다');
+      return;
+    }
+
+    const msgParts = [];
+    if (newOnes.length > 0) msgParts.push(`신규 ${newOnes.length}개 추가`);
+    if (updates.length > 0) msgParts.push(`기존 ${updates.length}개 업데이트 (계기시간·ALD 갱신)`);
+    const confirmAdd = confirm(msgParts.join('\n') + '\n\n진행하시겠습니까?');
+    if (confirmAdd) {
+      // 신규 추가
+      flights.push(...newOnes);
+      // 기존 기록 업데이트: PDF 값으로 덮어쓰되, 사용자가 직접 수정한 dutyCode는 보존
+      updates.forEach(f => {
+        const idx = flights.findIndex(x => fkey(x) === fkey(f));
+        if (idx >= 0) {
+          const prev = flights[idx];
+          flights[idx] = {
+            ...f,
+            id: prev.id,
+            remarks:  prev.remarks || '',
+            // dutyCodeManual=true면 사용자가 직접 수정한 것이므로 유지, 아니면 PDF값 사용
+            dutyCode: prev.dutyCodeManual ? prev.dutyCode : f.dutyCode,
+            dutyCodeManual: prev.dutyCodeManual || false,
+          };
+        }
+      });
+      saveData();
+      renderFlights();
+      showToast(msgParts.join(' / ') + ' ✈');
+      switchTab('logbook', document.querySelectorAll('.tab-btn')[0]);
+    }
+
+  } catch (err) {
+    console.error(err);
+    bar.style.width = '100%';
+    result.style.color = 'var(--danger)';
+    result.textContent = '오류: ' + err.message;
+    showToast('PDF 파싱 오류 — 수동 입력을 이용해 주세요');
+  }
+}
+
+// ─── Jeju Air ePaper Parser ──────────────────────────────────────
+// PDF 형식 (제주항공 PILOT FLIGHT LOG):
+//   메인줄: YYYY/MM/DD  ACTYPE  AC_NO  FLT_NO  DEP  ARR  T/P  blockTime  airTime  nightTime  instTime  Y  Y  N
+//   다음줄: depUTC  arrUTC
+//   blockTime: 도착UTC-출발UTC와 일치 (gate-to-gate)
+//   nightTime: 야간 비행시간
+//   AC_NO (예: 8087) → 등록부호 HL8087
+//   FLT_NO (예: 1303) → 편명 7C1303
+function parseJejuAirEpaper(text, filename, lines) {
+  const results = [];
+  const seen = new Set();
+  const srcLines = lines || text.split(/\r?\n/);
+
+  // 헤더에서 직책 감지 → PIC/SIC
+  const role = /\bCAPTAIN\b/i.test(text) ? 'PIC' : 'SIC';
+
+  function mapAcType(s) {
+    const u = s.toUpperCase();
+    if (u === '7M8' || u === 'B38M') return 'B737-8';
+    if (u === 'B738' || u === 'B737') return 'B737-800';
+    if (u.includes('A321')) return 'A321';
+    if (u.includes('A320')) return 'A320';
+    if (u.includes('Q400')) return 'Q400';
+    return s;
+  }
+
+  // 메인 데이터 줄 패턴
+  // YYYY/MM/DD  ACTYPE  AC_NO(3~5자리)  FLT_NO(3~4자리)  DEP  ARR  T/P  t1  t2  t3  t4  Y  Y  N
+  // T/P 캡처: [A-Z0-9]{1,3} — C, F, R, 2C, 2F, 3PC, 3NC, 3F 등 모두 처리
+  const MAIN_RE = /^(\d{4}[\/\-]\d{2}[\/\-]\d{2})\s+(7M8|B738|B38M|B737|A32[019]|A321|Q400)\s+(\d{3,5})\s+(\d{3,4})\s+([A-Z]{3})\s+([A-Z]{3})\s+([A-Z0-9]{1,3})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+([YN])\s+([YN])\s+([YN])/;
+
+  // 출발/도착 UTC 시간 줄 (딱 HH:MM HH:MM 두 개만)
+  const TIME_RE = /^(\d{2}:\d{2})\s+(\d{2}:\d{2})$/;
+
+  for (let i = 0; i < srcLines.length; i++) {
+    const line = srcLines[i].trim();
+    const m = MAIN_RE.exec(line);
+    if (!m) continue;
+
+    // m[1]=date, m[2]=acTypeRaw, m[3]=acNo,  m[4]=fltNo
+    // m[5]=dep,  m[6]=arr,       m[7]=dutyCode(T/P)
+    // m[8]=blockTime(t1), m[9]=t2, m[10]=nightTime(t3), m[11]=instTime(t4)
+    // m[12]=T/O, m[13]=L/D, m[14]=ALD
+    const date     = m[1].replace(/\//g, '-');
+    const acType   = mapAcType(m[2]);
+    const reg      = 'HL' + m[3];
+    const flight   = '7C' + m[4];
+    const dep      = m[5];
+    const arr      = m[6];
+    const dutyCode = m[7].toUpperCase();
+    // t1=Duty(gate-to-gate) │ t2=A/T(air time) │ t3=Night Time │ t4=Inst Time
+    const blockTime = m[8];
+    const nightTime = m[10];
+    const instTime  = m[11];
+
+    // 줄 끝 Y/N 3개를 명시적으로 추출 → T/O, L/D, ALD
+    const ynEnd = line.match(/([YN])\s+([YN])\s+([YN])\s*$/);
+    const hasLanding = ynEnd ? ynEnd[2] === 'Y' : m[13] === 'Y';
+    const aldVal     = ynEnd ? ynEnd[3]         : (m[14] || 'N');
+
+    // 바로 다음 줄에서 출발/도착 UTC 시간 추출
+    let depTime = '', arrTime = '';
+    if (i + 1 < srcLines.length) {
+      const tl = TIME_RE.exec(srcLines[i + 1].trim());
+      if (tl) { depTime = tl[1]; arrTime = tl[2]; }
+    }
+
+    const key = `${date}-${flight}-${dep}-${arr}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const isNight = parseHHMM(nightTime) > 0;
+
+    results.push({
+      id: uid(), date, flight, dep, arr, depTime, arrTime,
+      acType, reg,
+      total: blockTime,
+      night: nightTime,
+      ifr: instTime,    // Inst Time 컬럼 (PDF t4)
+      role,
+      dutyCode,
+      ald: aldVal,
+      ldgPf: hasLanding ? 'PF' : 'PM',
+      dayLdg:   (hasLanding && !isNight) ? '1' : '0',
+      nightLdg: (hasLanding &&  isNight) ? '1' : '0',
+      remarks: '',
+    });
+  }
+
+  return results;
+}
+
+// ─── CrewConnex Import ───────────────────────────────────────────
+let _ccData = null;
+let _ccOrigin = false; // 상세 모달이 CC Import에서 열렸는지 추적
+
+function openCrewConnex() {
+  document.getElementById('ccResultWrap').style.display = 'none';
+  document.getElementById('ccStatus').textContent = '';
+  document.getElementById('ccModalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCrewConnex() {
+  document.getElementById('ccModalOverlay').classList.remove('show');
+  document.body.style.overflow = '';
+  // 닫을 때 로그인 폼 복원
+  document.getElementById('ccPaneAuto').style.display = '';
+  document.getElementById('ccResultWrap').style.display = 'none';
+}
+
+function closeCcOnOverlay(e) {
+  if (e.target === document.getElementById('ccModalOverlay')) closeCrewConnex();
+}
+
+function ccSwitchTab(tab) {
+  const auto = tab === 'auto';
+  document.getElementById('ccPaneAuto').style.display = auto ? '' : 'none';
+  document.getElementById('ccPaneText').style.display = auto ? 'none' : '';
+  document.getElementById('ccTabAuto').className = 'cc-tab-btn' + (auto ? ' active' : '');
+  document.getElementById('ccTabText').className = 'cc-tab-btn' + (auto ? '' : ' active');
+  document.getElementById('ccResultWrap').style.display = 'none';
+}
+
+async function loginCrewConnex() {
+  const username = (document.getElementById('ccUsername').value || '').trim();
+  const password =  document.getElementById('ccPassword').value || '';
+  const statusEl =  document.getElementById('ccStatus');
+
+  if (!username || !password) {
+    statusEl.style.color = 'var(--warning)';
+    statusEl.textContent = '⚠ 아이디와 비밀번호를 입력해 주세요';
+    return;
+  }
+
+  statusEl.style.color = 'var(--text2)';
+  statusEl.textContent = '⏳ 로그인 중...';
+  document.getElementById('ccLoginBtn').disabled = true;
+
+  try {
+    const resp = await fetch('https://pilot-logbook.netlify.app/.netlify/functions/crewconnex', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username, password }),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '❌ ' + (data.error || '로그인 실패');
+    } else {
+      statusEl.style.color = 'var(--success)';
+      statusEl.textContent = `✅ ${data.flights?.length || 0}개 비행 추출됨`;
+      renderCcResults(data);
+    }
+  } catch (err) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '❌ 연결 오류: ' + err.message;
+  } finally {
+    document.getElementById('ccLoginBtn').disabled = false;
+  }
+}
+
+function parseCcText() {
+  const text = (document.getElementById('ccPastedText').value || '').trim();
+  if (!text) { showToast('텍스트를 붙여넣어 주세요'); return; }
+  const data = parseCrewConnexText(text);
+  if (!data.flights.length) {
+    showToast('비행 데이터를 찾을 수 없습니다. 체크인 페이지 전체를 복사해 주세요.');
+    return;
+  }
+  renderCcResults(data);
+}
+
+function _buildCrewStr(crew) {
+  return (crew || []).filter(c => c.name)
+    .map(c => `${c.position ? c.position + ': ' : ''}${c.name}`)
+    .join(' / ');
+}
+
+function renderCcResults(data) {
+  _ccData = data;
+  const wrap   = document.getElementById('ccResultWrap');
+  const items  = document.getElementById('ccFlightItems');
+  const crewW  = document.getElementById('ccCrewWrap');
+  const crewTx = document.getElementById('ccCrewText');
+
+  // 결과가 나오면 로그인 폼 숨김 (혼동 방지)
+  document.getElementById('ccPaneAuto').style.display = 'none';
+  document.getElementById('ccPaneText').style.display = 'none';
+
+  const flightHtml = (data.flights || []).map((f, i) => `
+    <label class="cc-flight-item" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+      <input type="checkbox" class="cc-flight-check" data-idx="${i}" onchange="ccUpdateCount()"
+        style="width:18px;height:18px;margin-top:6px;flex-shrink:0;accent-color:var(--accent)">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div>
+            <span style="font-size:15px;font-weight:700">${f.flight || '—'}</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:8px">${f.date}</span>
+          </div>
+          <button class="cc-import-btn" onclick="event.preventDefault();event.stopPropagation();importCcFlight(${i})"
+            style="font-size:11px;padding:4px 10px">상세</button>
+        </div>
+        <div class="cc-route">
+          <span style="font-weight:800;font-size:16px">${f.from}</span>
+          <span style="color:var(--text3);font-size:12px">${f.stdLocal}</span>
+          <span style="color:var(--accent)">✈</span>
+          <span style="font-weight:800;font-size:16px">${f.to}</span>
+          <span style="color:var(--text3);font-size:12px">${f.staLocal}</span>
+          <span style="margin-left:auto;color:var(--text3);font-size:11px">${f.acType} · ${f.blh}</span>
+        </div>
+        ${f.acReg ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${f.acReg}</div>` : ''}
+      </div>
+    </label>`).join('');
+
+  items.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:0 2px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;user-select:none">
+        <input type="checkbox" id="ccSelectAll" onchange="ccToggleAll(this.checked)"
+          style="width:16px;height:16px;accent-color:var(--accent)"> 전체 선택
+      </label>
+      <span id="ccSelCount" style="margin-left:auto;font-size:12px;color:var(--text3)">0개 선택</span>
+    </div>
+    ${flightHtml}
+    <button class="submit-btn" id="ccBatchBtn" onclick="importSelectedFlights()" style="margin-top:10px">
+      선택 가져오기 (0개)
+    </button>`;
+
+  crewW.style.display = 'none'; // 선택 비행 기준으로 ccUpdateCount에서 동적 표시
+  wrap.style.display = '';
+}
+
+function ccToggleAll(checked) {
+  document.querySelectorAll('.cc-flight-check').forEach(cb => cb.checked = checked);
+  ccUpdateCount();
+}
+
+function ccUpdateCount() {
+  const checkedBoxes = [...document.querySelectorAll('.cc-flight-check:checked')];
+  const checked = checkedBoxes.length;
+  const total   = document.querySelectorAll('.cc-flight-check').length;
+  const selEl   = document.getElementById('ccSelCount');
+  const btnEl   = document.getElementById('ccBatchBtn');
+  const allEl   = document.getElementById('ccSelectAll');
+  if (selEl) selEl.textContent = `${checked}개 선택`;
+  if (btnEl) btnEl.textContent = `선택 가져오기 (${checked}개)`;
+  if (allEl) allEl.checked = checked > 0 && checked === total;
+
+  // 선택한 비행의 편조를 하단 패널에 동적 표시
+  const crewW  = document.getElementById('ccCrewWrap');
+  const crewTx = document.getElementById('ccCrewText');
+  if (!crewW || !crewTx || !_ccData) return;
+
+  if (checked === 0) { crewW.style.display = 'none'; return; }
+
+  const selectedIdxs = checkedBoxes.map(cb => +cb.dataset.idx);
+  const lines = [];
+  const seen  = new Set();
+  selectedIdxs.forEach(i => {
+    const f = _ccData.flights[i];
+    const crewStr = _buildCrewStr(f.crew);
+    if (!crewStr) return;
+    const key = `${f.flight}|${crewStr}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    lines.push(`[${f.flight}] ${crewStr}`);
+  });
+
+  if (lines.length > 0) {
+    crewW.style.display = '';
+    crewTx.textContent = lines.join('\n');
+  } else {
+    crewW.style.display = 'none';
+  }
+}
+
+function importSelectedFlights() {
+  const idxs = [...document.querySelectorAll('.cc-flight-check:checked')].map(cb => +cb.dataset.idx);
+  if (!idxs.length) { showToast('가져올 비행을 선택해주세요'); return; }
+
+  const acTypeMap = { 'B737-8 MAX':'B737-8','B737-8MAX':'B737-8','-8 MAX':'B737-8','B737-8':'B737-8','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
+  const added = [];
+
+  for (const i of idxs) {
+    const f = _ccData.flights[i];
+    if (flights.some(x => x.date === f.date && x.flight === f.flight)) continue;
+    const crewStr = _buildCrewStr(f.crew || []);
+    added.push({
+      id: uid(), date: f.date, flight: f.flight,
+      dep: f.from, arr: f.to, depTime: f.stdLocal, arrTime: f.staLocal,
+      acType: acTypeMap[f.acType] || 'B737-800', reg: f.acReg || '', total: f.blh,
+      night: '', ifr: '', role: 'PIC', dutyCode: 'C',
+      dutyCodeManual: false, ald: '', toPf: 'PF', ldgPf: 'PF',
+      remarks: crewStr,
+    });
+  }
+
+  if (!added.length) { showToast('선택한 비행이 이미 저장되어 있습니다'); return; }
+  flights.push(...added);
+  saveData();
+  renderFlights();
+  closeCrewConnex();
+  showToast(`${added.length}개 비행이 저장되었습니다 ✈`);
+}
+
+function importCcFlight(idx) {
+  const f = _ccData.flights[idx];
+  const acTypeMap = { 'B737-8 MAX':'B737-8','B737-8MAX':'B737-8','-8 MAX':'B737-8','B737-8':'B737-8','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
+  // CC 모달을 완전히 닫지 않고 숨기기만 — 저장/닫기 후 복귀하기 위해
+  _ccOrigin = true;
+  document.getElementById('ccModalOverlay').classList.remove('show');
+  openModal({
+    fDate: f.date, fFlight: f.flight, fDep: f.from, fArr: f.to,
+    fDepTime: f.stdLocal, fArrTime: f.staLocal, fTotal: f.blh,
+    fAcType: acTypeMap[f.acType] || 'B737-800', fReg: f.acReg || '',
+    fRemarks: _buildCrewStr(f.crew || []),
+  });
+}
+
+// ── Text parser (copy-paste fallback) ────────────────────────────
+function parseCrewConnexText(rawText) {
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const flights = [];
+  const crew    = [];
+
+  // 오늘 날짜 기준으로 월 추적 (HTML/텍스트에서 뽑은 날짜 대신 사용)
+  const _today     = new Date();
+  let _trackYear   = _today.getFullYear();
+  let _trackMonth  = _today.getMonth() + 1;
+  let _prevDayNum  = 0;
+
+  function resolveDay(dayStr) {
+    const d = parseInt((dayStr || '').replace(/\D/g, ''));
+    if (!d) return _today.toISOString().slice(0, 10);
+    // 월 넘어감 감지: 일수가 크게 줄어들면 (예: 30→1)
+    if (_prevDayNum > 20 && d <= 5) {
+      _trackMonth++;
+      if (_trackMonth > 12) { _trackMonth = 1; _trackYear++; }
+    }
+    _prevDayNum = d;
+    return `${_trackYear}-${String(_trackMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  const AC_MAP = {
+    '7M8': '-8 MAX', 'B38M': '-8 MAX',
+    '738': '-800', 'B738': '-800',
+    'A321': 'A321', 'A320': 'A320', 'Q400': 'Q400',
+  };
+
+  const FLIGHT_RE = /\b([A-Z]{3})\s+(\d{4})\s+\d{4}\s+([A-Z]{3})\s+(\d{4})\s+\d{4}\s+(7M8|B38M|738|B738|A321|A320|Q400)\s+(?:\d{1,2}:\d{2}\s+)?(\d{1,2}:\d{2})/;
+
+  let lastDay = '';
+  for (const line of lines) {
+    // 날짜 행 감지: "Mon 27 Apr" 또는 "Mon 27"
+    const dayM = line.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2})/i);
+    if (dayM) lastDay = dayM[1];
+
+    const m = FLIGHT_RE.exec(line);
+    if (!m) continue;
+
+    const fltM = line.match(/7[Cc]\s*(\d{3,4})/);
+    const flt  = fltM ? `7C${fltM[1]}` : '';
+    const regM = line.match(/\bHL(\d{4,5})\b/);
+
+    flights.push({
+      date:     resolveDay(lastDay),
+      flight:   flt,
+      from:     m[1],
+      to:       m[3],
+      stdLocal: `${m[2].slice(0,2)}:${m[2].slice(2)}`,
+      staLocal: `${m[4].slice(0,2)}:${m[4].slice(2)}`,
+      acType:   AC_MAP[m[5]] || 'B737-800',
+      acReg:    regM ? `HL${regM[1]}` : '',
+      blh:      m[6],
+    });
+  }
+
+  // ±5일 필터
+  const _todayMs  = _today.getTime();
+  const _windowMs = 5 * 24 * 60 * 60 * 1000;
+  const filteredFlights = flights.filter(f => {
+    const diff = new Date(f.date).getTime() - _todayMs;
+    return diff >= -_windowMs && diff <= _windowMs;
+  });
+
+  // ── 편조 파싱: 전체 텍스트에서 글로벌 정규식으로 한 번에 추출 ──
+  const flatText = rawText.replace(/\r?\n/g, ' ');
+  const POS = 'Capt\\s*\\(PIC\\)|SFO|Capt|FO|PUR|JC\\d|FA|OBSP|OBSR|OBS';
+  // 1차: empNo + 이름 + 직책
+  const CREW_RE = new RegExp(`(\\d{6,7})\\s+([가-힣][가-힣A-Za-z0-9]{0,9})\\s+(?:TL\\s+)?(${POS})`, 'g');
+  let cm;
+  while ((cm = CREW_RE.exec(flatText)) !== null) {
+    crew.push({ position: cm[3], empNo: cm[1], name: cm[2] });
+  }
+  // 2차 폴백: 이름 + 직책만
+  if (crew.length === 0) {
+    const CREW2 = new RegExp(`([가-힣]{2,5}[A-Za-z0-9]*)\\s+(?:TL\\s+)?(${POS})`, 'g');
+    while ((cm = CREW2.exec(flatText)) !== null) {
+      crew.push({ position: cm[2], empNo: '', name: cm[1] });
+    }
+  }
+
+  return { flights: filteredFlights, crew };
+}
+
+// ─── Init ────────────────────────────────────────────────────────
+// dutyCode 없는 기존 데이터 마이그레이션
+(function migrateData() {
+  let changed = false;
+  flights.forEach(f => {
+    // ID 없는 flight에 ID 부여 → 메모 엉뚱한 카드 저장 버그 방지
+    if (!f.id) {
+      f.id = uid();
+      changed = true;
+    }
+    // dutyCode 없는 flight 보완
+    if (!f.dutyCod

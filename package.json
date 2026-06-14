@@ -1,0 +1,28 @@
+{
+  "name": "pilot-logbook",
+  "version": "1.0.0",
+  "description": "",
+  "main": "DailyNewsBriefing_Final.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rufnek737/pilot-logbook.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rufnek737/pilot-logbook/issues"
+  },
+  "homepage": "https://github.com/rufnek737/pilot-logbook#readme",
+  "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2"
+  }
+}
