@@ -114,8 +114,8 @@ function extractCrewFromRow(rowText) {
   if (names.length < empNos.length) return [];
 
   const posMatches = [];
-  // 3PC|3NC|3F 먼저, JCI(=JC1 이체자) 포함, Capt(PIC) 정규화
-  const posRe = /3PC|3NC|3FO|3F|Capt\s*\(PIC\)|SFO|FO|PUR|JCI|JC\d|FA|Capt/g;
+  // 3PC|3NC|3F 먼저, JCI(=JC1 이체자) 포함, Capt(PIC) 정규화, OBSP/OBSR/OBS(관찰비행) 추가
+  const posRe = /3PC|3NC|3FO|3F|Capt\s*\(PIC\)|SFO|FO|PUR|JCI|JC\d|FA|Capt|OBSP|OBSR|OBS/g;
   let pm;
   while ((pm = posRe.exec(rowText)) !== null) {
     // 정규화: "Capt (PIC)" / "SFO" → "Capt", "JCI" → "JC1", "3FO" → "3F"
@@ -215,19 +215,25 @@ function parseRosterHtml(html) {
         const entry = { date: lastDate, flight: flt, from, to, stdLocal: std, staLocal: sta, acType: ac, acReg, blh, crew };
         flights.push(entry);
         lastFlight = entry;
-      } else if (lastFlight) {
+      } else if (lastFlight && lastDate === lastFlight.date) {
         // 비행 행이 아닌 경우: 크루 누적 (크루가 행마다 1명씩 나오는 경우 대응)
-        const rowText = r.join(' ');
-        const crew = extractCrewFromRow(rowText);
-        if (crew.length > 0) {
-          // 이미 있는 empNo는 건너뜀 (중복 방지)
-          const seen = new Set(lastFlight.crew.map(c => c.empNo));
-          crew.forEach(c => {
-            if (c.empNo && !seen.has(c.empNo)) {
-              lastFlight.crew.push(c);
-              seen.add(c.empNo);
-            }
-          });
+        // 날짜가 다르면 누적 금지 (다른 날 지상교육 편조가 비행에 붙는 버그 방지)
+        const rowFrom = (iFrom >= 0 ? r[iFrom] : '').slice(0, 3).trim().toUpperCase();
+        const rowTo   = (iTo   >= 0 ? r[iTo]   : '').slice(0, 3).trim().toUpperCase();
+        // 출발=도착인 지상훈련/대기(GMP→GMP 등)는 편조 누적 제외
+        if (!rowFrom || rowFrom !== rowTo) {
+          const rowText = r.join(' ');
+          const crew = extractCrewFromRow(rowText);
+          if (crew.length > 0) {
+            // 이미 있는 empNo는 건너뜀 (중복 방지)
+            const seen = new Set(lastFlight.crew.map(c => c.empNo));
+            crew.forEach(c => {
+              if (c.empNo && !seen.has(c.empNo)) {
+                lastFlight.crew.push(c);
+                seen.add(c.empNo);
+              }
+            });
+          }
         }
       }
     }

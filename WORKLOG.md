@@ -2,6 +2,26 @@
 
 ---
 
+## 2026-06-14
+
+### Bug Fix: CrewConnex 편조 파싱 오류 2건 수정
+
+**Bug 1 — OBSP(관찰비행 조종사) 직책 미인식 → 인덱스 밀림**
+- **원인**: `crewconnex.js` `extractCrewFromRow()`의 `posRe` 정규식에 OBSP 없음
+  - 편조 텍스트: `2510018 최원준 OBSP 1208020 조혜정 PUR …`
+  - OBSP를 건너뜀 → posMatches 인덱스가 1 밀림 → 최원준에 PUR, 조혜정에 JC1 등 직책 전부 오기재
+- **수정**: `posRe`에 `OBSP|OBSR|OBS` 추가 (`crewconnex.js` + `index.html` 텍스트 파서 양쪽)
+
+**Bug 2 — 다른 날짜 지상교육 편조가 비행에 누적**
+- **원인**: `parseRosterHtml()` 의 `else if (lastFlight)` 크루 누적 브랜치에 날짜·공항 체크 없음
+  - NGO→ICN(6/12) 이후 테이블 순서로 나오는 GMP→GMP 지상교육(6/15) 편조가
+    날짜 무관하게 `lastFlight`(NGO→ICN)에 계속 누적됨
+- **수정** (`crewconnex.js` `parseRosterHtml`):
+  1. `else if (lastFlight && lastDate === lastFlight.date)` — 날짜가 다르면 누적 금지
+  2. `if (!rowFrom || rowFrom !== rowTo)` — 출발=도착(GMP→GMP)인 지상훈련 행 스킵
+
+---
+
 ## 2026-06-12
 
 ### Bug Fix: Live Server SyntaxError 1984:1 수정 (루트 원인 해결)
