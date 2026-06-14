@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920">
+  <defs>
+    <linearGradient id="skyG" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#060d20"/>
+      <stop offset="60%" stop-color="#0a1540"/>
+      <stop offset="80%" stop-color="#0e1e5a"/>
+      <stop offset="100%" stop-color="#122470"/>
+    </linearGradient>
+    <linearGradient id="horizG" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0e2060"/>
+      <stop offset="15%" stop-color="#1a3080"/>
+      <stop offset="35%" stop-color="#e8780a"/>
+      <stop offset="55%" stop-color="#f09020"/>
+      <stop offset="70%" stop-color="#c86010"/>
+      <stop offset="85%" stop-color="#5a2a08"/>
+      <stop offset="100%" stop-color="#1e1008"/>
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="50%" cy="0%" r="55%">
+      <stop offset="0%" stop-color="#ffd060" stop-opacity="0.55"/>
+      <stop offset="40%" stop-color="#f08020" stop-opacity="0.30"/>
+      <stop offset="70%" stop-color="#c06010" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldG" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8d860"/>
+      <stop offset="100%" stop-color="#c89018"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1920" fill="url(#skyG)"/>
+  <rect x="0" y="1060" width="1080" height="860" fill="url(#horizG)"/>
+  <ellipse cx="540" cy="1200" rx="600" ry="300" fill="url(#sunGlow)"/>
+  <ellipse cx="540" cy="1195" rx="55" ry="18" fill="rgba(255,240,180,0.85)"/>
+  <ellipse cx="540" cy="1196" rx="28" ry="9" fill="rgba(255,255,220,0.95)"/>
+  <ellipse cx="270" cy="1285" rx="280" ry="55" fill="rgba(160,195,230,0.18)"/>
+  <ellipse cx="810" cy="1300" rx="240" ry="50" fill="rgba(150,185,220,0.15)"/>
+  <ellipse cx="540" cy="1265" rx="380" ry="45" fill="rgba(170,200,240,0.12)"/>
+  <ellipse cx="180" cy="1430" rx="360" ry="70" fill="rgba(140,175,215,0.20)"/>
+  <ellipse cx="860" cy="1450" rx="280" ry="65" fill="rgba(130,165,210,0.18)"/>
+  <ellipse cx="540" cy="1480" rx="480" ry="80" fill="rgba(120,158,200,0.15)"/>
+  <ellipse cx="320" cy="1650" rx="420" ry="90" fill="rgba(110,150,195,0.22)"/>
+  <ellipse cx="760" cy="1680" rx="350" ry="85" fill="rgba(100,140,188,0.20)"/>
+  <ellipse cx="540" cy="1700" rx="540" ry="95" fill="rgba(90,132,180,0.15)"/>
+  <path d="M 620 1900 L 580 1830 C 570 1810, 565 1790, 580 1780 C 595 1770, 650 1775, 700 1795 C 760 1820, 820 1840, 900 1850 C 960 1858, 1040 1852, 1080 1848 L 1080 1920 Z" fill="rgba(15,25,65,0.75)"/>
+  <path d="M 580 1780 C 595 1770, 650 1775, 700 1795 C 760 1820, 820 1840, 900 1850" stroke="rgba(255,210,100,0.20)" stroke-width="3" fill="none"/>
+  <g stroke="rgba(140,185,255,0.28)" stroke-width="1.5" fill="none">
+    <line x1="200" y1="1320" x2="420" y2="1290"/>
+    <line x1="420" y1="1290" x2="590" y2="1350"/>
+    <line x1="590" y1="1350" x2="780" y2="1310"/>
+    <line x1="780" y1="1310" x2="950" y2="1370"/>
+    <line x1="350" y1="1420" x2="540" y2="1390"/>
+    <line x1="540" y1="1390" x2="720" y2="1440"/>
+    <line x1="720" y1="1440" x2="880" y2="1410"/>
+    <line x1="150" y1="1500" x2="380" y2="1480"/>
+    <line x1="380" y1="1480" x2="600" y2="1520"/>
+    <line x1="600" y1="1520" x2="820" y2="1490"/>
+  </g>
+  <g fill="rgba(160,210,255,0.55)">
+    <circle cx="200" cy="1320" r="5"/>
+    <circle cx="420" cy="1290" r="6"/>
+    <circle cx="590" cy="1350" r="5"/>
+    <circle cx="780" cy="1310" r="6"/>
+    <circle cx="950" cy="1370" r="4"/>
+    <circle cx="350" cy="1420" r="5"/>
+    <circle cx="540" cy="1390" r="7"/>
+    <circle cx="720" cy="1440" r="5"/>
+    <circle cx="880" cy="1410" r="4"/>
+    <circle cx="150" cy="1500" r="4"/>
+    <circle cx="380" cy="1480" r="5"/>
+    <circle cx="600" cy="1520" r="6"/>
+    <circle cx="820" cy="1490" r="4"/>
+  </g>
+  <path d="M 508 582 C 498 568, 480 552, 456 538 C 437 526, 415 518, 391 515 C 372 513, 352 516, 336 525 C 323 532, 316 545, 320 558 C 324 570, 338 574, 358 571 C 380 568, 404 562, 432 565 C 454 568, 483 578, 508 582 Z" fill="white"/>
+  <line x1="392" y1="517" x2="397" y2="570" stroke="rgba(15,25,70,0.22)" stroke-width="3.5"/>
+  <line x1="364" y1="516" x2="366" y2="566" stroke="rgba(15,25,70,0.22)" stroke-width="3.5"/>
+  <line x1="340" y1="524" x2="339" y2="566" stroke="rgba(15,25,70,0.22)" stroke-width="3.5"/>
+  <path d="M 572 582 C 582 568, 600 552, 624 538 C 643 526, 665 518, 689 515 C 708 513, 728 516, 744 525 C 757 532, 764 545, 760 558 C 756 570, 742 574, 722 571 C 700 568, 676 562, 648 565 C 626 568, 597 578, 572 582 Z" fill="white"/>
+  <line x1="688" y1="517" x2="683" y2="570" stroke="rgba(15,25,70,0.22)" stroke-width="3.5"/>
+  <line x1="716" y1="516" x2="714" y2="566" stroke="rgba(15,25,70,0.22)" stroke-width="3.5"/>
+  <line x1="740" y1="524" x2="741" y2="566" stroke="rgba(15,25,70,0.22)" stroke-width="3.5"/>
+  <path d="M540,462 L546,478 L548,508 L546,536 L540,552 L534,536 L532,508 L534,478 Z" fill="white"/>
+  <path d="M533,506 L500,517 L500,523 L533,515 L547,515 L547,517 L580,506 L547,515 Z" fill="white"/>
+  <path d="M534,542 L524,564 L540,558 L556,564 L546,542 Z" fill="white"/>
+  <text x="540" y="660" text-anchor="middle" font-family="Georgia, serif" font-size="118" font-weight="bold" letter-spacing="20" fill="white">PILOT</text>
+  <text x="540" y="760" text-anchor="middle" font-family="Georgia, serif" font-size="80" letter-spacing="18" fill="white">LOGBOOK</text>
+  <line x1="270" y1="810" x2="810" y2="810" stroke="url(#goldG)" stroke-width="2.5" opacity="0.85"/>
+  <text x="540" y="874" text-anchor="middle" font-family="Georgia, serif" font-size="38" letter-spacing="5" fill="url(#goldG)">LOG IT. REVIEW IT. FLY BETTER.</text>
+  <text x="540" y="1820" text-anchor="middle" font-family="Georgia, serif" font-size="30" letter-spacing="4" fill="rgba(255,255,255,0.55)">YOUR FLIGHTS. YOUR STORY.</text>
+</svg>
