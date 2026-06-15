@@ -7,15 +7,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Pilot Logbook" />
   <meta name="theme-color" content="#0a1440" />
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="/manifest.json" />
   <!-- PWA Icons -->
-  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
-  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
   <!-- iOS Splash Screens -->
-  <link rel="apple-touch-startup-image" href="splash-430x932.png"
+  <link rel="apple-touch-startup-image" href="/splash-430x932.png"
         media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
-  <link rel="apple-touch-startup-image" href="splash-390x844.png"
+  <link rel="apple-touch-startup-image" href="/splash-390x844.png"
         media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
   <title>Pilot Logbook</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -301,6 +301,7 @@
       color: var(--text2);
       text-transform: uppercase;
       letter-spacing: 0.8px;
+      white-space: nowrap;
     }
     .add-btn {
       display: flex;
@@ -925,6 +926,12 @@
       animation: ptr-spin .7s linear infinite;
     }
     @keyframes ptr-spin { to { transform: rotate(360deg); } }
+    @media print {
+      body { background: #fff !important; color: #111 !important; }
+      body > *:not(#printView) { display: none !important; }
+      #printView { position: static !important; padding: 0 !important; background: #fff !important; }
+      #pv-toolbar { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -982,13 +989,19 @@
     <div style="display:flex;align-items:center;gap:8px">
       <div class="header-badge" id="totalFlightsLabel">0 비행</div>
       <div class="user-chip" id="userChip" style="display:none" onclick="signOutUser()">
-        <img id="userPhoto" src="" alt="" />
+        <img id="userPhoto" src="" alt="" style="display:none" />
+        <span id="userInitial" style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0"></span>
         <span id="userName"></span>
       </div>
     </div>
   </div>
 </header>
 <div id="syncStatus"></div>
+
+<!-- Print Overlay -->
+<div id="printView" style="display:none;position:fixed;inset:0;background:#fff;z-index:9999;overflow-y:auto;padding:16px;box-sizing:border-box;color:#111;font-family:Arial,sans-serif;font-size:11px">
+  <div id="printViewContent"></div>
+</div>
 
 <!-- Stats Bar -->
 <div class="stats-bar">
@@ -1533,23 +1546,39 @@ function copyAndOpenExternal() {
 
 // ── Google 로그인 / 로그아웃 ─────────────────────────────────────
 async function signInWithGoogle() {
+  const GOOGLE_BTN_HTML = `<svg width="20" height="20" viewBox="0 0 48 48" style="margin-right:8px;vertical-align:middle"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Google로 로그인`;
   const btn = document.querySelector('.google-btn');
   if (btn) { btn.disabled = true; btn.textContent = '로그인 중...'; }
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.addScope('email');
-    provider.addScope('profile');
-    // Popup 우선 시도 (redirect보다 모바일에서 안정적)
-    await auth.signInWithPopup(provider);
-  } catch(e) {
-    if (e.code === 'auth/popup-blocked') {
-      // iOS Safari 등 팝업 차단 환경 — redirect 대신 안내 메시지
-      alert('팝업이 차단되었습니다.\n\niOS Safari: 설정 → Safari → 팝업 차단 끄기\nChrome: 주소창 팝업 허용 후 다시 시도해주세요.');
-    } else if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
-      alert('로그인 실패: ' + e.message);
+    const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform());
+    if (isNative) {
+      const GoogleAuth = window.Capacitor.Plugins.GoogleAuth;
+      if (!GoogleAuth) {
+        alert('GoogleAuth 플러그인 없음\nnpx cap sync android 후 APK 재빌드 필요');
+        return;
+      }
+      await GoogleAuth.initialize({
+        clientId: '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      });
+      const googleUser = await GoogleAuth.signIn();
+      const idToken = googleUser.authentication.idToken;
+      const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+      await auth.signInWithCredential(credential);
+    } else {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      await auth.signInWithPopup(provider);
     }
+  } catch(e) {
+    if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+      alert('[로그인 오류] ' + (e.message || JSON.stringify(e)));
+    }
+    console.error('로그인 오류:', e);
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/><path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.3-7.7 2.3-6.2 0-11.5-4.2-13.4-9.9l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg> Google로 로그인`; }
+    if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 48 48" style="margin-right:8px;vertical-align:middle"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Google로 로그인`; }
   }
 }
 
@@ -1786,8 +1815,19 @@ auth.onAuthStateChanged(user => {
   if (user) {
     overlay.classList.add('hidden');
     chip.style.display = 'flex';
-    document.getElementById('userPhoto').src  = user.photoURL || '';
-    document.getElementById('userName').textContent = user.displayName?.split(' ')[0] || '';
+    const photoEl = document.getElementById('userPhoto');
+    const initEl = document.getElementById('userInitial');
+    const name = user.displayName || '';
+    if (user.photoURL) {
+      photoEl.src = user.photoURL;
+      photoEl.style.display = '';
+      initEl.style.display = 'none';
+    } else {
+      photoEl.style.display = 'none';
+      initEl.style.display = 'flex';
+      initEl.textContent = name.charAt(0).toUpperCase() || '?';
+    }
+    document.getElementById('userName').textContent = name.split(' ')[0] || '';
     subscribeToFirestore(user.uid);
   } else {
     overlay.classList.remove('hidden');
@@ -1942,51 +1982,65 @@ function printMonth(ym) {
       <td style="font-weight:600">${f.total || toHHMM(calcDuration(f.depTime,f.arrTime))}</td>
       <td>${f.night||''}</td>
       <td>${f.ifr||''}</td>
-      <td>${f.toPf !== undefined ? f.toPf : (parseInt(f.takeoffs||f.toCnt||0)>0?'PF':'PM')}</td>
-      <td>${f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||0)>0?'PF':'PM')}</td>
+      <td>${f.toPf !== undefined ? (f.toPf==='PF'?1:0) : (parseInt(f.takeoffs||f.toCnt||1)>0?1:0)}</td>
+      <td>${f.ldgPf !== undefined ? (f.ldgPf==='PF'?1:0) : (parseInt(f.landings||f.ldCnt||1)>0?1:0)}</td>
     </tr>`).join('');
 
   const printDate = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-  <title>Pilot Logbook - ${label}</title>
-  <style>
-    body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #111; }
-    h2 { font-size: 16px; margin-bottom: 4px; }
-    .subtitle { font-size: 12px; color: #555; margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #1e3a5f; color: #fff; padding: 6px 4px; text-align: center; font-size: 10px; }
-    td { padding: 5px 4px; border-bottom: 1px solid #ddd; text-align: center; }
-    tr:nth-child(even) td { background: #f5f8ff; }
-    .summary { margin-top: 14px; display: flex; gap: 24px; font-size: 12px; }
-    .summary b { font-size: 14px; color: #1e3a5f; }
-    @media print { body { margin: 10mm; } }
-  </style></head><body>
-  <h2>Pilot Logbook — ${label}</h2>
-  <div class="subtitle">Kyungtae Kang · Printed: ${printDate}</div>
-  <table>
-    <thead><tr>
-      <th>#</th><th>Date</th><th>Flight</th><th>From</th><th>To</th>
-      <th>STD</th><th>STA</th><th>A/C Type</th><th>Registration</th><th>Duty</th>
-      <th>Block</th><th>Night</th><th>IFR</th><th>T/O</th><th>LDG</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="summary">
-    <div>Sectors: <b>${sel.length}</b></div>
-    <div>Total Block: <b>${toHHMM(total)}</b></div>
-    <div>Night: <b>${toHHMM(night)}</b></div>
-    <div>IFR: <b>${toHHMM(ifr)}</b></div>
-    <div>T/O: <b>${to}</b></div>
-    <div>LDG: <b>${ldg}</b></div>
-  </div>
-  <\/body><\/html>`;
 
-  const w = window.open('', '_blank');
-  if (!w) { alert('팝업이 차단되었습니다. 팝업을 허용해주세요.'); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => { try { w.print(); } catch(e) {} }, 400);
+  // Show in-page overlay (works in Android WebView)
+  const pv = document.getElementById('printView');
+  const pc = document.getElementById('printViewContent');
+  pc.innerHTML = `
+    <style>
+      #pv-table { width:100%; border-collapse:collapse; font-size:11px; }
+      #pv-table th { background:#1e3a5f; color:#fff; padding:6px 4px; text-align:center; font-size:10px; }
+      #pv-table td { padding:5px 4px; border-bottom:1px solid #ddd; text-align:center; color:#111; background:#fff; }
+      #pv-table tr:nth-child(even) td { background:#f5f8ff; }
+      #pv-summary { margin-top:14px; display:flex; gap:20px; font-size:12px; flex-wrap:wrap; }
+      #pv-summary b { font-size:14px; color:#1e3a5f; }
+    </style>
+    <div id="pv-toolbar" style="display:flex;gap:10px;margin-bottom:16px">
+      <button id="pv-back"  style="padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;background:#e5e7eb;color:#111;cursor:pointer">← 뒤로</button>
+      <button id="pv-print" style="padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;background:#1e3a5f;color:#fff;cursor:pointer">인쇄</button>
+    </div>
+    <h2 style="font-size:16px;margin:0 0 4px">${label}</h2>
+    <div style="font-size:12px;color:#555;margin-bottom:14px">Kyungtae Kang · ${printDate}</div>
+    <table id="pv-table">
+      <thead><tr>
+        <th>#</th><th>Date</th><th>Flight</th><th>From</th><th>To</th>
+        <th>STD</th><th>STA</th><th>A/C</th><th>Reg</th><th>Duty</th>
+        <th>Block</th><th>Night</th><th>IFR</th><th>T/O</th><th>LDG</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div id="pv-summary">
+      <div>Sectors: <b>${sel.length}</b></div>
+      <div>Total: <b>${toHHMM(total)}</b></div>
+      <div>Night: <b>${toHHMM(night)}</b></div>
+      <div>IFR: <b>${toHHMM(ifr)}</b></div>
+      <div>T/O: <b>${to}</b></div>
+      <div>LDG: <b>${ldg}</b></div>
+    </div>`;
+
+  // Attach button handlers after innerHTML is set
+  document.getElementById('pv-back').addEventListener('click', closePrintView);
+  document.getElementById('pv-print').addEventListener('click', function() {
+    if (window.AndroidPrint) {
+      window.AndroidPrint.print();
+    } else {
+      window.print();
+    }
+  });
+
+  pv.style.display = 'block';
+  document.body.style.overflow = 'hidden';
   closePrintModal();
+}
+
+function closePrintView() {
+  document.getElementById('printView').style.display = 'none';
+  document.body.style.overflow = '';
 }
 
 // 출발/도착시간 변경 시 총 비행시간 자동계산
@@ -2316,11 +2370,11 @@ function flightCard(f) {
         <div class="card-stat-lbl">계기</div>
       </div>
       <div class="card-stat">
-        <div class="card-stat-val" style="font-size:11px">${f.toPf !== undefined ? f.toPf : (parseInt(f.takeoffs||f.toCnt||1)>0?'PF':'PM')}</div>
+        <div class="card-stat-val" style="font-size:11px">${f.toPf !== undefined ? (f.toPf==='PF'?1:0) : (parseInt(f.takeoffs||f.toCnt||1)>0?1:0)}</div>
         <div class="card-stat-lbl">T/O</div>
       </div>
       <div class="card-stat">
-        <div class="card-stat-val" style="font-size:11px">${f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||1)>0?'PF':'PM')}</div>
+        <div class="card-stat-val" style="font-size:11px">${f.ldgPf !== undefined ? (f.ldgPf==='PF'?1:0) : (parseInt(f.landings||f.ldCnt||1)>0?1:0)}</div>
         <div class="card-stat-lbl">LDG</div>
       </div>
     </div>
@@ -3270,7 +3324,7 @@ async function loginCrewConnex() {
   document.getElementById('ccLoginBtn').disabled = true;
 
   try {
-    const resp = await fetch('https://pilot-logbook.netlify.app/.netlify/functions/crewconnex', {
+    const resp = await fetch('https://crewconnex.tae26001.workers.dev', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ username, password }),
@@ -3547,4 +3601,29 @@ function parseCrewConnexText(rawText) {
       changed = true;
     }
     // dutyCode 없는 flight 보완
-    if (!f.dutyCod
+    if (!f.dutyCode) {
+      f.dutyCode = (f.role === 'PIC' || f.role === 'INST') ? 'C' : 'F';
+      changed = true;
+    }
+    // acType 정규화: B737-8 MAX → B737-8 통일
+    if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') {
+      f.acType = 'B737-8';
+      changed = true;
+    }
+    // 구형 landings/takeoffs → toPf/ldgPf 변환
+    if (f.toPf === undefined && (f.takeoffs !== undefined || f.toCnt !== undefined)) {
+      f.toPf = parseInt(f.takeoffs||f.toCnt||0) > 0 ? 'PF' : 'PM';
+      changed = true;
+    }
+    if (f.ldgPf === undefined && (f.landings !== undefined || f.ldCnt !== undefined)) {
+      f.ldgPf = parseInt(f.landings||f.ldCnt||0) > 0 ? 'PF' : 'PM';
+      changed = true;
+    }
+  });
+  if (changed) saveData();
+})();
+
+renderFlights();
+</script>
+</body>
+</html>
