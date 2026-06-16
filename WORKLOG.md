@@ -2,6 +2,49 @@
 
 ---
 
+## 2026-06-17 (macOS — iOS 실기기 빌드/테스트)
+
+### ✅ 완료된 작업
+
+#### iOS CocoaPods 전환
+- `@codetrix-studio/capacitor-google-auth`가 `Package.swift`를 제공하지 않아 SPM과 근본적으로
+  호환 불가 (Capacitor 7+ 기본값인 SPM 워크플로우로는 빌드 자체에 플러그인이 포함되지 않음)
+- Xcode에서 `CapApp-SPM` 패키지 참조 제거 (Frameworks 목록 + Package Dependencies)
+- `ios/App/Podfile` 신규 작성 (Capacitor + 플러그인 전부 CocoaPods로 전환), `pod install` 적용
+- `ios/debug.xcconfig`에 `#include "App/Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"`
+  추가 (커스텀 xcconfig라 CocoaPods가 자동으로 연결 못 하던 문제)
+
+#### Google 로그인 iOS 활성화
+- 원인 1: `npm install`로 플러그인 재설치 후 `npx cap sync ios`를 누락 → `capacitor.config.json`의
+  `packageClassList`에 `GoogleAuth`가 빠져서 네이티브 플러그인 자체가 인식 안 됨 → 재sync로 해결
+- 원인 2: 기존 클라이언트 ID가 Google Cloud Console에 **웹(Web)** 타입으로 등록돼 있어 iOS 커스텀
+  URL 스킴 리다이렉트가 거부됨 (`Custom scheme URIs are not allowed for 'WEB' client type`)
+  → Google Cloud Console에서 **iOS 타입 OAuth 클라이언트** 신규 생성 (Bundle ID: `com.rufnek.pilotlogbook`)
+  → `www/index.html`의 `clientId`를 iOS 클라이언트 ID로 교체, 기존 웹 클라이언트 ID는
+  `capacitor.config.json` → `plugins.GoogleAuth.serverClientId`로 이동 (Firebase 백엔드 토큰 검증용)
+  → `Info.plist`에 새 iOS 클라이언트 ID 역순 문자열로 `CFBundleURLTypes` 등록
+- 실기기에서 로그인 성공 확인
+
+#### iOS 앱 아이콘 교체
+- `apply_icons.py`가 Android 전용이라 iOS `AppIcon.appiconset`은 한 번도 갱신된 적 없이
+  Capacitor 기본 placeholder 아이콘 그대로였음 → `pilot_logbook_app_icon_1024.png`로 교체
+
+#### iOS 인쇄 기능 네이티브 브리지 신규 구현
+- WKWebView는 안드로이드와 달리 `window.print()`만으로 인쇄 다이얼로그가 뜨지 않음
+- `ios/App/App/PrintViewController.swift` 신규 추가 — `CAPBridgeViewController` 상속,
+  `capacitorDidLoad()`에서 `WKScriptMessageHandler("iosPrint")` 등록 →
+  `UIPrintInteractionController` + `webView.viewPrintFormatter()`로 시스템 인쇄 다이얼로그 호출
+  (안드로이드 `PrintBridge`와 동일한 역할)
+- `Main.storyboard`의 뷰 컨트롤러 customClass를 `CAPBridgeViewController` → `PrintViewController`로 변경
+- `www/index.html` 인쇄 버튼 핸들러에 `window.webkit.messageHandlers.iosPrint` 분기 추가
+- 빌드/적용 완료, 실기기 동작 테스트는 사용자 진행 중
+
+### 📌 참고
+- `ios/App/Podfile`, `Podfile.lock` 신규 — 앞으로 iOS 의존성 변경 시 `pod install` 필요
+- Xcode는 항상 `.xcworkspace`로 열어야 함 (`.xcodeproj` 아님)
+
+---
+
 ## 2026-06-16 (Windows — 로그인/스플래시 영상화)
 
 ### ✅ 완료된 작업
@@ -64,16 +107,16 @@
 git pull origin main
 npm install
 npx cap sync ios
-npx cap open ios
+cd ios/App && pod install && cd ../..
+npx cap open ios   # .xcworkspace로 열림 (CocoaPods 전환 완료, .xcodeproj 직접 열지 말 것)
 ```
 
 ### iOS 체크리스트
-- [ ] GoogleService-Info.plist → `ios/App/App/` 에 배치 (Firebase Console에서 다운로드)
-- [ ] Info.plist URL Scheme에 `REVERSED_CLIENT_ID` 등록
-- [ ] 인쇄 기능 — iOS WKWebView에서 `window.print()` 동작 확인
-  - 안되면 iOS용 PrintBridge 별도 구현 필요
-- [ ] 스플래시/아이콘 Xcode Assets 확인
-- [ ] Apple Developer Signing 설정 (Team, Bundle ID: `com.rufnek.pilotlogbook`)
+- [x] Info.plist URL Scheme에 `REVERSED_CLIENT_ID` 등록 (2026-06-17)
+- [x] 인쇄 기능 — iOS용 PrintBridge 별도 구현 완료 (2026-06-17), 실기기 최종 확인 대기
+- [x] 아이콘 Xcode Assets 확인 (2026-06-17, placeholder였던 걸 실제 아이콘으로 교체)
+- [ ] 스플래시 영상(`auth-bg.mp4`/`splash-intro.mp4`) iOS 실기기 재생 확인
+- [ ] Apple Developer Signing 설정 (Team, Bundle ID: `com.rufnek.pilotlogbook`) — 앱스토어 배포 전 필요
 
 ### 기술 스택
 | 항목 | 값 |

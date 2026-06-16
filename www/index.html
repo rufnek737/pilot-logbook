@@ -1712,7 +1712,7 @@ async function signInWithGoogle() {
         return;
       }
       await GoogleAuth.initialize({
-        clientId: '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
+        clientId: '824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com',
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       });
@@ -2182,6 +2182,8 @@ function printMonth(ym) {
   document.getElementById('pv-print').addEventListener('click', function() {
     if (window.AndroidPrint) {
       window.AndroidPrint.print();
+    } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iosPrint) {
+      window.webkit.messageHandlers.iosPrint.postMessage('print');
     } else {
       window.print();
     }
