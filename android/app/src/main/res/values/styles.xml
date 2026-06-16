@@ -16,7 +16,17 @@
     </style>
 
 
-    <style name="AppTheme.NoActionBarLaunch" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <!-- Android 12+ 는 cold-start 시 OS가 강제로 아이콘 스플래시를 띄움.
+         배경색만이라도 앱과 맞춰서 흰 화면 깜빡임 없이 자연스럽게 전환되도록 설정.
+         아이콘 스플래시가 사라지면 postSplashScreenTheme(아래)의
+         windowBackground(splash.png 전체 이미지)로 바로 전환됨. -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBarLaunch.Post</item>
+    </style>
+
+    <style name="AppTheme.NoActionBarLaunch.Post" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:windowBackground">@drawable/splash</item>

@@ -2,6 +2,37 @@
 
 ---
 
+## 2026-06-16 (Windows — 로그인/스플래시 영상화)
+
+### ✅ 완료된 작업
+
+#### 이메일/비밀번호 로그인 추가
+- 로그인 폼 (이메일/비밀번호, 로그인 상태 유지, 비밀번호 찾기) 추가
+- 회원가입 폼 추가 (이메일/비밀번호/비밀번호 확인), "회원가입" 링크로 전환
+- Firebase Console → Authentication → 이메일/비밀번호 공급자 사용 설정 완료
+- **버그 수정**: 기존 `signInWithGoogle()` 함수가 `async` 누락 상태로 내부에서 `await` 사용 →
+  SyntaxError로 해당 script 블록 전체가 깨져 Google 로그인이 실제로는 동작하지 않던 문제 발견 및 수정
+
+#### 앱 아이콘/스플래시 — 실사 디자인으로 교체
+- 사용자가 제공한 새 아이콘 이미지(흰 배경 → flood-fill로 투명화) → `assets/icon.png` → 전체 mipmap 적용
+- `apply_icons.py`의 `SPLASH_SIZES`에 `night`/`ldpi` 변형 폴더 누락 발견 → 추가
+  (다크모드에서 옛 아이콘이 스플래시로 보이던 버그 원인)
+
+#### 스플래시 화면 영상화
+- Android 12+ SplashScreen API는 풀스크린 이미지를 지원하지 않고 작은 아이콘만 지원 (OS 제약)
+  → 인페이지 HTML `#nativeSplash` 오버레이 방식으로 직접 구현
+- 사용자가 제공한 영상에서 UI 인트로(아이콘+"PILOT LOGBOOK" 텍스트 페이드 인/아웃, 0~3초) 추출
+  → `www/splash-intro.mp4` (인트로 그대로 재생 후 페이드 → 로그인/메인 화면)
+- 로그인 화면 배경에도 같은 원본 영상에서 UI 없는 구간(2.7초~끝)만 추출
+  → `www/auth-bg.mp4` 로 루프 재생 (로그인 카드는 반투명+blur로 가독성 확보)
+- `capacitor.config.json` `launchShowDuration: 200→0` — OS 아이콘 스플래시 최소화
+- `MainActivity.java` — Capacitor `SplashScreenPlugin`이 자체적으로 `installSplashScreen()`을
+  호출하는 걸 발견, 직접 추가했던 중복 호출 제거 (충돌로 스플래시가 즉시 사라지던 원인)
+- 스플래시→로그인 전환 시 텍스트가 겹쳐 보이는 문제 → `.auth-card` 페이드인을
+  스플래시 제거 완료 후로 순서 분리
+
+---
+
 ## 2026-06-15 (Windows — Android 완료)
 
 ### ✅ 완료된 작업

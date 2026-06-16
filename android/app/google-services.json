@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "824870554939",
+    "project_id": "pilot-logbook-22bb8",
+    "storage_bucket": "pilot-logbook-22bb8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:824870554939:android:e8c55c76ca1dc161dd7b1e",
+        "android_client_info": {
+          "package_name": "com.rufnek.pilotlogbook"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "824870554939-01vvmu9b1qol8p1j73f1b0qn68ul2al7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rufnek.pilotlogbook",
+            "certificate_hash": "5e2489c7dfb250b5732b7e12e2e438d4e075b0e9"
+          }
+        },
+        {
+          "client_id": "824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVFLeR_zTBbHHUptSi_57AkUxqB9Ymu5o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

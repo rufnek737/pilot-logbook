@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<title>Pilot Logbook · 날개 디자인 프리뷰</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", sans-serif; background:#f3f4f6; margin:0; padding:24px; color:#1f2937; }
+  h1 { margin:0 0 4px; font-size:22px; }
+  .sub { color:#6b7280; margin-bottom:18px; font-size:13px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:900px; margin:0 auto; }
+  .tile { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
+  .tile h3 { margin:0 0 10px; font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:1px; }
+  .icon-bg   { aspect-ratio:1/1; border-radius:22%; overflow:hidden; background:linear-gradient(135deg,#1A2F60 0%,#0D1B3E 60%,#07101F 100%); display:grid; place-items:center; }
+  .splash-bg { aspect-ratio:1/1; border-radius:12px; overflow:hidden; background:linear-gradient(180deg,#040C1A 0%,#0E2245 70%,#1A4A8A 88%,#0C1E3A 100%); display:grid; place-items:center; }
+</style>
+</head>
+<body>
+<h1>Pilot Logbook · 날개 디자인 프리뷰</h1>
+<p class="sub">새 디자인: pilot_logbook_splash_vector_simple.svg 좌표 직접 스케일링.</p>
+
+<div class="grid">
+  <div class="tile"><h3>아이콘 1024 — 새 디자인</h3><div class="icon-bg" id="iconNew"></div></div>
+  <div class="tile"><h3>스플래시 2732 — 새 디자인</h3><div class="splash-bg" id="splashNew"></div></div>
+</div>
+
+<script>
+function wings(cx, cy, W, color) {
+  const sc = (W / 2) / 300;
+  const p = (x, y) => `${(cx + x*sc).toFixed(1)} ${(cy + y*sc).toFixed(1)}`;
+
+  const plane = `M ${p(-20,-155)} C ${p(-12,-184)} ${p(12,-184)} ${p(20,-155)} L ${p(28,-30)} L ${p(92,-5)} C ${p(111,3)} ${p(109,21)} ${p(89,18)} L ${p(33,8)} L ${p(38,84)} L ${p(64,105)} C ${p(74,113)} ${p(69,126)} ${p(56,120)} L ${p(14,101)} L ${p(-14,101)} L ${p(-56,120)} C ${p(-69,126)} ${p(-74,113)} ${p(-64,105)} L ${p(-38,84)} L ${p(-33,8)} L ${p(-89,18)} C ${p(-109,21)} ${p(-111,3)} ${p(-92,-5)} L ${p(-28,-30)} Z`;
+  const lw1 = `M ${p(-55,-74)} C ${p(-145,-108)} ${p(-215,-118)} ${p(-300,-110)} C ${p(-237,-86)} ${p(-178,-68)} ${p(-85,-52)} Z`;
+  const lw2 = `M ${p(-72,-37)} C ${p(-156,-55)} ${p(-225,-58)} ${p(-298,-50)} C ${p(-235,-24)} ${p(-167,-13)} ${p(-80,-17)} Z`;
+  const lw3 = `M ${p(-82,2)} C ${p(-160,-6)} ${p(-226,0)} ${p(-286,17)} C ${p(-226,39)} ${p(-157,43)} ${p(-82,29)} Z`;
+  const rw1 = `M ${p(55,-74)} C ${p(145,-108)} ${p(215,-118)} ${p(300,-110)} C ${p(237,-86)} ${p(178,-68)} ${p(85,-52)} Z`;
+  const rw2 = `M ${p(72,-37)} C ${p(156,-55)} ${p(225,-58)} ${p(298,-50)} C ${p(235,-24)} ${p(167,-13)} ${p(80,-17)} Z`;
+  const rw3 = `M ${p(82,2)} C ${p(160,-6)} ${p(226,0)} ${p(286,17)} C ${p(226,39)} ${p(157,43)} ${p(82,29)} Z`;
+
+  return (
+    `<path d="${plane}" fill="${color}"/>` +
+    `<path d="${lw1}" fill="${color}" opacity="0.98"/>` +
+    `<path d="${lw2}" fill="${color}" opacity="0.96"/>` +
+    `<path d="${lw3}" fill="${color}" opacity="0.94"/>` +
+    `<path d="${rw1}" fill="${color}" opacity="0.98"/>` +
+    `<path d="${rw2}" fill="${color}" opacity="0.96"/>` +
+    `<path d="${rw3}" fill="${color}" opacity="0.94"/>`
+  );
+}
+
+function svgWrap(viewBox, inner) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" style="width:80%;height:80%">
+    <defs>
+      <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#F0DC82"/>
+        <stop offset="40%" stop-color="#C9A84C"/>
+        <stop offset="100%" stop-color="#8A6010"/>
+      </linearGradient>
+    </defs>
+    ${inner}
+  </svg>`;
+}
+
+document.getElementById('iconNew').innerHTML   = svgWrap('0 0 1024 1024', wings(476, 310, 620, 'url(#gold)'));
+document.getElementById('splashNew').innerHTML = svgWrap('0 0 2732 2732', wings(1366, 880, 1140, 'white'));
+</script>
+</body>
+</html>
