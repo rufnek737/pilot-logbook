@@ -1909,7 +1909,7 @@ document.addEventListener('visibilitychange', () => {
 
 function setSyncStatus(msg) {
   const el = document.getElementById('syncStatus');
-  if (el) el.textContent = msg;
+  if (el) el.textContent = msg.startsWith('⚠') ? '' : msg;
 }
 
 // ── Pull-to-refresh ──────────────────────────────────────────────
