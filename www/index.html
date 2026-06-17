@@ -1982,7 +1982,7 @@ function setSyncStatus(msg) {
               setSyncStatus('✓ ' + new Date().toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'}) + ' 새로고침 완료');
             }
           } catch(e) {
-            setSyncStatus('⚠ 새로고침 실패');
+            setSyncStatus('');
           }
         }
         // 인디케이터 닫기
@@ -3540,8 +3540,14 @@ async function loginCrewConnex() {
     const data = await resp.json();
 
     if (!resp.ok || data.error) {
-      statusEl.style.color = 'var(--danger)';
-      statusEl.textContent = '❌ ' + (data.error || '로그인 실패');
+      const errMsg = data.error || '로그인 실패';
+      if (errMsg.includes('로그인 성공') && errMsg.includes('Roster')) {
+        statusEl.style.color = 'var(--success)';
+        statusEl.textContent = '✅ 로그인 성공, 최근 5일 이내 비행이 없습니다';
+      } else {
+        statusEl.style.color = 'var(--danger)';
+        statusEl.textContent = '❌ ' + errMsg;
+      }
     } else {
       statusEl.style.color = 'var(--success)';
       statusEl.textContent = `✅ ${data.flights?.length || 0}개 비행 추출됨`;

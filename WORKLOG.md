@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-17 (macOS — iOS UX 버그 수정)
+
+### ✅ 완료된 작업
+
+#### 새로고침 실패 메시지 숨김
+- 풀투리프레시 실패 시 `#syncStatus`에 표시되던 "⚠ 새로고침 실패" 제거 → 빈 문자열로 대체
+
+#### CC 가져오기 오류 메시지 개선
+- `loginCrewConnex()`: 서버가 "로그인 성공 + Roster 페이지 없음" 에러를 반환할 때 (= 5일 이내 비행 없음)
+  장황한 페이지 내용 전체 대신 "✅ 로그인 성공, 최근 5일 이내 비행이 없습니다"로 표시
+
+### 📌 iOS 빌드 절차 (cap sync 후 매번 필요)
+```bash
+cd /Users/kaymac/projects/pilot-logbook
+npx cap sync ios
+rm -rf ios/App/CapApp-SPM ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
+cd ios/App && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install && cd ../..
+npx cap open ios   # Xcode → Cmd+Shift+K → Cmd+B
+```
+
+---
+
 ## 2026-06-17 (Windows — 낮/밤 모드 + 헤더 개선)
 
 ### ✅ 완료된 작업
