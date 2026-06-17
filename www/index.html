@@ -1740,8 +1740,11 @@ async function signInWithGoogle() {
         alert('GoogleAuth 플러그인 없음\nnpx cap sync android 후 APK 재빌드 필요');
         return;
       }
+      const isIOS = window.Capacitor.getPlatform() === 'ios';
       await GoogleAuth.initialize({
-        clientId: '824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com',
+        clientId: isIOS
+          ? '824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com'
+          : '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       });
