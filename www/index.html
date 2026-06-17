@@ -543,9 +543,9 @@
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       z-index: 200;
       align-items: flex-end;
     }
@@ -3500,12 +3500,20 @@ function openCrewConnex() {
   document.getElementById('ccResultWrap').style.display = 'none';
   document.getElementById('ccStatus').textContent = '';
   document.getElementById('ccModalOverlay').classList.add('show');
-  document.body.style.overflow = 'hidden';
+  const scrollY = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${scrollY}px`;
+  document.body.style.width = '100%';
+  document.body.dataset.scrollY = scrollY;
 }
 
 function closeCrewConnex() {
   document.getElementById('ccModalOverlay').classList.remove('show');
-  document.body.style.overflow = '';
+  const scrollY = parseInt(document.body.dataset.scrollY || '0');
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  window.scrollTo(0, scrollY);
   // 닫을 때 로그인 폼 복원
   document.getElementById('ccPaneAuto').style.display = '';
   document.getElementById('ccResultWrap').style.display = 'none';
