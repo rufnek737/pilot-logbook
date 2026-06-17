@@ -13,6 +13,16 @@
 - `loginCrewConnex()`: 서버가 "로그인 성공 + Roster 페이지 없음" 에러를 반환할 때 (= 5일 이내 비행 없음)
   장황한 페이지 내용 전체 대신 "✅ 로그인 성공, 최근 5일 이내 비행이 없습니다"로 표시
 
+#### iOS 오버스크롤 배경 깜빡임 방지
+- `html` / `body` 모두 `overscroll-behavior: none` 추가
+- 드래그 시 흰 배경이 비치던 문제 해결
+
+#### CC 모달 배경 스크롤 방지 + 블러 개선
+- `openCrewConnex()`: iOS body-lock 방식 적용 — `position:fixed` + `top: -scrollY` 저장/복원
+  (`body.overflow = hidden`은 iOS WKWebView에서 배경 스크롤을 막지 못함)
+- `closeCrewConnex()`: 저장된 scrollY로 `window.scrollTo()` 복원
+- `.modal-overlay` backdrop-filter `blur(4px) → blur(8px)`, 불투명도 `0.7 → 0.75`
+
 ### 📌 iOS 빌드 절차 (cap sync 후 매번 필요)
 ```bash
 cd /Users/kaymac/projects/pilot-logbook
