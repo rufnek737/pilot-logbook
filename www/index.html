@@ -75,12 +75,18 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html {
+      background: var(--bg);
+      overscroll-behavior: none;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
     }
 
     /* ── Header ── */
@@ -1559,6 +1565,8 @@
             <label class="form-label">아이디</label>
             <input type="text" class="form-input" id="ccUsername" placeholder="아이디" />
           </div>
+        </div>
+        <div class="form-row single">
           <div class="form-group">
             <label class="form-label">비밀번호</label>
             <input type="password" class="form-input" id="ccPassword" placeholder="비밀번호" />
