@@ -2,6 +2,27 @@
 
 ---
 
+## 2026-06-17 (Windows — 낮/밤 모드 + 헤더 개선)
+
+### ✅ 완료된 작업
+
+#### 낮/밤 테마 전환 기능 추가
+- CSS 변수 기반 `body.day { }` 라이트 테마 정의 (배경 밝은 회백색, 텍스트 다크 네이비)
+- 헤더 우측에 `🌙/☀️` 토글 버튼 추가, `localStorage`로 선택값 저장/복원
+- `toggleTheme()` JS 함수 추가, 페이지 로드 시 저장된 테마 자동 적용
+
+#### 헤더 레이아웃 개선
+- 낮/밤 모드 모두 헤더에 딥블루 gradient 고정 적용 (낮 모드: `#1e3a5f → #2563eb`)
+- 로고 텍스트 `white-space: nowrap` 적용 → 줄바꿈 방지
+- 로고 텍스트/서브텍스트 색상 흰색 고정 (테마에 무관하게 헤더는 항상 어두운 배경이므로)
+- 헤더 비행 수 배지 (`#totalFlightsLabel`) 제거 → 통계 탭에서 확인 가능
+
+#### Android Google 로그인 복구
+- macOS 커밋(`6e741ab`)이 `www/index.html`의 `clientId`를 iOS용으로 덮어써서 Android 로그인 깨짐
+- `Capacitor.getPlatform()`으로 플랫폼 분기 → Android/iOS 각각 올바른 clientId 사용
+
+---
+
 ## 2026-06-17 (macOS — iOS 실기기 빌드/테스트)
 
 ### ✅ 완료된 작업
