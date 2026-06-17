@@ -17,6 +17,11 @@
 - 로고 텍스트/서브텍스트 색상 흰색 고정 (테마에 무관하게 헤더는 항상 어두운 배경이므로)
 - 헤더 비행 수 배지 (`#totalFlightsLabel`) 제거 → 통계 탭에서 확인 가능
 
+#### 헤더 레이아웃 2차 수정
+- `header-top` / `logo` align-items를 `center` → `flex-start`로 변경 → 우측 유저칩 상단 잘림 해결
+- `logo-sub` `white-space: normal` + `max-width: 160px` → "PILOT ELECTRONIC LOGBOOK" 두 줄 표시
+- `line-height: 1.3` 추가로 두 줄 간격 정리
+
 #### Android Google 로그인 복구
 - macOS 커밋(`6e741ab`)이 `www/index.html`의 `clientId`를 iOS용으로 덮어써서 Android 로그인 깨짐
 - `Capacitor.getPlatform()`으로 플랫폼 분기 → Android/iOS 각각 올바른 clientId 사용
