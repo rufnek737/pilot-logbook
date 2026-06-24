@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Pilot Logbook" />
@@ -92,26 +92,14 @@
     /* ── Header ── */
     .header {
       background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
-      padding: 16px 20px 12px;
+      padding: calc(16px + env(safe-area-inset-top)) 20px 12px;
       position: sticky;
       top: 0;
       z-index: 100;
       border-bottom: 1px solid rgba(59,130,246,0.2);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
     }
     body.day .header {
       background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
-    }
-    #safeAreaTop {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: env(safe-area-inset-top);
-      background: #0f172a;
-      z-index: 9000;
-    }
-    body.day #safeAreaTop {
-      background: #1e3a5f;
     }
     .header-top {
       display: flex;
@@ -1038,8 +1026,6 @@
 </head>
 <body>
 
-<div id="safeAreaTop"></div>
-
 <!-- Native Splash (WebView 즉시 페인트, OS 아이콘 스플래시 직후 표시) -->
 <div id="nativeSplash" style="position:fixed;inset:0;z-index:999999;background:#0a1440;transition:opacity .6s ease;overflow:hidden">
   <video autoplay muted playsinline preload="auto" poster="splash-intro-poster.jpg"
@@ -1306,27 +1292,6 @@
       </button>
     </div>
 
-    <div class="chart-card">
-      <div class="chart-title">📋 지원 형식 안내</div>
-      <div style="font-size:13px; color:var(--text2); line-height:1.8;">
-        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
-          <span style="color:var(--success);flex-shrink:0">✓</span>
-          <span><strong>제주항공 ePaper</strong> — 월별 비행 스케줄 PDF</span>
-        </div>
-        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
-          <span style="color:var(--success);flex-shrink:0">✓</span>
-          <span>편명, 출발지/도착지, 시간, 기종 자동 추출</span>
-        </div>
-        <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
-          <span style="color:var(--success);flex-shrink:0">✓</span>
-          <span>등록부호(HL-XXXX) 자동 인식</span>
-        </div>
-        <div style="display:flex;gap:8px;align-items:flex-start;">
-          <span style="color:var(--text3);flex-shrink:0">i</span>
-          <span style="color:var(--text3)">파싱 후 각 항목을 직접 수정할 수 있습니다</span>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- Charts Tab -->
@@ -3079,10 +3044,11 @@ function saveEntry() {
     flights.push(entry);
   }
 
+  const wasEditing = editingId;
+  closeModal();
   saveData();
   renderFlights();
-  closeModal();
-  showToast(editingId ? '수정되었습니다' : '비행 기록이 저장되었습니다 ✈');
+  showToast(wasEditing ? '수정되었습니다' : '비행 기록이 저장되었습니다 ✈');
 }
 
 

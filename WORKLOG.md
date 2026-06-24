@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-06-24 (macOS — 헤더 안전영역 + 업로드 정리 + 수정 저장)
+
+### ✅ 완료된 작업
+
+#### 상단 헤더 안전영역 배경 비침 수정
+- `viewport` 메타에 `viewport-fit=cover` 추가
+  → 누락 시 iOS에서 `env(safe-area-inset-top)`이 0으로 계산되어 안전영역 커버가 사라지고
+    카드 내용이 상태바 영역으로 비쳐 보이던 문제 해결
+- 별도 오버레이(`#safeAreaTop` fixed 요소) 방식 제거 →
+  헤더 자체 패딩에 안전영역 포함: `padding: calc(16px + env(safe-area-inset-top)) 20px 12px`
+  → 헤더 그라데이션 배경이 상태바까지 끊김 없이 연속으로 덮음 (색 이음새 없음)
+- `.header`의 `backdrop-filter: blur(20px)` 제거 (반투명 블러로 뒤 내용이 비치는 것 방지, 불투명 그라데이션만 유지)
+
+#### 업로드 탭 "지원 형식 안내" 설명란 제거
+- 업로드 탭 하단 `📋 지원 형식 안내` chart-card 블록 완전 삭제
+
+#### 비행 기록 수정 → 저장 시 화면 닫힘 보장
+- `saveEntry()`: 기존 `saveData() → renderFlights() → closeModal()` 순서에서
+  중간 렌더링 예외 시 `closeModal()`에 도달 못 해 모달이 안 닫히던 문제
+- `closeModal()`을 저장·렌더링보다 먼저 호출하도록 순서 변경 →
+  저장 누르면 무조건 화면 먼저 닫힘 (`editingId`는 토스트 메시지용으로 사전 보관)
+
+---
+
 ## 2026-06-17 (macOS — iOS UX 버그 수정)
 
 ### ✅ 완료된 작업
