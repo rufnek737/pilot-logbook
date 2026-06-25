@@ -32,10 +32,37 @@ function mapAc(code) {
 }
 
 function fmtTime(s) {
-  const t = (s || '').trim().split(/\s+/)[0];
+  let t = (s || '').trim().split(/\s+/)[0];
+  t = t.replace(/\+\d+$/, '');   // 익일(+1) 표기 제거: 0701+1 → 0701
   if (/^\d{4}$/.test(t)) return `${t.slice(0, 2)}:${t.slice(2)}`;
   if (/^\d{2}:\d{2}/.test(t)) return t.slice(0, 5);
   return '';
+}
+
+// crew position → 본인 duty code/role 매핑
+function posToDuty(pos) {
+  const p = (pos || '').toUpperCase();
+  if (p === '3PC') return { dutyCode: '3PC', role: 'PIC' };
+  if (p === '3NC') return { dutyCode: '3NC', role: 'PIC' };
+  if (p === '3F')  return { dutyCode: '3F',  role: 'SIC' };
+  if (p === 'CAPT') return { dutyCode: 'C', role: 'PIC' };
+  if (p === 'FO' || p === 'SFO') return { dutyCode: 'F', role: 'SIC' };
+  return null;
+}
+
+// 로그인 아이디(=이름)를 crew 명단에서 찾아 본인 duty code 자동 설정
+function applyDutyCode(result, username) {
+  if (!result || !result.flights || !username) return result;
+  const uname = String(username).trim().replace(/\s+/g, '');
+  result.flights.forEach(f => {
+    if (!f.crew || !f.crew.length) return;
+    const me = f.crew.find(c => c.name && c.name.replace(/\s+/g, '') === uname)
+            || f.crew.find(c => c.name && c.name.replace(/[A-Za-z]+$/, '') === uname);
+    if (!me) return;
+    const d = posToDuty(me.position);
+    if (d) { f.dutyCode = d.dutyCode; f.role = d.role; }
+  });
+  return result;
 }
 
 function updateJar(jar, arr) {
@@ -197,7 +224,13 @@ function parseRosterHtml(html) {
       const to   = iTo   >= 0 ? r[iTo].slice(0, 3).trim().toUpperCase()   : '';
       const std  = iStd  >= 0 ? fmtTime(r[iStd])                          : '';
       const sta  = iSta  >= 0 ? fmtTime(r[iSta])                          : '';
-      const ac   = iAc   >= 0 ? mapAc(r[iAc].split(/\s+/)[0])             : 'B737-800';
+      let ac     = iAc   >= 0 ? mapAc(r[iAc].split(/\s+/)[0])             : '';
+      // 컬럼 미검출/기본값이면 행 전체에서 기종 코드 직접 탐색 (AC Reg 컬럼 오인식 등 방지)
+      if (!ac || ac === 'B737-800') {
+        const acM = r.join(' ').toUpperCase().match(/\b(7M8|B38M|A321|A320|A319|Q400|B738|738)\b/);
+        if (acM) ac = mapAc(acM[1]);
+      }
+      if (!ac) ac = 'B737-800';
       const blh  = iBLH  >= 0 ? r[iBLH].trim()                            : '';
       let acReg  = iReg  >= 0 ? r[iReg]                                   : '';
       const regM = acReg.match(/HL\d{4,5}/);
@@ -279,7 +312,7 @@ export default {
       'Content-Type':                 'application/json',
     };
 
-    const ok   = body        => new Response(JSON.stringify(body), { status: 200, headers: cors });
+    const ok   = body        => new Response(JSON.stringify(applyDutyCode(body, username)), { status: 200, headers: cors });
     const fail = (code, msg) => new Response(JSON.stringify({ error: msg }), { status: code, headers: cors });
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });

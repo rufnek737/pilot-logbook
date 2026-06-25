@@ -1482,20 +1482,13 @@
         </div>
       </div>
 
-      <div class="form-row">
+      <div class="form-row single">
         <div class="form-group">
           <label class="form-label">착륙 (LDG)</label>
           <select class="form-input" id="fLdgPf">
             <option value="PF">PF — 본인 착륙</option>
             <option value="PM">PM — 상대방 착륙</option>
             <option value="">— 해당없음</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">오토랜딩 (ALD)</label>
-          <select class="form-input" id="fAldDup">
-            <option value="N">N — 일반 착륙</option>
-            <option value="Y">Y — 오토랜딩</option>
           </select>
         </div>
       </div>
@@ -3677,11 +3670,21 @@ function ccUpdateCount() {
   }
 }
 
+// CC acType(원본/매핑값 모두) → 앱 셀렉트 값
+function _ccAcType(raw) {
+  const v = (raw || '').toString().toUpperCase().replace(/\s+/g, '');
+  if (v === '7M8' || v === 'B38M' || v === '-8MAX' || v === 'B737-8MAX' || v === 'B737-8') return 'B737-8';
+  if (v === '738' || v === 'B738' || v === '-800' || v === 'B737-800' || v === 'B737') return 'B737-800';
+  if (v.includes('A321')) return 'A321';
+  if (v.includes('A320')) return 'A320';
+  if (v.includes('Q400')) return 'Q400';
+  return 'B737-800';
+}
+
 function importSelectedFlights() {
   const idxs = [...document.querySelectorAll('.cc-flight-check:checked')].map(cb => +cb.dataset.idx);
   if (!idxs.length) { showToast('가져올 비행을 선택해주세요'); return; }
 
-  const acTypeMap = { 'B737-8 MAX':'B737-8','B737-8MAX':'B737-8','-8 MAX':'B737-8','B737-8':'B737-8','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
   const added = [];
 
   for (const i of idxs) {
@@ -3691,8 +3694,8 @@ function importSelectedFlights() {
     added.push({
       id: uid(), date: f.date, flight: f.flight,
       dep: f.from, arr: f.to, depTime: f.stdLocal, arrTime: f.staLocal,
-      acType: acTypeMap[f.acType] || 'B737-800', reg: f.acReg || '', total: f.blh,
-      night: '', ifr: '', role: 'PIC', dutyCode: 'C',
+      acType: _ccAcType(f.acType), reg: f.acReg || '', total: f.blh,
+      night: '', ifr: '', role: f.role || 'PIC', dutyCode: f.dutyCode || 'C',
       dutyCodeManual: false, ald: '', toPf: 'PF', ldgPf: 'PF',
       remarks: crewStr,
     });
@@ -3708,14 +3711,14 @@ function importSelectedFlights() {
 
 function importCcFlight(idx) {
   const f = _ccData.flights[idx];
-  const acTypeMap = { 'B737-8 MAX':'B737-8','B737-8MAX':'B737-8','-8 MAX':'B737-8','B737-8':'B737-8','B737-800':'B737-800','-800':'B737-800','A320':'A320','A321':'A321','Q400':'Q400' };
   // CC 모달을 완전히 닫지 않고 숨기기만 — 저장/닫기 후 복귀하기 위해
   _ccOrigin = true;
   document.getElementById('ccModalOverlay').classList.remove('show');
   openModal({
     fDate: f.date, fFlight: f.flight, fDep: f.from, fArr: f.to,
     fDepTime: f.stdLocal, fArrTime: f.staLocal, fTotal: f.blh,
-    fAcType: acTypeMap[f.acType] || 'B737-800', fReg: f.acReg || '',
+    fAcType: _ccAcType(f.acType), fReg: f.acReg || '',
+    fRole: f.role || 'PIC', fDutyCode: f.dutyCode || 'C',
     fRemarks: _buildCrewStr(f.crew || []),
   });
 }
@@ -3750,7 +3753,7 @@ function parseCrewConnexText(rawText) {
     'A321': 'A321', 'A320': 'A320', 'Q400': 'Q400',
   };
 
-  const FLIGHT_RE = /\b([A-Z]{3})\s+(\d{4})\s+\d{4}\s+([A-Z]{3})\s+(\d{4})\s+\d{4}\s+(7M8|B38M|738|B738|A321|A320|Q400)\s+(?:\d{1,2}:\d{2}\s+)?(\d{1,2}:\d{2})/;
+  const FLIGHT_RE = /\b([A-Z]{3})\s+(\d{4})(?:\+\d)?\s+\d{4}(?:\+\d)?\s+([A-Z]{3})\s+(\d{4})(?:\+\d)?\s+\d{4}(?:\+\d)?\s+(7M8|B38M|738|B738|A321|A320|Q400)\s+(?:\d{1,2}:\d{2}\s+)?(\d{1,2}:\d{2})/;
 
   let lastDay = '';
   for (const line of lines) {
