@@ -3703,10 +3703,14 @@ function importSelectedFlights() {
 
   if (!added.length) { showToast('선택한 비행이 이미 저장되어 있습니다'); return; }
   flights.push(...added);
+  const cnt = added.length;
+  // 먼저 CC 모달 닫고 로그북(메인)으로 전환 — 렌더링 예외와 무관하게 항상 닫히도록
+  closeCrewConnex();
+  switchTab('logbook', document.querySelectorAll('.tab-btn')[0]);
+  window.scrollTo(0, 0);
   saveData();
   renderFlights();
-  closeCrewConnex();
-  showToast(`${added.length}개 비행이 저장되었습니다 ✈`);
+  showToast(`${cnt}개 비행이 저장되었습니다 ✈`);
 }
 
 function importCcFlight(idx) {
