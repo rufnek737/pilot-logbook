@@ -1217,10 +1217,18 @@
         <button onclick="calcRangeSum()" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">합산</button>
       </div>
       <div id="rangeSumResult" style="margin-top:10px;display:none">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px">
           <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
             <div style="font-size:10px;color:var(--text3);margin-bottom:4px">총 비행</div>
             <div id="rsTotal" style="font-size:16px;font-weight:700;color:var(--accent)">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">PIC</div>
+            <div id="rsPic" style="font-size:16px;font-weight:700;color:#3b82f6">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">SIC</div>
+            <div id="rsSic" style="font-size:16px;font-weight:700;color:#10b981">-</div>
           </div>
           <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
             <div style="font-size:10px;color:var(--text3);margin-bottom:4px">야간</div>
@@ -2109,14 +2117,18 @@ function calcRangeSum() {
   if (!from || !to) { showToast('날짜를 선택해주세요'); return; }
   const sel = flights.filter(f => f.date >= from && f.date <= to);
   if (!sel.length) { showToast('해당 기간에 비행이 없습니다'); return; }
-  let total = 0, night = 0, ifr = 0;
+  let total = 0, night = 0, ifr = 0, pic = 0, sic = 0;
   sel.forEach(f => {
     const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
     total += dur;
     night += parseHHMM(f.night);
     ifr   += parseHHMM(f.ifr);
+    const cr = calcCreditedTime(f);
+    pic += cr.pic; sic += cr.sic;
   });
   document.getElementById('rsTotal').textContent = toHHMM(total);
+  document.getElementById('rsPic').textContent   = toHHMM(pic);
+  document.getElementById('rsSic').textContent   = toHHMM(sic);
   document.getElementById('rsNight').textContent = toHHMM(night);
   document.getElementById('rsIfr').textContent   = toHHMM(ifr);
   document.getElementById('rsCount').textContent = sel.length + '편';
@@ -2276,7 +2288,7 @@ function calcCreditedTime(f) {
     case '3PC':
       return { pic: Math.round(block * 2 / 3), sic: 0 };
     case '3NC':
-      return { pic: Math.round(block / 3), sic: Math.round(block * 2 / 3) };
+      return { pic: Math.round(block / 3), sic: Math.round(block / 3) };
     case 'F': case '2F': case 'NC':
       return { pic: 0, sic: block };
     case 'F1': case 'F2':
@@ -2515,10 +2527,19 @@ function flightCard(f) {
 
   const duration = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
   const cr = calcCreditedTime(f);
-  const creditLabel = cr.pic > 0
-    ? `<span style="color:var(--accent)">${toHHMM(cr.pic)}</span>`
-    : (cr.sic > 0 ? `<span style="color:var(--success)">${toHHMM(cr.sic)}</span>`
-                  : `<span style="color:var(--text3)">—</span>`);
+  let creditLabel;
+  if (cr.pic > 0 && cr.sic > 0) {
+    // 3NC 등 PIC/SIC 분할: 둘 다 표시
+    creditLabel = `<span style="font-size:11px;line-height:1.35">`
+      + `<span style="color:var(--accent)">P ${toHHMM(cr.pic)}</span><br>`
+      + `<span style="color:var(--success)">S ${toHHMM(cr.sic)}</span></span>`;
+  } else if (cr.pic > 0) {
+    creditLabel = `<span style="color:var(--accent)">${toHHMM(cr.pic)}</span>`;
+  } else if (cr.sic > 0) {
+    creditLabel = `<span style="color:var(--success)">${toHHMM(cr.sic)}</span>`;
+  } else {
+    creditLabel = `<span style="color:var(--text3)">—</span>`;
+  }
 
   return `<div class="flight-card ${isNight?'night':''} ${isSim?'sim':''}">
     <div class="card-top">

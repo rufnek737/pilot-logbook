@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-07-10 (macOS — 인정시간 PIC/SIC 명확화 + 3NC 계산 수정 + 합산 PIC/SIC)
+
+### ✅ 완료된 작업
+
+#### 3NC 인정시간 계산 버그 수정
+- `calcCreditedTime()`의 3NC가 `⅓ PIC + ⅔ SIC`로 잘못 계산되고 있었음
+  (옵션 라벨·규정은 `⅓ PIC + ⅓ SIC`)
+- `sic: block*2/3` → `sic: block/3`로 수정 (예: 7:08 → PIC 2:23 / SIC 2:23)
+- 상단 통계, 통계 탭 PIC/SIC 집계에도 자동 반영됨
+
+#### 카드 "인정시간" 표시 명확화
+- 기존: `cr.pic`만 표시 → 3NC 편은 PIC(⅓)만 보이고 SIC는 숨겨짐
+- 수정: PIC/SIC가 모두 있는 편(3NC)은 `P 2:23 / S 2:23`처럼 두 줄로 둘 다 표시
+- 순수 PIC/SIC 편은 색으로 구분 (파랑=PIC, 초록=SIC)
+
+#### 기간 합산에 PIC/SIC 추가
+- `calcRangeSum()`: `calcCreditedTime` 누적으로 PIC/SIC 합계 계산
+- 합산 결과 패널: 총비행·야간·계기·편수 + PIC·SIC 칸 추가 (3열 2행)
+
+> 참고: 인정시간 = 규정(SP.5.1) 기준 근무 형태별 PIC/SIC 환산 시간.
+> 단독 운항은 기장=전체 PIC / 부기장=전체 SIC, 증편(3-set)은 3PC(⅔PIC)/3NC(⅓PIC+⅓SIC)/3F(⅔SIC)
+
+---
+
 ## 2026-06-25 (macOS — CrewConnex 가져오기 인식 개선 + 중복 ALD 제거)
 
 ### ✅ 완료된 작업
