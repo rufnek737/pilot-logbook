@@ -1501,10 +1501,19 @@
         </div>
       </div>
 
-      <div class="form-section-title">비고</div>
+      <div class="form-section-title">편조</div>
       <div class="form-row single">
         <div class="form-group">
-          <input type="text" class="form-input" id="fRemarks" placeholder="특이사항 (선택)" />
+          <input type="text" class="form-input" id="fCrewInfo" placeholder="CrewConnex에서 자동으로 가져온 편조" />
+        </div>
+      </div>
+
+      <div class="form-section-title">개인 메모</div>
+      <div class="form-row single">
+        <div class="form-group">
+          <textarea class="form-input" id="fPersonalMemo" rows="3"
+            style="width:100%;resize:vertical;line-height:1.5"
+            placeholder="개인 메모 (선택)"></textarea>
         </div>
       </div>
 
@@ -1843,20 +1852,21 @@ function subscribeToFirestore(uid) {
       incoming.forEach(f => {
         if (!f.id) { f.id = simpleUid(); _snapChanged = true; }
         if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') { f.acType = 'B737-8'; _snapChanged = true; }
+        if (normalizeFlightTextFields(f)) _snapChanged = true;
       });
 
-      // 현재 포커스된 textarea 내용 보존 (아직 blur 안 됨)
+      // 현재 포커스된 개인 메모 내용 보존 (아직 blur 안 됨)
       const activeNotes = {};
       document.querySelectorAll('textarea.notes-ta').forEach(ta => {
-        const fid = ta.id.replace('notes-', '');
+        const fid = ta.id.replace('personal-memo-', '');
         const focused = document.activeElement === ta;
-        if (focused && ta.value.trim()) activeNotes[fid] = ta.value.trim();
+        if (focused) activeNotes[fid] = ta.value;
       });
 
       flights = incoming;
       Object.entries(activeNotes).forEach(([fid, val]) => {
         const idx = flights.findIndex(f => f.id === fid);
-        if (idx >= 0) flights[idx].remarks = val;
+        if (idx >= 0) flights[idx].personalMemo = val;
       });
 
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
@@ -1891,6 +1901,7 @@ document.addEventListener('visibilitychange', () => {
         incoming.forEach(f => {
           if (!f.id) { f.id = simpleUid(); _visChanged = true; }
           if (f.acType === 'B737-8 MAX' || f.acType === 'B737-8MAX') { f.acType = 'B737-8'; _visChanged = true; }
+          if (normalizeFlightTextFields(f)) _visChanged = true;
         });
         flights = incoming;
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
@@ -1969,7 +1980,10 @@ function setSyncStatus(msg) {
               .get({ source: 'server' });
             if (snap.exists) {
               const data = snap.data().flights || [];
-              data.forEach(f => { if (!f.id) f.id = uid(); });
+              data.forEach(f => {
+                if (!f.id) f.id = uid();
+                normalizeFlightTextFields(f);
+              });
               flights = data;
               localStorage.setItem(STORAGE_KEY, JSON.stringify(flights));
               renderFlights();
@@ -2043,9 +2057,41 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 // ─── State ──────────────────────────────────────────────────────
 const STORAGE_KEY = 'pilotLogbook';
 
+function getCrewInfo(f) {
+  return (f && (f.crewInfo ?? f.remarks)) || '';
+}
+
+function getPersonalMemo(f) {
+  return (f && f.personalMemo) || '';
+}
+
+// 구버전의 remarks(편조/메모 공용)를 편조로 안전하게 이전한다.
+// remarks는 이전 앱 버전과의 호환을 위해 편조 사본으로 유지한다.
+function normalizeFlightTextFields(f) {
+  if (!f || typeof f !== 'object') return false;
+  let changed = false;
+  if (f.crewInfo === undefined) {
+    f.crewInfo = f.remarks || '';
+    changed = true;
+  }
+  if (f.personalMemo === undefined) {
+    f.personalMemo = '';
+    changed = true;
+  }
+  if (f.remarks !== f.crewInfo) {
+    f.remarks = f.crewInfo;
+    changed = true;
+  }
+  return changed;
+}
+
 function loadData() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let changed = false;
+    data.forEach(f => { if (normalizeFlightTextFields(f)) changed = true; });
+    if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return data;
   } catch(e) {
     console.warn('localStorage 읽기 실패:', e);
     return [];
@@ -2350,7 +2396,7 @@ function renderFlights() {
   // 검색 중이면 전체 표시 (페이지네이션 없음)
   const q = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
   if (q) {
-    const visible = flights.filter(f => [f.date, f.flight, f.dep, f.arr, f.acType, f.reg, f.dutyCode, f.remarks]
+    const visible = flights.filter(f => [f.date, f.flight, f.dep, f.arr, f.acType, f.reg, f.dutyCode, getCrewInfo(f), getPersonalMemo(f)]
         .map(v => (v||'').toLowerCase()).some(v => v.includes(q)));
     const countEl = document.getElementById('searchCount');
     if (countEl) { countEl.textContent = `${visible.length}건`; countEl.style.display = 'block'; }
@@ -2516,6 +2562,8 @@ function dutyCodeBadgeClass(dc) {
 function flightCard(f) {
   const isNight = parseHHMM(f.night) > 0;
   const isSim   = f.role === 'SIM';
+  const crewInfo = getCrewInfo(f);
+  const personalMemo = getPersonalMemo(f);
 
   // 배지: duty code 우선, 없으면 role
   const dc = f.dutyCode || '';
@@ -2594,7 +2642,12 @@ function flightCard(f) {
       </div>
     </div>
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-      <textarea class="notes-ta" id="notes-${f.id}" placeholder="메모 (부기장, 특이사항 등...)" onblur="saveNotes('${f.id}',this.value)">${escHtml(f.remarks||'')}</textarea>
+      <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:5px">편조</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap;word-break:break-word">${crewInfo ? escHtml(crewInfo) : '—'}</div>
+    </div>
+    <div style="margin-top:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:5px">개인 메모</div>
+      <textarea class="notes-ta" id="personal-memo-${f.id}" placeholder="개인 메모 (선택)" onblur="savePersonalMemo('${f.id}',this.value)">${escHtml(personalMemo)}</textarea>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button onclick="editEntry('${f.id}')" style="flex:1;background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;">✏️ 수정</button>
@@ -2921,7 +2974,7 @@ function openModal(prefill) {
   // reset
   const today = new Date().toISOString().slice(0,10);
   document.getElementById('fDate').value = today;
-  ['fFlight','fDep','fArr','fDepTime','fArrTime','fReg','fTotal','fNight','fIfr','fRemarks'].forEach(id => {
+  ['fFlight','fDep','fArr','fDepTime','fArrTime','fReg','fTotal','fNight','fIfr','fCrewInfo','fPersonalMemo'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('fAcType').value    = 'B737-800';
@@ -2970,7 +3023,8 @@ function editEntry(id) {
   const _ldgPf = f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||1)>0 ? 'PF' : 'PM');
   document.getElementById('fToPf').value   = _toPf;
   document.getElementById('fLdgPf').value  = _ldgPf;
-  document.getElementById('fRemarks').value   = f.remarks   || '';
+  document.getElementById('fCrewInfo').value = getCrewInfo(f);
+  document.getElementById('fPersonalMemo').value = getPersonalMemo(f);
   document.getElementById('modalOverlay').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
@@ -3028,7 +3082,11 @@ function saveEntry() {
     total = toHHMM(calcDuration(depTime, arrTime));
   }
 
+  const existingIdx = editingId ? flights.findIndex(x => x.id === editingId) : -1;
+  const previous = existingIdx >= 0 ? flights[existingIdx] : null;
+  const crewInfo = document.getElementById('fCrewInfo').value.trim();
   const entry = {
+    ...(previous || {}),
     id: editingId || uid(),
     date,
     flight: document.getElementById('fFlight').value.toUpperCase().trim(),
@@ -3044,16 +3102,13 @@ function saveEntry() {
     ald:       document.getElementById('fAld').value,
     toPf:     document.getElementById('fToPf').value,
     ldgPf:    document.getElementById('fLdgPf').value,
-    remarks:   document.getElementById('fRemarks').value,
+    crewInfo,
+    personalMemo: document.getElementById('fPersonalMemo').value,
+    remarks: crewInfo, // 구버전 호환용 편조 사본
   };
 
   if (editingId) {
-    const idx = flights.findIndex(x => x.id === editingId);
-    if (idx >= 0) {
-      const inlineNotes = document.getElementById('notes-' + editingId);
-      if (inlineNotes && !entry.remarks) entry.remarks = flights[idx].remarks || '';
-      flights[idx] = entry;
-    }
+    if (existingIdx >= 0) flights[existingIdx] = entry;
   } else {
     flights.push(entry);
   }
@@ -3066,12 +3121,12 @@ function saveEntry() {
 }
 
 
-function saveNotes(id, val) {
+function savePersonalMemo(id, val) {
   const idx = flights.findIndex(f => f.id === id);
   if (idx < 0) return;
   const trimmed = val.trim();
-  if (flights[idx].remarks === trimmed) return;
-  flights[idx].remarks = trimmed;
+  if (getPersonalMemo(flights[idx]) === trimmed) return;
+  flights[idx].personalMemo = trimmed;
   saveData(true);  // immediate=true → Firestore 즉시 저장
 }
 
@@ -3217,6 +3272,8 @@ async function processExcel(file) {
         toPf: takeoffs > 0 ? 'PF' : 'PM',
         ldgPf: landings > 0 ? 'PF' : 'PM',
         dayLdg: String(dayLdg),
+        crewInfo: remarks,
+        personalMemo: '',
         remarks,
         source: 'excel'
       });
@@ -3375,10 +3432,13 @@ async function processPDF(file) {
         const idx = flights.findIndex(x => fkey(x) === fkey(f));
         if (idx >= 0) {
           const prev = flights[idx];
+          const crewInfo = getCrewInfo(prev) || getCrewInfo(f);
           flights[idx] = {
             ...f,
             id: prev.id,
-            remarks:  prev.remarks || '',
+            crewInfo,
+            personalMemo: getPersonalMemo(prev),
+            remarks: crewInfo,
             // dutyCodeManual=true면 사용자가 직접 수정한 것이므로 유지, 아니면 PDF값 사용
             dutyCode: prev.dutyCodeManual ? prev.dutyCode : f.dutyCode,
             dutyCodeManual: prev.dutyCodeManual || false,
@@ -3485,6 +3545,8 @@ function parseJejuAirEpaper(text, filename, lines) {
       ldgPf: hasLanding ? 'PF' : 'PM',
       dayLdg:   (hasLanding && !isNight) ? '1' : '0',
       nightLdg: (hasLanding &&  isNight) ? '1' : '0',
+      crewInfo: '',
+      personalMemo: '',
       remarks: '',
     });
   }
@@ -3702,50 +3764,96 @@ function _ccAcType(raw) {
   return 'B737-800';
 }
 
+function _findCrewConnexFlightIndex(f) {
+  return flights.findIndex(x => x.date === f.date && x.flight === f.flight);
+}
+
+// CrewConnex 재가져오기: 자동 파싱 항목만 최신값으로 바꾸고
+// 사용자가 입력한 계기·야간·착륙·오토랜딩·개인 메모는 보존한다.
+function _mergeCrewConnexFlight(f, previous) {
+  const crewInfo = _buildCrewStr(f.crew || []);
+  return {
+    ...(previous || {}),
+    id: previous?.id || uid(),
+    date: f.date,
+    flight: f.flight,
+    dep: f.from,
+    arr: f.to,
+    depTime: f.stdLocal,
+    arrTime: f.staLocal,
+    acType: _ccAcType(f.acType),
+    reg: f.acReg || '',
+    total: f.blh,
+    role: f.role || 'PIC',
+    dutyCode: f.dutyCode || 'C',
+    dutyCodeManual: false,
+    crewInfo,
+    remarks: crewInfo, // 구버전 호환용 편조 사본
+    night: previous?.night || '',
+    ifr: previous?.ifr || '',
+    ald: previous?.ald || '',
+    toPf: previous?.toPf ?? 'PF',
+    ldgPf: previous?.ldgPf ?? 'PF',
+    personalMemo: getPersonalMemo(previous),
+    source: 'crewconnex',
+  };
+}
+
 function importSelectedFlights() {
   const idxs = [...document.querySelectorAll('.cc-flight-check:checked')].map(cb => +cb.dataset.idx);
   if (!idxs.length) { showToast('가져올 비행을 선택해주세요'); return; }
 
-  const added = [];
+  let added = 0;
+  let updated = 0;
 
   for (const i of idxs) {
     const f = _ccData.flights[i];
-    if (flights.some(x => x.date === f.date && x.flight === f.flight)) continue;
-    const crewStr = _buildCrewStr(f.crew || []);
-    added.push({
-      id: uid(), date: f.date, flight: f.flight,
-      dep: f.from, arr: f.to, depTime: f.stdLocal, arrTime: f.staLocal,
-      acType: _ccAcType(f.acType), reg: f.acReg || '', total: f.blh,
-      night: '', ifr: '', role: f.role || 'PIC', dutyCode: f.dutyCode || 'C',
-      dutyCodeManual: false, ald: '', toPf: 'PF', ldgPf: 'PF',
-      remarks: crewStr,
-    });
+    const existingIdx = _findCrewConnexFlightIndex(f);
+    const previous = existingIdx >= 0 ? flights[existingIdx] : null;
+    const merged = _mergeCrewConnexFlight(f, previous);
+    if (existingIdx >= 0) {
+      flights[existingIdx] = merged;
+      updated++;
+    } else {
+      flights.push(merged);
+      added++;
+    }
   }
 
-  if (!added.length) { showToast('선택한 비행이 이미 저장되어 있습니다'); return; }
-  flights.push(...added);
-  const cnt = added.length;
   // 먼저 CC 모달 닫고 로그북(메인)으로 전환 — 렌더링 예외와 무관하게 항상 닫히도록
   closeCrewConnex();
   switchTab('logbook', document.querySelectorAll('.tab-btn')[0]);
   window.scrollTo(0, 0);
   saveData();
   renderFlights();
-  showToast(`${cnt}개 비행이 저장되었습니다 ✈`);
+  const parts = [];
+  if (added) parts.push(`신규 ${added}편`);
+  if (updated) parts.push(`기존 ${updated}편 갱신`);
+  showToast(`동기화 완료 — ${parts.join(' · ')} ✈`);
 }
 
 function importCcFlight(idx) {
   const f = _ccData.flights[idx];
+  const existingIdx = _findCrewConnexFlightIndex(f);
+  const previous = existingIdx >= 0 ? flights[existingIdx] : null;
+  const merged = _mergeCrewConnexFlight(f, previous);
   // CC 모달을 완전히 닫지 않고 숨기기만 — 저장/닫기 후 복귀하기 위해
   _ccOrigin = true;
   document.getElementById('ccModalOverlay').classList.remove('show');
   openModal({
-    fDate: f.date, fFlight: f.flight, fDep: f.from, fArr: f.to,
-    fDepTime: f.stdLocal, fArrTime: f.staLocal, fTotal: f.blh,
-    fAcType: _ccAcType(f.acType), fReg: f.acReg || '',
-    fRole: f.role || 'PIC', fDutyCode: f.dutyCode || 'C',
-    fRemarks: _buildCrewStr(f.crew || []),
+    fDate: merged.date, fFlight: merged.flight, fDep: merged.dep, fArr: merged.arr,
+    fDepTime: merged.depTime, fArrTime: merged.arrTime, fTotal: merged.total,
+    fAcType: merged.acType, fReg: merged.reg,
+    fNight: merged.night, fIfr: merged.ifr,
+    fRole: merged.role, fDutyCode: merged.dutyCode,
+    fAld: merged.ald || 'N', fToPf: merged.toPf, fLdgPf: merged.ldgPf,
+    fCrewInfo: merged.crewInfo, fPersonalMemo: merged.personalMemo,
   });
+  if (previous) {
+    editingId = previous.id;
+    document.getElementById('editId').value = previous.id;
+    document.getElementById('modalTitle').textContent = '비행 기록 갱신';
+  }
 }
 
 // ── Text parser (copy-paste fallback) ────────────────────────────
