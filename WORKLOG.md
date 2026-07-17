@@ -2,6 +2,79 @@
 
 ---
 
+## 2026-07-17 (상용화 출시 점검 + 다음 작업 인계)
+
+### 현재 기준점
+- 최신 기능 커밋: `87f434d feat: add account deletion and policy center`.
+- 공개 웹앱과 FAQ·개인정보처리방침·이용약관은 GitHub Pages 배포 및 실제 URL 응답 확인 완료.
+- 최신 iOS Debug 앱을 `Kay phone`(iPhone 15 Pro Max)에 기존 데이터 컨테이너를 지우지 않는 덮어쓰기 방식으로 설치·실행 완료.
+- 현재 상태는 개인 사용·소규모 베타 테스트에는 사용 가능하지만, 유료 공개 출시 전 보안·심사·결제 준비가 추가로 필요함.
+- 이번 점검에서는 코드와 배포 상태를 변경하지 않고 후속 작업만 정리함.
+
+### 출시 전 남은 작업 — 권장 순서
+
+#### 1순위: CrewConnex·Firebase 보안 강화
+- 현재 `workers/crewconnex.js`는 공개 Worker 주소로 들어오는 POST 요청에 Firebase 로그인 토큰을 요구하지 않음.
+- CORS가 `Access-Control-Allow-Origin: *`이며 반복 요청 제한이 없어, 주소를 아는 외부 클라이언트가 Worker와 CrewConnex 로그인 요청을 반복할 가능성이 있음.
+- CrewConnex 아이디·비밀번호를 데이터베이스·파일·캐시에 저장하는 코드는 없으며 요청 처리 중에만 사용되는 현재 원칙은 유지.
+- 실패 응답에 내부 접속 URL·상태·로그인 필드명이 포함되는 디버그 문자열이 있어 정식 출시 전 사용자용 오류만 남기도록 축소 필요.
+- Firestore 보안 규칙 파일이 저장소에 없어 Firebase Console의 실제 규칙이 사용자 UID별 읽기·쓰기만 허용하는지 현재 저장소만으로 재현·검증할 수 없음.
+
+다음 보안 작업의 제안 범위:
+1. 로그인 사용자의 Firebase ID 토큰을 CrewConnex 요청에 포함.
+2. Cloudflare Worker에서 토큰의 서명·프로젝트·만료·사용자 UID를 검증하고 비로그인 요청은 거부.
+3. GitHub Pages와 iOS·Android WebView의 실제 Origin을 확인한 뒤 허용 Origin만 응답.
+4. UID·IP 기준 반복 요청 제한과 짧은 시간의 연속 로그인 시도 방지.
+5. 내부 디버그 정보 제거 및 비밀번호·토큰이 로그에 남지 않는지 검사.
+6. Firestore 규칙을 저장소에 추가하고 `users/{uid}` 아래 자료는 본인만 접근하도록 규칙 테스트.
+
+완료 기준:
+- 로그아웃·위조 토큰 요청은 401/403으로 거부되고 정상 로그인 사용자의 가져오기는 웹과 아이폰에서 유지될 것.
+- 기존 비행기록, 계기·야간시간, 편조, 개인 메모에는 데이터 변경이 없을 것.
+- Worker 재배포, 아이폰 덮어쓰기 설치, WORKLOG와 GitHub 업데이트까지 완료할 것.
+
+#### 2순위: CrewConnex 상용 사용 권한 확인
+- 제주항공 내부 CrewConnex에 사용자의 계정으로 접속해 로스터를 파싱하는 기능이므로 상용 제공 전에 회사 보안정책·CrewConnex 이용조건과 허용 여부 확인 필요.
+- 제3자 서비스 접근 허가가 확인되지 않으면 앱 기능을 먼저 확대하지 말고, 공식 연동 또는 사용자 파일 가져오기 중심의 대안을 검토.
+- 이 항목은 코드 수정으로 해결할 수 없으며 운영자의 확인이 선행되어야 함.
+
+#### 3순위: Apple 로그인
+- 현재 Google 로그인을 제공하므로 일반 공개 App Store 배포에서는 Apple 심사 지침 4.8에 맞는 동등한 개인정보 보호 로그인 수단이 필요할 가능성이 높음.
+- `Apple로 로그인` 버튼, Firebase Apple Provider, iOS Capability, 최초 로그인 계정 연결, 탈퇴 시 Apple 토큰 해제까지 한 흐름으로 구현 필요.
+- 기업 내부 전용 앱 등 심사 예외 적용 여부를 먼저 확정하고, 일반 공개 앱이면 구현하는 방향을 권장.
+
+#### 4순위: 회원가입 정책 확인 절차
+- 이메일 가입 및 Google·Apple 최초 가입 전에 이용약관·개인정보처리방침을 확인하는 절차 추가.
+- 필수·선택 항목을 구분하고 동의한 정책 버전과 시각을 계정에 기록하는 방안 검토.
+- 정책의 운영자 법적 명칭, Firebase 실제 저장 리전과 국외 처리·위탁 내용을 상용 출시 정보에 맞춰 최종 수정.
+
+#### 5순위: 50편 이후 유료 자동 가져오기
+- 시험 운영 중에는 횟수 제한과 결제를 적용하지 않는 현재 정책 유지.
+- 유료화 시 자동 가져오기 성공 편수를 서버에서 사용자별로 계산하고 최초 50편을 무료 처리.
+- App Store 인앱결제, 구매 복원, 구독 상태 확인·관리·해지 안내를 구현.
+- 결제하지 않아도 기존 기록 조회·수정, 수동 입력, 인쇄·PDF 저장은 계속 무료로 유지.
+- 앱 재설치·재가입·중복 가져오기로 무료 횟수를 초기화하거나 과다 계산하지 않도록 기준 확정 필요.
+
+#### 후속 출시 준비
+- App Store Connect 개인정보 수집 항목과 공개 개인정보처리방침 URL 등록.
+- CrewConnex 계정을 심사자에게 제공하기 어려운 경우를 위한 데모 모드 또는 심사용 설명 준비.
+- CrewConnex 화면 변경에 대비한 파서·병합 자동 회귀 테스트 보강.
+- 앱 버전·빌드 번호 관리, 출시용 서명, 스토어 설명·스크린샷·지원 URL 준비.
+- 제주항공 이외 항공사는 각 로스터 형식과 사용 권한을 확인한 뒤 파서를 항공사별 모듈로 분리해 순차 추가.
+
+### 다음 작업 시작 규칙
+- 다음 작업은 `1순위 CrewConnex·Firebase 보안 강화`로 제안.
+- 실제 수정 전에 사용자와 인증 방식, 허용 환경, 요청 제한 기준, 기존 사용자 영향이 없는지 먼저 상호 확인.
+- 사용자 확인 전에는 Worker·Firebase 설정·앱 코드를 변경하거나 배포하지 않음.
+
+참고 문서:
+- Apple App Review Guidelines: https://developer.apple.com/app-store/review/guidelines/
+- Firebase App Check: https://firebase.google.com/docs/app-check
+- Firestore Security Rules 조건: https://firebase.google.com/docs/firestore/security/rules-conditions
+- Cloudflare Rate Limiting: https://developers.cloudflare.com/waf/rate-limiting-rules/
+
+---
+
 ## 2026-07-17 (계정 관리·회원 탈퇴 + FAQ·정책 공개)
 
 ### ✅ 완료된 작업
