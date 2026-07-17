@@ -2,7 +2,7 @@
   "name": "Pilot Logbook",
   "short_name": "LogBook",
   "description": "항공일지 — Log It. Review It. Fly Better.",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#0a1440",
   "theme_color": "#0a1440",
