@@ -10,6 +10,7 @@
 - 스크롤 시 고정 헤더가 Dynamic Island·상태 표시줄 영역과 겹치던 문제를 수정.
 - iOS WebView의 자동 콘텐츠 여백과 앱 CSS의 안전영역 여백이 동시에 적용되지 않도록 Capacitor `contentInset`을 `never`로 변경하고, 헤더가 CSS `safe-area-inset-top`만 사용하도록 통일.
 - 구형 iOS용 `constant(safe-area-inset-top)` 대체값도 함께 추가하고 기존 고정 헤더와 표시 순서를 유지.
+- 월별 출력 전체화면에도 상·하단 안전영역을 적용하고 `뒤로`·`인쇄` 도구막대를 안전영역 아래에 고정해 Dynamic Island와 겹치지 않도록 추가 보완.
 
 #### LogTen 호환 CSV 전체 내보내기
 - `출력 및 내보내기` 화면에 `LogTen CSV 전체 내보내기`를 추가.
@@ -17,7 +18,8 @@
 - 날짜, 편명, 출·도착지, 기번·기종, 실제 OUT/IN, 총 비행시간, PIC/SIC 인정시간, 야간·실제 계기시간, 이착륙, 오토랜딩, PIC 이름, Duty Code, 편조, 개인 메모를 각각 분리해 내보냄.
 - B737-8/MAX는 `B38M`, B737-800은 `B738`로 정규화하며, CSV 수식으로 오인될 수 있는 메모 값은 안전하게 처리.
 - 내보내기는 기존 비행기록을 읽기만 하며 Firestore와 기기 저장 자료를 수정하지 않음.
-- Mac용 LogTen의 `File → Import from File → Flights` 흐름과 iPhone만 사용하는 경우의 파일 저장·지원팀 전달 안내를 화면에 추가.
+- Mac용 LogTen의 `File → Import from File → Flights` 흐름과 iPhone/iPad만 사용하는 경우의 파일 저장·지원팀 전달 안내를 화면에 추가.
+- Android에서는 공유 화면 또는 다운로드로 CSV를 파일 앱·Drive 등에 저장한 뒤 Mac으로 옮기거나 LogTen 지원팀에 전달하도록 안내하고, LogTen이 Android를 지원하지 않는다는 점을 명시.
 
 #### 월별 출력 한글·영문 지원
 - 기존 `인쇄` 메뉴를 `출력`로 정리하고 한국어·English 선택 버튼을 추가.
@@ -32,8 +34,9 @@
   - 기존 Firebase·CrewConnex 보안, 로스터 파싱 및 편조 자동 판정 회귀 테스트.
 - JavaScript 구문 검사와 변경 파일 공백 검사 통과.
 - 430×932 모바일 미리보기에서 상단 메뉴와 출력 버튼의 반응형 배치 및 브라우저 오류 없음 확인.
+- 430×932 모바일 크기에서 출력 화면 안전영역·고정 도구막대와 Android 안내 연결, 가로 넘침 및 브라우저 오류 없음 확인.
 - iOS 프로젝트 동기화 후 `contentInset: never`와 LogTen 내보내기 파일 포함 여부 확인.
-- `Kay phone`(iPhone 15 Pro Max) 대상 Debug 빌드 성공 및 기존 앱 위에 덮어쓰기 설치 완료. 설치 후 자동 실행은 기기 잠금 상태로 iOS가 차단했으므로 앱 아이콘 실행으로 확인 필요.
+- 최종 iOS 동기화와 `Kay phone`(iPhone 15 Pro Max) 대상 Debug 빌드 성공 후 기존 앱 위에 덮어쓰기 설치 및 자동 실행 완료.
 
 ### 사용자 최종 확인
 - 앱에서 기록 화면을 아래로 스크롤해 고정 헤더가 시계·Dynamic Island와 겹치지 않는지 확인.

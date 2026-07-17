@@ -62,4 +62,6 @@ test('app wires the export, bilingual print, and CSS-owned iOS safe area', () =>
   assert.match(html, /setPrintLanguage\('en'\)/);
   assert.match(html, /constant\(safe-area-inset-top\)/);
   assert.match(html, /env\(safe-area-inset-top\)/);
+  assert.match(html, /#pv-toolbar \{ position:sticky; top:constant\(safe-area-inset-top\); top:env\(safe-area-inset-top\)/);
+  assert.match(html, /LogTen은 Android를 지원하지 않습니다/);
 });

@@ -1311,7 +1311,7 @@
 <div id="syncStatus"></div>
 
 <!-- Print Overlay -->
-<div id="printView" style="display:none;position:fixed;inset:0;background:#fff;z-index:9999;overflow-y:auto;padding:16px;box-sizing:border-box;color:#111;font-family:Arial,sans-serif;font-size:11px">
+<div id="printView" style="display:none;position:fixed;inset:0;background:#fff;z-index:9999;overflow-y:auto;padding:calc(16px + constant(safe-area-inset-top)) 16px calc(16px + constant(safe-area-inset-bottom));padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));box-sizing:border-box;color:#111;font-family:Arial,sans-serif;font-size:11px">
   <div id="printViewContent"></div>
 </div>
 
@@ -1716,7 +1716,7 @@
     </div>
     <div class="modal-body">
       <button onclick="exportLogTenCsv()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:14px">📤 LogTen CSV 전체 내보내기</button>
-      <div style="font-size:11px;color:var(--text3);line-height:1.55;margin:-6px 2px 14px">전체 비행기록을 UTF-8 CSV로 저장합니다. Mac용 LogTen에서는 File → Import from File → Flights를 사용하세요. iPhone만 사용하면 파일 앱에 저장한 뒤 LogTen 지원팀에 전달할 수 있습니다. OUT/IN은 앱에 저장된 현지시간 기준입니다.</div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.55;margin:-6px 2px 14px">전체 비행기록을 UTF-8 CSV로 저장합니다. Mac용 LogTen에서는 File → Import from File → Flights를 사용하세요. iPhone/iPad만 사용하면 파일 앱에 저장한 뒤 LogTen 지원팀에 전달할 수 있습니다. Android에서는 공유 화면 또는 다운로드로 파일 앱·Drive 등에 저장한 뒤 Mac으로 옮기거나 LogTen 지원팀에 전달하세요. LogTen은 Android를 지원하지 않습니다. OUT/IN은 앱에 저장된 현지시간 기준입니다.</div>
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">월별 인쇄 언어</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         <button id="printLangKo" onclick="setPrintLanguage('ko')" style="border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">한국어</button>
@@ -2773,6 +2773,7 @@ function printMonth(ym, language = printLanguage) {
       #pv-table tr:nth-child(even) td { background:#f5f8ff; }
       #pv-summary { margin-top:14px; display:flex; gap:20px; font-size:12px; flex-wrap:wrap; }
       #pv-summary b { font-size:14px; color:#1e3a5f; }
+      #pv-toolbar { position:sticky; top:constant(safe-area-inset-top); top:env(safe-area-inset-top); z-index:2; background:#fff; padding:8px 0; }
     </style>
     <div id="pv-toolbar" style="display:flex;gap:10px;margin-bottom:16px">
       <button id="pv-back"  style="padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;background:#e5e7eb;color:#111;cursor:pointer">${labels.back}</button>
