@@ -7,6 +7,155 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 const BASE = 'https://crewconnex.jejuair.net';
+const DEFAULT_FIREBASE_PROJECT_ID = 'pilot-logbook-22bb8';
+const FIREBASE_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+const ALLOWED_ORIGINS = new Set([
+  'https://rufnek737.github.io',
+  'https://pilot-logbook.netlify.app',
+  'capacitor://localhost',
+  'http://localhost',
+  'https://localhost',
+]);
+const MAX_REQUEST_BYTES = 4096;
+
+let firebaseCertCache = { certificates: null, expiresAt: 0 };
+
+function decodeBase64Url(value) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, ch => ch.charCodeAt(0));
+}
+
+function readDerElement(bytes, offset) {
+  if (offset >= bytes.length) throw new Error('Invalid DER');
+  const start = offset;
+  const tag = bytes[offset++];
+  if (offset >= bytes.length) throw new Error('Invalid DER length');
+  let length = bytes[offset++];
+  if (length & 0x80) {
+    const count = length & 0x7f;
+    if (!count || count > 4 || offset + count > bytes.length) throw new Error('Invalid DER length');
+    length = 0;
+    for (let i = 0; i < count; i++) length = (length * 256) + bytes[offset++];
+  }
+  const contentStart = offset;
+  const end = contentStart + length;
+  if (end > bytes.length) throw new Error('Invalid DER bounds');
+  return { tag, start, contentStart, end };
+}
+
+// Firebase가 제공하는 X.509 인증서에서 Web Crypto가 요구하는 SPKI 공개키를 추출한다.
+export function extractSpkiFromCertificate(pem) {
+  const body = String(pem || '')
+    .replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s/g, '');
+  if (!body) throw new Error('Missing certificate');
+  const certificate = Uint8Array.from(atob(body), ch => ch.charCodeAt(0));
+  const root = readDerElement(certificate, 0);
+  if (root.tag !== 0x30 || root.end !== certificate.length) throw new Error('Invalid certificate');
+  const tbs = readDerElement(certificate, root.contentStart);
+  if (tbs.tag !== 0x30) throw new Error('Invalid certificate body');
+
+  let offset = tbs.contentStart;
+  let element = readDerElement(certificate, offset);
+  if (element.tag === 0xa0) {
+    offset = element.end;
+    element = readDerElement(certificate, offset);
+  }
+  // serialNumber, signature, issuer, validity, subject
+  for (let i = 0; i < 5; i++) {
+    offset = element.end;
+    element = readDerElement(certificate, offset);
+  }
+  if (element.tag !== 0x30 || element.end > tbs.end) throw new Error('Invalid public key');
+  return certificate.slice(element.start, element.end);
+}
+
+function cacheMaxAge(headers) {
+  const match = (headers.get('cache-control') || '').match(/(?:^|,)\s*max-age=(\d+)/i);
+  return match ? Math.max(60, Number(match[1])) : 3600;
+}
+
+async function getFirebaseCertificates(fetchImpl, nowMs) {
+  if (firebaseCertCache.certificates && firebaseCertCache.expiresAt > nowMs) {
+    return firebaseCertCache.certificates;
+  }
+  const response = await fetchImpl(FIREBASE_CERTS_URL, { headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error('Certificate fetch failed');
+  const certificates = await response.json();
+  firebaseCertCache = {
+    certificates,
+    expiresAt: nowMs + cacheMaxAge(response.headers) * 1000,
+  };
+  return certificates;
+}
+
+export async function verifyFirebaseIdToken(token, projectId, options = {}) {
+  if (typeof token !== 'string' || token.length > 8192) throw new Error('Invalid token');
+  const parts = token.split('.');
+  if (parts.length !== 3 || parts.some(part => !part)) throw new Error('Invalid token');
+
+  let header, payload;
+  try {
+    header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0])));
+    payload = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1])));
+  } catch (_) {
+    throw new Error('Invalid token');
+  }
+
+  if (header.alg !== 'RS256' || typeof header.kid !== 'string' || !header.kid) {
+    throw new Error('Invalid token header');
+  }
+
+  const nowMs = options.nowMs ?? Date.now();
+  const now = Math.floor(nowMs / 1000);
+  const issuer = `https://securetoken.google.com/${projectId}`;
+  if (payload.aud !== projectId || payload.iss !== issuer) throw new Error('Invalid token project');
+  if (typeof payload.sub !== 'string' || !payload.sub || payload.sub.length > 128) throw new Error('Invalid token subject');
+  if (!Number.isFinite(payload.exp) || payload.exp <= now) throw new Error('Expired token');
+  if (!Number.isFinite(payload.iat) || payload.iat > now) throw new Error('Invalid issued time');
+  if (!Number.isFinite(payload.auth_time) || payload.auth_time > now) throw new Error('Invalid auth time');
+
+  const certificates = options.certificates
+    || await getFirebaseCertificates(options.fetchImpl || fetch, nowMs);
+  const certificate = certificates[header.kid];
+  if (!certificate) throw new Error('Unknown signing key');
+  const spki = extractSpkiFromCertificate(certificate);
+  const publicKey = await crypto.subtle.importKey(
+    'spki',
+    spki,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+  const verified = await crypto.subtle.verify(
+    { name: 'RSASSA-PKCS1-v1_5' },
+    publicKey,
+    decodeBase64Url(parts[2]),
+    new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
+  );
+  if (!verified) throw new Error('Invalid token signature');
+  return { ...payload, uid: payload.sub };
+}
+
+function responseHeaders(origin) {
+  const headers = {
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    'Cache-Control': 'no-store',
+    'Content-Type': 'application/json; charset=utf-8',
+    'Vary': 'Origin',
+    'X-Content-Type-Options': 'nosniff',
+  };
+  if (ALLOWED_ORIGINS.has(origin)) headers['Access-Control-Allow-Origin'] = origin;
+  return headers;
+}
+
+function bearerToken(request) {
+  const match = (request.headers.get('authorization') || '').match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : '';
+}
 
 function stripHtml(s) {
   return (s || '')
@@ -51,7 +200,7 @@ function posToDuty(pos) {
 }
 
 // 로그인 아이디(=이름)를 crew 명단에서 찾아 본인 duty code 자동 설정
-function applyDutyCode(result, username) {
+export function applyDutyCode(result, username) {
   if (!result || !result.flights || !username) return result;
   const uname = String(username).trim().replace(/\s+/g, '');
   result.flights.forEach(f => {
@@ -81,31 +230,6 @@ function getSetCookies(r) {
   if (typeof r.headers.getSetCookie === 'function') return r.headers.getSetCookie();
   const h = r.headers.get('set-cookie');
   return h ? [h] : [];
-}
-
-function extractNavInfo(html) {
-  const seen = new Set();
-  const add = (s, target) => { if (s && !seen.has(s)) { seen.add(s); target.push(s); } };
-  const hrefs = [], forms = [], iframes = [], jsUrls = [];
-  const hrefRe = /href=["']([^"']+)["']/gi;
-  let m;
-  while ((m = hrefRe.exec(html)) !== null) {
-    const h = m[1];
-    if (h !== '#' && h !== '/' && !h.startsWith('javascript') && !h.startsWith('mailto')) add(h, hrefs);
-  }
-  const actRe = /action=["']([^"']+)["']/gi;
-  while ((m = actRe.exec(html)) !== null) {
-    if (!m[1].startsWith('javascript')) add(m[1], forms);
-  }
-  const ifRe = /<i?frame[^>]+src=["']([^"']+)["']/gi;
-  while ((m = ifRe.exec(html)) !== null) add(m[1], iframes);
-  const locRe = /(?:location\.href|window\.location)\s*=\s*["']([^"']+)["']/gi;
-  while ((m = locRe.exec(html)) !== null) add(m[1], jsUrls);
-  const navFnRe = /(?:goPage|navigate|loadPage|movePage|goMenu|changeMenu|openPage|showMenu|goPg|fnGo|menuClick)\s*\(\s*["']([^"']+)["']/gi;
-  while ((m = navFnRe.exec(html)) !== null) add(m[1], jsUrls);
-  const titleM = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const title = titleM ? titleM[1].trim() : '';
-  return { title, hrefs: hrefs.slice(0, 30), forms, iframes, jsUrls: jsUrls.slice(0, 20) };
 }
 
 function findRosterUrl(html) {
@@ -160,7 +284,7 @@ function extractCrewFromRow(rowText) {
   }));
 }
 
-function parseRosterHtml(html) {
+export function parseRosterHtml(html) {
   const flights = [];
   const today   = new Date();
   let trackYear  = today.getFullYear();
@@ -304,24 +428,67 @@ async function tryFetch(url, jar, referer) {
 }
 
 // ─── Cloudflare Workers 핸들러 (Netlify와 다른 부분) ───────────────────────
-export default {
-  async fetch(request, env, ctx) {
-    const cors = {
-      'Access-Control-Allow-Origin':  '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Content-Type':                 'application/json',
-    };
+export async function handleRequest(request, env = {}, dependencies = {}) {
+    const origin = request.headers.get('origin') || '';
+    const cors = responseHeaders(origin);
+    const ok = body => new Response(JSON.stringify(applyDutyCode(body, username)), {
+      status: 200,
+      headers: cors,
+    });
+    const fail = (status, error, code) => new Response(JSON.stringify({ error, code }), {
+      status,
+      headers: cors,
+    });
 
-    const ok   = body        => new Response(JSON.stringify(applyDutyCode(body, username)), { status: 200, headers: cors });
-    const fail = (code, msg) => new Response(JSON.stringify({ error: msg }), { status: code, headers: cors });
-
+    if (!ALLOWED_ORIGINS.has(origin)) {
+      return fail(403, '허용되지 않은 앱 환경입니다.', 'ORIGIN_NOT_ALLOWED');
+    }
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (request.method !== 'POST')   return fail(405, 'Method Not Allowed');
+    if (request.method !== 'POST') return fail(405, '지원하지 않는 요청입니다.', 'METHOD_NOT_ALLOWED');
+
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > MAX_REQUEST_BYTES) return fail(413, '요청 내용이 너무 큽니다.', 'REQUEST_TOO_LARGE');
+
+    const token = bearerToken(request);
+    if (!token) {
+      return fail(401, 'Pilot Logbook에 로그인한 뒤 다시 시도해 주세요.', 'AUTH_REQUIRED');
+    }
+
+    let verifiedUser;
+    try {
+      const verifyToken = dependencies.verifyToken || verifyFirebaseIdToken;
+      verifiedUser = await verifyToken(token, env.FIREBASE_PROJECT_ID || DEFAULT_FIREBASE_PROJECT_ID);
+    } catch (_) {
+      return fail(401, '로그인이 만료되었습니다. 다시 로그인해 주세요.', 'AUTH_INVALID');
+    }
+
+    if (!env.CREWCONNEX_RATE_LIMITER || typeof env.CREWCONNEX_RATE_LIMITER.limit !== 'function') {
+      return fail(503, '가져오기 보안 설정을 확인 중입니다. 잠시 후 다시 시도해 주세요.', 'RATE_LIMIT_UNAVAILABLE');
+    }
+    try {
+      const rateLimit = await env.CREWCONNEX_RATE_LIMITER.limit({ key: `crewconnex:${verifiedUser.uid}` });
+      if (!rateLimit.success) {
+        return fail(429, '요청이 너무 많습니다. 1분 후 다시 시도해 주세요.', 'RATE_LIMITED');
+      }
+    } catch (_) {
+      return fail(503, '가져오기 보안 설정을 확인 중입니다. 잠시 후 다시 시도해 주세요.', 'RATE_LIMIT_UNAVAILABLE');
+    }
 
     let username, password;
-    try { ({ username, password } = JSON.parse(await request.text() || '{}')); }
-    catch { return fail(400, '잘못된 요청'); }
-    if (!username || !password) return fail(400, '아이디/비밀번호를 입력해 주세요');
+    try {
+      const requestBody = await request.text();
+      if (new TextEncoder().encode(requestBody).byteLength > MAX_REQUEST_BYTES) {
+        return fail(413, '요청 내용이 너무 큽니다.', 'REQUEST_TOO_LARGE');
+      }
+      ({ username, password } = JSON.parse(requestBody || '{}'));
+    } catch (_) {
+      return fail(400, '잘못된 요청입니다.', 'INVALID_REQUEST');
+    }
+    username = typeof username === 'string' ? username.trim() : '';
+    password = typeof password === 'string' ? password : '';
+    if (!username || !password || username.length > 128 || password.length > 256) {
+      return fail(400, '아이디/비밀번호를 확인해 주세요.', 'INVALID_CREDENTIALS');
+    }
 
     const UA  = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
     const jar = {};
@@ -400,9 +567,9 @@ export default {
       });
       updateJar(jar, getSetCookies(r1));
 
-      const dbg = `[postUrl:${postUrl}] [status:${r1.status}] [idField:${userField}] [pwField:${pwField}]`;
-
-      if (r1.status === 401 || r1.status === 403) return fail(401, `로그인 실패 — 아이디/비밀번호를 확인해 주세요\n${dbg}`);
+      if (r1.status === 401 || r1.status === 403) {
+        return fail(401, 'CrewConnex 로그인 실패 — 아이디/비밀번호를 확인해 주세요.', 'CREWCONNEX_LOGIN_FAILED');
+      }
 
       let mainUrl;
       const loc1 = r1.headers.get('location') || '';
@@ -412,7 +579,7 @@ export default {
       } else {
         const r1Body = await r1.text();
         if (/invalid|incorrect|실패|오류|틀린|없는|만료|wrong|fail/i.test(r1Body)) {
-          return fail(401, `로그인 실패 — 아이디/비밀번호를 확인해 주세요\n${dbg}`);
+          return fail(401, 'CrewConnex 로그인 실패 — 아이디/비밀번호를 확인해 주세요.', 'CREWCONNEX_LOGIN_FAILED');
         }
         const directParsed = parseRosterHtml(r1Body);
         if (directParsed.flights.length > 0) return ok(directParsed);
@@ -431,7 +598,7 @@ export default {
 
       const mainTitle = (mainHtml.match(/<title[^>]*>([^<]+)<\/title>/i) || [])[1] || '';
       if (r2.url.includes('login') || /login|로그인/i.test(mainTitle)) {
-        return fail(401, `로그인 실패 — 아이디/비밀번호를 확인해 주세요\n${dbg}`);
+        return fail(401, 'CrewConnex 로그인 실패 — 아이디/비밀번호를 확인해 주세요.', 'CREWCONNEX_LOGIN_FAILED');
       }
 
       const rosterRel = findRosterUrl(mainHtml);
@@ -458,19 +625,15 @@ export default {
       const mainParsed = parseRosterHtml(mainHtml);
       if (mainParsed.flights.length > 0) return ok(mainParsed);
 
-      const nav = extractNavInfo(mainHtml);
-      const lines = [
-        `로그인 성공, Roster 페이지를 찾을 수 없습니다.`,
-        `현재 페이지: ${r2.url}`,
-        nav.title ? `페이지 제목: ${nav.title}` : '',
-        nav.hrefs.length   ? `\n[링크]\n${nav.hrefs.join('\n')}` : '',
-        nav.forms.length   ? `\n[폼 action]\n${nav.forms.join('\n')}` : '',
-      ].filter(Boolean);
+      return fail(404, '로그인 성공, 최근 5일 이내 비행을 찾을 수 없습니다.', 'NO_RECENT_FLIGHTS');
 
-      return fail(404, lines.join('\n'));
-
-    } catch (e) {
-      return fail(500, `서버 오류: ${e.message}`);
+    } catch (_) {
+      return fail(502, 'CrewConnex 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'UPSTREAM_ERROR');
     }
-  }
+}
+
+export default {
+  fetch(request, env) {
+    return handleRequest(request, env);
+  },
 };

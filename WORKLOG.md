@@ -2,6 +2,61 @@
 
 ---
 
+## 2026-07-17 (CrewConnex·Firebase 보안 강화 완료)
+
+### ✅ 적용 내용
+
+#### CrewConnex 요청 인증
+- 앱에서 CrewConnex 가져오기를 실행할 때 현재 로그인 사용자의 Firebase ID 토큰을 HTTPS 요청의 `Authorization: Bearer` 헤더에 포함하도록 변경.
+- Cloudflare Worker가 Firebase 공식 공개 인증서를 이용해 토큰의 RS256 서명, 프로젝트 ID, 발급자, 만료 시각, 발급 시각, 인증 시각, 사용자 UID를 모두 확인하도록 구현.
+- 비로그인·만료·위조 토큰은 CrewConnex 사이트에 접속하기 전에 `401`로 차단.
+- CrewConnex 아이디·비밀번호는 기존과 동일하게 요청 처리 중에만 사용하며 데이터베이스·파일·캐시에 저장하지 않음.
+
+#### 접근 환경 및 반복 요청 보호
+- 허용 환경을 GitHub Pages, 기존 Netlify 주소, iOS Capacitor, Android/로컬 Capacitor Origin으로 제한.
+- Cloudflare Rate Limiting binding을 추가해 Firebase 사용자 UID별 CrewConnex 요청을 `1분 5회`로 제한.
+- 요청 본문을 4KB로 제한하고 아이디·비밀번호 형식과 최대 길이를 검사.
+- CORS 응답에서 `Access-Control-Allow-Origin: *`를 제거하고 요청 Origin과 일치하는 허용 주소만 반환.
+- 응답에 `Cache-Control: no-store`, `Vary: Origin`, `X-Content-Type-Options: nosniff` 보안 헤더 추가.
+
+#### 오류 정보 축소
+- 실패 응답에 노출되던 CrewConnex 내부 접속 URL, HTTP 상태, 로그인 필드명, 페이지 제목, 링크·폼 목록 및 서버 예외 메시지를 제거.
+- 사용자에게 필요한 로그인 실패·최근 비행 없음·연결 오류만 표시하고, 클라이언트 처리를 위한 비민감 오류 코드만 반환.
+
+#### Firestore 보안 규칙
+- `firestore.rules`, `firebase.json`, `.firebaserc`를 저장소에 추가.
+- `users/{uid}`와 그 아래 모든 문서는 로그인한 본인 UID만 읽기·쓰기·삭제할 수 있도록 제한.
+- 규칙 컴파일 성공 후 Firebase 프로젝트 `pilot-logbook-22bb8`에 실제 배포 완료.
+
+### 🧪 검증 결과
+- 자동 테스트 6개 통과:
+  - Firebase 정상 서명·위조 서명·다른 프로젝트 토큰 검증.
+  - 허용/차단 Origin, 비로그인 요청, 반복 요청 제한 검증.
+  - Firestore UID 소유자 규칙과 배포 설정 검증.
+  - 클라이언트 Firebase 토큰 전송 및 비밀번호 미저장 확인.
+  - CrewConnex 로스터 파싱과 편조 duty code 자동 판정 회귀 확인.
+- Firebase 실제 공개 X.509 인증서 4개를 Worker의 Web Crypto 코드로 읽고 공개키 가져오기 성공.
+- Cloudflare Worker 배포 완료:
+  - URL: `https://crewconnex.tae26001.workers.dev`
+  - Version ID: `57fb5046-e441-4b03-9bab-4986172140f7`
+  - Binding: Firebase 프로젝트 ID, 사용자 UID별 5회/60초 제한.
+- 실서비스 주소 확인:
+  - GitHub Pages Origin의 OPTIONS 요청 `204`.
+  - 비로그인 요청 `401 AUTH_REQUIRED`.
+  - 위조 토큰 요청 `401 AUTH_INVALID`.
+  - 외부 Origin 요청 `403 ORIGIN_NOT_ALLOWED`.
+- iOS 앱 빌드 성공 후 `Kay phone`에 기존 앱 데이터 컨테이너를 유지하는 덮어쓰기 설치·실행 완료.
+
+### 데이터 영향
+- 비행기록 구조와 가져오기 병합 코드는 변경하지 않음.
+- 기존 계기시간, 야간시간, 편조, 개인 메모 보존 로직은 그대로 유지.
+
+### 다음 작업 후보
+- 실제 사용자 계정으로 iPhone에서 CrewConnex 가져오기 1회 최종 확인.
+- 사용자와 범위 확인 후 LogTen 호환 내보내기와 영문 출력 기능 진행.
+
+---
+
 ## 2026-07-17 (상용화 출시 점검 + 다음 작업 인계)
 
 ### 현재 기준점

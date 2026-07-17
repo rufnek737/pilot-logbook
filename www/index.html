@@ -4059,9 +4059,17 @@ async function loginCrewConnex() {
   document.getElementById('ccLoginBtn').disabled = true;
 
   try {
+    const signedInUser = auth.currentUser;
+    if (!signedInUser) {
+      throw new Error('Pilot Logbook에 로그인한 뒤 다시 시도해 주세요');
+    }
+    const firebaseIdToken = await signedInUser.getIdToken();
     const resp = await fetch('https://crewconnex.tae26001.workers.dev', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${firebaseIdToken}`,
+        'Content-Type': 'application/json',
+      },
       body:    JSON.stringify({ username, password }),
     });
     const data = await resp.json();

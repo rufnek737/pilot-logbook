@@ -1,3 +1,14 @@
 name = "crewconnex"
 main = "crewconnex.js"
 compatibility_date = "2024-01-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "pilot-logbook-22bb8"
+
+[[ratelimits]]
+name = "CREWCONNEX_RATE_LIMITER"
+namespace_id = "73726001"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60
