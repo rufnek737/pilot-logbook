@@ -942,6 +942,23 @@
       content: ''; flex: 1; height: 1px; background: var(--border);
     }
     .auth-switch { margin-top: 16px; font-size: 13px; color: var(--text2); }
+    .auth-policy-links {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+    .auth-policy-links button {
+      border: 0;
+      background: none;
+      color: rgba(255,255,255,.65);
+      font-size: 11px;
+      padding: 2px;
+      cursor: pointer;
+    }
     .user-chip {
       display: flex; align-items: center; gap: 8px;
       background: var(--surface2); border-radius: 20px;
@@ -949,6 +966,105 @@
     }
     .user-chip img { width: 24px; height: 24px; border-radius: 50%; }
     #syncStatus { font-size: 10px; color: var(--text3); text-align: right; padding: 4px 16px 0; }
+
+    /* ── Account & policy ── */
+    #accountModalOverlay { z-index: 320; }
+    #infoModalOverlay { z-index: 10020; }
+    .account-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface2);
+    }
+    .account-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--accent);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      overflow: hidden;
+    }
+    .account-avatar img { width:100%; height:100%; object-fit:cover; }
+    .account-menu-list {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 14px;
+      background: var(--surface2);
+    }
+    .account-menu-button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      background: transparent;
+      color: var(--text1);
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .account-menu-button:last-child { border-bottom:0; }
+    .account-menu-button .account-arrow { margin-left:auto; color:var(--text3); }
+    .account-action-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .account-action {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text1);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .account-action.danger {
+      color: var(--danger);
+      border-color: rgba(239,68,68,.35);
+      background: rgba(239,68,68,.08);
+    }
+    .delete-account-panel {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid rgba(239,68,68,.35);
+      border-radius: 14px;
+      background: rgba(239,68,68,.08);
+    }
+    .delete-account-panel.show { display:block; }
+    .delete-account-panel .form-input { margin-top:10px; width:100%; }
+    .delete-account-final {
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--danger);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .delete-account-final:disabled { opacity:.4; cursor:default; }
+    .info-modal {
+      height: min(88vh, 760px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .info-modal .modal-body { padding:0; flex:1; min-height:0; }
+    #infoFrame { width:100%; height:100%; border:0; background:#f8fafc; }
 
     /* ── CrewConnex Modal ── */
     .cc-tab-btn {
@@ -1160,6 +1276,12 @@
       </button>
       <div class="auth-switch">이미 계정이 있으신가요? <a href="#" onclick="toggleAuthMode();return false;">로그인</a></div>
     </div>
+
+    <div class="auth-policy-links">
+      <button type="button" onclick="openInfoPage('faq.html','자주 묻는 질문')">FAQ</button>
+      <button type="button" onclick="openInfoPage('privacy.html','개인정보처리방침')">개인정보처리방침</button>
+      <button type="button" onclick="openInfoPage('terms.html','이용약관')">이용약관</button>
+    </div>
   </div>
 </div>
 
@@ -1175,7 +1297,7 @@
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <button id="themeToggle" onclick="toggleTheme()" title="테마 전환">🌙</button>
-      <div class="user-chip" id="userChip" style="display:none" onclick="signOutUser()">
+      <div class="user-chip" id="userChip" style="display:none" onclick="openAccountMenu()" role="button" aria-label="계정 및 도움말">
         <img id="userPhoto" src="" alt="" style="display:none" />
         <span id="userInitial" style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0"></span>
         <span id="userName"></span>
@@ -1596,6 +1718,66 @@
   </div>
 </div>
 
+<!-- Account & Help Modal -->
+<div class="modal-overlay" id="accountModalOverlay" onclick="if(event.target===this)closeAccountMenu()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">계정 및 도움말</div>
+      <button class="modal-close" onclick="closeAccountMenu()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="account-profile">
+        <div class="account-avatar" id="accountAvatar">?</div>
+        <div style="min-width:0">
+          <div id="accountDisplayName" style="font-size:15px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">사용자</div>
+          <div id="accountEmail" style="font-size:11px;color:var(--text3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+        </div>
+      </div>
+
+      <div class="account-menu-list">
+        <button class="account-menu-button" onclick="openInfoPage('faq.html','자주 묻는 질문')"><span>❓</span><span>자주 묻는 질문</span><span class="account-arrow">›</span></button>
+        <button class="account-menu-button" onclick="openInfoPage('privacy.html','개인정보처리방침')"><span>🛡️</span><span>개인정보처리방침</span><span class="account-arrow">›</span></button>
+        <button class="account-menu-button" onclick="openInfoPage('terms.html','이용약관')"><span>📄</span><span>이용약관 및 무료·유료 정책</span><span class="account-arrow">›</span></button>
+        <button class="account-menu-button" onclick="contactSupport()"><span>✉️</span><span>문의하기</span><span style="margin-left:auto;color:var(--text3);font-size:11px">rufnek737@gmail.com</span></button>
+      </div>
+
+      <div class="account-action-row">
+        <button class="account-action" onclick="signOutUser()">로그아웃</button>
+        <button class="account-action danger" onclick="showDeleteAccountPanel()">회원 탈퇴</button>
+      </div>
+
+      <div class="delete-account-panel" id="deleteAccountPanel">
+        <div style="font-size:14px;font-weight:800;color:var(--danger)">계정과 모든 비행기록을 삭제합니다</div>
+        <div style="font-size:11px;line-height:1.65;color:var(--text2);margin-top:7px">
+          Firebase 로그인 계정, 클라우드 비행기록, 이 기기의 로컬 기록이 영구 삭제되며 복구할 수 없습니다. 필요한 기록은 먼저 인쇄 또는 PDF로 보관해 주세요.
+        </div>
+        <div id="deletePasswordWrap" style="display:none">
+          <input type="password" class="form-input" id="deleteAccountPassword" autocomplete="current-password" placeholder="본인 확인용 현재 비밀번호" />
+        </div>
+        <div id="deleteReauthHint" style="font-size:11px;color:var(--text3);margin-top:9px"></div>
+        <input type="text" class="form-input" id="deleteConfirmText" autocomplete="off" placeholder="확인을 위해 ‘탈퇴’를 입력하세요" oninput="updateDeleteAccountButton()" />
+        <button class="delete-account-final" id="deleteAccountButton" onclick="deleteAccountPermanently()" disabled>계정 및 기록 영구 삭제</button>
+        <div id="deleteAccountStatus" style="min-height:18px;margin-top:8px;font-size:11px;color:var(--text2);text-align:center"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ / Policy Viewer -->
+<div class="modal-overlay" id="infoModalOverlay" onclick="if(event.target===this)closeInfoPage()">
+  <div class="modal info-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="infoModalTitle">안내</div>
+      <button class="modal-close" onclick="closeInfoPage()">✕</button>
+    </div>
+    <div class="modal-body">
+      <iframe id="infoFrame" title="Pilot Logbook 안내"></iframe>
+    </div>
+  </div>
+</div>
+
 <!-- CrewConnex Import Modal -->
 <div class="modal-overlay" id="ccModalOverlay" onclick="closeCcOnOverlay(event)">
   <div class="modal">
@@ -1850,10 +2032,206 @@ function toggleTheme() {
   }
 })();
 
+function openAccountMenu() {
+  if (!currentUser) return;
+  const name = currentUser.displayName || 'Pilot Logbook 사용자';
+  const email = currentUser.email || '';
+  const avatar = document.getElementById('accountAvatar');
+  document.getElementById('accountDisplayName').textContent = name;
+  document.getElementById('accountEmail').textContent = email;
+  if (currentUser.photoURL) {
+    avatar.innerHTML = `<img src="${escHtml(currentUser.photoURL)}" alt="" />`;
+  } else {
+    avatar.textContent = (name.charAt(0) || email.charAt(0) || '?').toUpperCase();
+  }
+  resetDeleteAccountPanel();
+  document.getElementById('accountModalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAccountMenu() {
+  document.getElementById('accountModalOverlay').classList.remove('show');
+  resetDeleteAccountPanel();
+  if (!document.getElementById('infoModalOverlay').classList.contains('show')) {
+    document.body.style.overflow = '';
+  }
+}
+
+function openInfoPage(path, title) {
+  document.getElementById('infoModalTitle').textContent = title;
+  document.getElementById('infoFrame').src = path;
+  document.getElementById('infoModalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeInfoPage() {
+  document.getElementById('infoModalOverlay').classList.remove('show');
+  document.getElementById('infoFrame').src = 'about:blank';
+  if (!document.getElementById('accountModalOverlay').classList.contains('show')) {
+    document.body.style.overflow = '';
+  }
+}
+
+function contactSupport() {
+  window.location.href = 'mailto:rufnek737@gmail.com?subject=Pilot%20Logbook%20문의';
+}
+
 async function signOutUser() {
   if (!confirm('로그아웃 하시겠습니까?')) return;
+  const uid = currentUser?.uid;
+  if (_saveTimer && uid) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+    await saveToFirestore(uid);
+  }
+  closeAccountMenu();
   if (_unsubSnapshot) { _unsubSnapshot(); _unsubSnapshot = null; }
   await auth.signOut();
+  flights = [];
+  localStorage.removeItem(STORAGE_KEY);
+  renderFlights();
+}
+
+function resetDeleteAccountPanel() {
+  const panel = document.getElementById('deleteAccountPanel');
+  if (!panel) return;
+  panel.classList.remove('show');
+  document.getElementById('deleteAccountPassword').value = '';
+  document.getElementById('deleteConfirmText').value = '';
+  document.getElementById('deleteAccountStatus').textContent = '';
+  const button = document.getElementById('deleteAccountButton');
+  button.disabled = true;
+  button.textContent = '계정 및 기록 영구 삭제';
+}
+
+function showDeleteAccountPanel() {
+  if (!currentUser) return;
+  const providers = (currentUser.providerData || []).map(p => p.providerId);
+  const usesPassword = providers.includes('password');
+  document.getElementById('deletePasswordWrap').style.display = usesPassword ? '' : 'none';
+  document.getElementById('deleteReauthHint').textContent = usesPassword
+    ? '안전을 위해 현재 비밀번호로 본인 확인 후 삭제합니다.'
+    : '삭제 과정에서 Google 계정으로 본인 확인을 진행합니다.';
+  document.getElementById('deleteAccountPanel').classList.add('show');
+  document.getElementById(usesPassword ? 'deleteAccountPassword' : 'deleteConfirmText').focus();
+}
+
+function updateDeleteAccountButton() {
+  const confirmed = document.getElementById('deleteConfirmText').value.trim() === '탈퇴';
+  document.getElementById('deleteAccountButton').disabled = !confirmed;
+}
+
+async function reauthenticateForAccountDeletion(user) {
+  const providers = (user.providerData || []).map(p => p.providerId);
+  if (providers.includes('password')) {
+    const password = document.getElementById('deleteAccountPassword').value;
+    if (!password) {
+      const error = new Error('현재 비밀번호를 입력해 주세요.');
+      error.code = 'auth/missing-password';
+      throw error;
+    }
+    const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
+    await user.reauthenticateWithCredential(credential);
+    return;
+  }
+
+  if (providers.includes('google.com')) {
+    const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform());
+    if (isNative) {
+      const GoogleAuth = window.Capacitor.Plugins.GoogleAuth;
+      if (!GoogleAuth) throw new Error('Google 본인 확인 모듈을 사용할 수 없습니다.');
+      const isIOS = window.Capacitor.getPlatform() === 'ios';
+      await GoogleAuth.initialize({
+        clientId: isIOS
+          ? '824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com'
+          : '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      });
+      const googleUser = await GoogleAuth.signIn();
+      const credential = firebase.auth.GoogleAuthProvider.credential(googleUser.authentication.idToken);
+      await user.reauthenticateWithCredential(credential);
+    } else {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      await user.reauthenticateWithPopup(provider);
+    }
+    return;
+  }
+
+  const error = new Error('지원하지 않는 로그인 방식입니다. 문의하기로 연락해 주세요.');
+  error.code = 'auth/provider-not-supported';
+  throw error;
+}
+
+function accountDeleteErrorMessage(error) {
+  const map = {
+    'auth/missing-password': '현재 비밀번호를 입력해 주세요.',
+    'auth/wrong-password': '비밀번호가 일치하지 않습니다.',
+    'auth/invalid-credential': '본인 확인 정보가 올바르지 않습니다.',
+    'auth/popup-closed-by-user': 'Google 본인 확인이 취소되었습니다.',
+    'auth/cancelled-popup-request': 'Google 본인 확인이 취소되었습니다.',
+    'auth/user-mismatch': '현재 로그인한 계정과 다른 Google 계정입니다.',
+    'auth/network-request-failed': '네트워크 연결을 확인해 주세요.',
+    'permission-denied': '클라우드 기록 삭제 권한을 확인할 수 없습니다.',
+  };
+  return map[error?.code] || error?.message || '계정을 삭제하지 못했습니다.';
+}
+
+async function deleteAccountPermanently() {
+  const user = auth.currentUser;
+  if (!user) {
+    document.getElementById('deleteAccountStatus').textContent = '로그인 상태를 확인할 수 없습니다.';
+    return;
+  }
+  if (document.getElementById('deleteConfirmText').value.trim() !== '탈퇴') return;
+
+  const button = document.getElementById('deleteAccountButton');
+  const status = document.getElementById('deleteAccountStatus');
+  button.disabled = true;
+  button.textContent = '본인 확인 중...';
+  status.style.color = 'var(--text2)';
+  status.textContent = '계정 소유자를 확인하고 있습니다.';
+
+  const uid = user.uid;
+  let cloudDeleted = false;
+  try {
+    await reauthenticateForAccountDeletion(user);
+
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+    if (_unsubSnapshot) { _unsubSnapshot(); _unsubSnapshot = null; }
+
+    button.textContent = '클라우드 기록 삭제 중...';
+    status.textContent = '저장된 비행기록을 삭제하고 있습니다.';
+    await db.collection('users').doc(uid).collection('data').doc('flights').delete();
+    await db.collection('users').doc(uid).delete();
+    cloudDeleted = true;
+
+    button.textContent = '로그인 계정 삭제 중...';
+    await user.delete();
+
+    flights = [];
+    localStorage.removeItem(STORAGE_KEY);
+    const ccUsername = document.getElementById('ccUsername');
+    const ccPassword = document.getElementById('ccPassword');
+    if (ccUsername) ccUsername.value = '';
+    if (ccPassword) ccPassword.value = '';
+    closeAccountMenu();
+    renderFlights();
+    showToast('회원 탈퇴가 완료되었습니다');
+  } catch (error) {
+    console.error('회원 탈퇴 실패:', error);
+    // 인증 계정 삭제가 실패한 경우 클라우드 기록을 원상복구해 일부 삭제 상태를 막는다.
+    if (cloudDeleted && auth.currentUser) {
+      try { await saveToFirestore(uid); } catch (_) {}
+    }
+    if (auth.currentUser && !_unsubSnapshot) subscribeToFirestore(uid);
+    status.style.color = 'var(--danger)';
+    status.textContent = accountDeleteErrorMessage(error);
+    button.disabled = false;
+    button.textContent = '계정 및 기록 영구 삭제';
+  }
 }
 
 // ── Firestore 저장 ───────────────────────────────────────────────
@@ -2090,7 +2468,7 @@ auth.onAuthStateChanged(user => {
     chip.style.display = 'flex';
     const photoEl = document.getElementById('userPhoto');
     const initEl = document.getElementById('userInitial');
-    const name = user.displayName || '';
+    const name = user.displayName || (user.email || '').split('@')[0] || '사용자';
     if (user.photoURL) {
       photoEl.src = user.photoURL;
       photoEl.style.display = '';
@@ -2100,11 +2478,17 @@ auth.onAuthStateChanged(user => {
       initEl.style.display = 'flex';
       initEl.textContent = name.charAt(0).toUpperCase() || '?';
     }
-    document.getElementById('userName').textContent = name.split(' ')[0] || '';
+    document.getElementById('userName').textContent = name.split(' ')[0];
     subscribeToFirestore(user.uid);
   } else {
     overlay.classList.remove('hidden');
     chip.style.display = 'none';
+    document.getElementById('accountModalOverlay').classList.remove('show');
+    document.getElementById('infoModalOverlay').classList.remove('show');
+    document.body.style.overflow = '';
+    flights = [];
+    localStorage.removeItem(STORAGE_KEY);
+    renderFlights();
     setSyncStatus('');
   }
 });
@@ -3126,6 +3510,8 @@ document.addEventListener('keydown', function(e) {
     if (document.getElementById('modalOverlay').classList.contains('show')) closeModal();
     if (document.getElementById('ccModalOverlay').classList.contains('show')) closeCrewConnex();
     if (document.getElementById('printModalOverlay').classList.contains('show')) closePrintModal();
+    if (document.getElementById('infoModalOverlay').classList.contains('show')) closeInfoPage();
+    else if (document.getElementById('accountModalOverlay').classList.contains('show')) closeAccountMenu();
   }
 });
 
