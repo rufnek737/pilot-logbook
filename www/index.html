@@ -978,7 +978,66 @@
       padding: 12px;
       margin-bottom: 10px;
     }
+    .cc-flight-item.cc-new { border-color: rgba(34,197,94,.45); }
+    .cc-flight-item.cc-changed { border-color: rgba(245,158,11,.5); }
+    .cc-flight-item.cc-unchanged { opacity: .72; }
     .cc-flight-item:last-child { margin-bottom: 0; }
+    .cc-review-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .cc-summary-card {
+      padding: 9px 6px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface2);
+      text-align: center;
+    }
+    .cc-summary-card strong { display:block; font-size:17px; line-height:1.2; }
+    .cc-summary-card span { font-size:10px; color:var(--text3); }
+    .cc-status-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 7px;
+      font-size: 10px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .cc-status-badge.new { color:#86efac; background:rgba(34,197,94,.14); }
+    .cc-status-badge.changed { color:#fcd34d; background:rgba(245,158,11,.14); }
+    .cc-status-badge.unchanged { color:var(--text3); background:rgba(148,163,184,.12); }
+    .cc-diff-panel {
+      display: none;
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+    .cc-diff-panel.show { display: block; }
+    .cc-diff-head, .cc-diff-row {
+      display: grid;
+      grid-template-columns: 64px minmax(0,1fr) minmax(0,1fr);
+      gap: 7px;
+      align-items: start;
+    }
+    .cc-diff-head {
+      padding: 0 4px 5px;
+      color: var(--text3);
+      font-size: 9px;
+      font-weight: 700;
+    }
+    .cc-diff-row {
+      padding: 7px 4px;
+      border-top: 1px solid rgba(148,163,184,.1);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .cc-diff-label { color:var(--text3); font-weight:700; }
+    .cc-diff-old, .cc-diff-new { overflow-wrap:anywhere; white-space:pre-wrap; }
+    .cc-diff-old { color:var(--text2); }
+    .cc-diff-new { color:#fcd34d; font-weight:700; }
     .cc-route {
       display: flex;
       align-items: center;
@@ -1585,7 +1644,7 @@
       <!-- Results -->
       <div id="ccResultWrap" style="display:none;margin-top:18px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px">추출된 비행 목록</div>
+          <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px">가져오기 검토</div>
           <button onclick="ccSwitchTab('auto')" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;text-decoration:underline">↩ 다시 검색</button>
         </div>
         <div id="ccFlightItems"></div>
@@ -2686,7 +2745,8 @@ function updateStats() {
   document.getElementById('statLandings').textContent   = landings;
   document.getElementById('statAld').textContent        = ald;
   document.getElementById('statLast90').textContent     = toHHMM(last90);
-  document.getElementById('totalFlightsLabel').textContent = `${flights.length} 비행`;
+  const totalFlightsLabel = document.getElementById('totalFlightsLabel');
+  if (totalFlightsLabel) totalFlightsLabel.textContent = `${flights.length} 비행`;
 }
 
 // ─── Charts ─────────────────────────────────────────────────────
@@ -3114,9 +3174,11 @@ function saveEntry() {
   }
 
   const wasEditing = editingId;
+  const wasFromCrewConnex = _ccOrigin;
   closeModal();
   saveData();
   renderFlights();
+  if (wasFromCrewConnex && _ccData) renderCcResults(_ccData);
   showToast(wasEditing ? '수정되었습니다' : '비행 기록이 저장되었습니다 ✈');
 }
 
@@ -3557,6 +3619,7 @@ function parseJejuAirEpaper(text, filename, lines) {
 // ─── CrewConnex Import ───────────────────────────────────────────
 let _ccData = null;
 let _ccOrigin = false; // 상세 모달이 CC Import에서 열렸는지 추적
+let _ccReview = [];
 
 function openCrewConnex() {
   document.getElementById('ccResultWrap').style.display = 'none';
@@ -3656,6 +3719,68 @@ function _buildCrewStr(crew) {
     .join(' / ');
 }
 
+const CC_AUTO_FIELDS = [
+  { key: 'depTime',  label: 'OUT' },
+  { key: 'arrTime',  label: 'IN' },
+  { key: 'total',    label: '비행시간' },
+  { key: 'dep',      label: '출발' },
+  { key: 'arr',      label: '도착' },
+  { key: 'acType',   label: '기종' },
+  { key: 'reg',      label: '기번' },
+  { key: 'role',     label: '역할' },
+  { key: 'dutyCode', label: 'Duty Code' },
+  { key: 'crewInfo', label: '편조' },
+];
+
+function _ccCompareValue(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function _ccDisplayValue(value) {
+  const text = String(value ?? '').trim();
+  return text || '—';
+}
+
+function _ccAutoFieldValue(record, key) {
+  if (key === 'crewInfo') return getCrewInfo(record);
+  return record?.[key];
+}
+
+function _buildCcReview(f, idx) {
+  const existingIdx = _findCrewConnexFlightIndex(f);
+  const previous = existingIdx >= 0 ? flights[existingIdx] : null;
+  const merged = _mergeCrewConnexFlight(f, previous);
+  if (!previous) return { idx, status: 'new', existingIdx, previous, merged, changes: [] };
+
+  const changes = CC_AUTO_FIELDS.filter(field =>
+    _ccCompareValue(_ccAutoFieldValue(previous, field.key)) !== _ccCompareValue(_ccAutoFieldValue(merged, field.key))
+  ).map(field => ({
+    ...field,
+    before: _ccAutoFieldValue(previous, field.key),
+    after: _ccAutoFieldValue(merged, field.key),
+  }));
+
+  return {
+    idx,
+    status: changes.length ? 'changed' : 'unchanged',
+    existingIdx,
+    previous,
+    merged,
+    changes,
+  };
+}
+
+function ccToggleDiff(idx) {
+  const panel = document.getElementById(`ccDiff-${idx}`);
+  if (!panel) return;
+  const expanded = panel.classList.toggle('show');
+  const button = document.getElementById(`ccDiffBtn-${idx}`);
+  if (button) {
+    button.textContent = `변경 ${button.dataset.count}건 ${expanded ? '▴' : '▾'}`;
+    button.setAttribute('aria-expanded', String(expanded));
+  }
+}
+
 function renderCcResults(data) {
   _ccData = data;
   const wrap   = document.getElementById('ccResultWrap');
@@ -3667,63 +3792,106 @@ function renderCcResults(data) {
   document.getElementById('ccPaneAuto').style.display = 'none';
   document.getElementById('ccPaneText').style.display = 'none';
 
-  const flightHtml = (data.flights || []).map((f, i) => `
-    <label class="cc-flight-item" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+  _ccReview = (data.flights || []).map((f, i) => _buildCcReview(f, i));
+  const counts = _ccReview.reduce((acc, item) => {
+    acc[item.status]++;
+    return acc;
+  }, { new: 0, changed: 0, unchanged: 0 });
+
+  const flightHtml = _ccReview.map((review, i) => {
+    const f = data.flights[i];
+    const selectable = review.status !== 'unchanged';
+    const statusLabel = review.status === 'new' ? '신규' : review.status === 'changed' ? `변경 ${review.changes.length}건` : '동일';
+    const diffHtml = review.status === 'changed' ? `
+      <div class="cc-diff-panel" id="ccDiff-${i}">
+        <div class="cc-diff-head"><span>항목</span><span>기존</span><span>CrewConnex</span></div>
+        ${review.changes.map(change => `
+          <div class="cc-diff-row">
+            <span class="cc-diff-label">${escHtml(change.label)}</span>
+            <span class="cc-diff-old">${escHtml(_ccDisplayValue(change.before))}</span>
+            <span class="cc-diff-new">${escHtml(_ccDisplayValue(change.after))}</span>
+          </div>`).join('')}
+      </div>` : '';
+
+    return `
+    <label class="cc-flight-item cc-${review.status}" style="display:flex;align-items:flex-start;gap:10px;cursor:${selectable ? 'pointer' : 'default'}">
       <input type="checkbox" class="cc-flight-check" data-idx="${i}" onchange="ccUpdateCount()"
+        ${selectable ? 'checked' : 'disabled'}
         style="width:18px;height:18px;margin-top:6px;flex-shrink:0;accent-color:var(--accent)">
       <div style="flex:1;min-width:0">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div>
-            <span style="font-size:15px;font-weight:700">${f.flight || '—'}</span>
-            <span style="font-size:11px;color:var(--text3);margin-left:8px">${f.date}</span>
+            <span style="font-size:15px;font-weight:700">${escHtml(f.flight || '—')}</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:8px">${escHtml(f.date || '')}</span>
           </div>
-          <button class="cc-import-btn" onclick="event.preventDefault();event.stopPropagation();importCcFlight(${i})"
-            style="font-size:11px;padding:4px 10px">상세</button>
+          <div style="display:flex;align-items:center;gap:5px">
+            ${review.status === 'changed' ? `<button class="cc-status-badge changed" id="ccDiffBtn-${i}" data-count="${review.changes.length}" aria-expanded="false" onclick="event.preventDefault();event.stopPropagation();ccToggleDiff(${i})" style="border:0;cursor:pointer">${statusLabel} ▾</button>` : `<span class="cc-status-badge ${review.status}">${statusLabel}</span>`}
+            <button class="cc-import-btn" onclick="event.preventDefault();event.stopPropagation();importCcFlight(${i})"
+              style="font-size:10px;padding:4px 8px">상세</button>
+          </div>
         </div>
         <div class="cc-route">
-          <span style="font-weight:800;font-size:16px">${f.from}</span>
-          <span style="color:var(--text3);font-size:12px">${f.stdLocal}</span>
+          <span style="font-weight:800;font-size:16px">${escHtml(f.from || '—')}</span>
+          <span style="color:var(--text3);font-size:12px">${escHtml(f.stdLocal || '—')}</span>
           <span style="color:var(--accent)">✈</span>
-          <span style="font-weight:800;font-size:16px">${f.to}</span>
-          <span style="color:var(--text3);font-size:12px">${f.staLocal}</span>
-          <span style="margin-left:auto;color:var(--text3);font-size:11px">${f.acType} · ${f.blh}</span>
+          <span style="font-weight:800;font-size:16px">${escHtml(f.to || '—')}</span>
+          <span style="color:var(--text3);font-size:12px">${escHtml(f.staLocal || '—')}</span>
+          <span style="margin-left:auto;color:var(--text3);font-size:11px">${escHtml(f.acType || '—')} · ${escHtml(f.blh || '—')}</span>
         </div>
-        ${f.acReg ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${f.acReg}</div>` : ''}
+        ${f.acReg ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${escHtml(f.acReg)}</div>` : ''}
+        ${diffHtml}
       </div>
-    </label>`).join('');
+    </label>`;
+  }).join('');
 
   items.innerHTML = `
+    <div class="cc-review-summary">
+      <div class="cc-summary-card"><strong style="color:#86efac">${counts.new}</strong><span>신규</span></div>
+      <div class="cc-summary-card"><strong style="color:#fcd34d">${counts.changed}</strong><span>변경</span></div>
+      <div class="cc-summary-card"><strong style="color:var(--text3)">${counts.unchanged}</strong><span>동일</span></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);line-height:1.55;margin:-2px 2px 10px">
+      신규·변경 항목만 적용됩니다. 계기·야간·착륙 정보와 개인 메모는 보존됩니다.
+    </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:0 2px">
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;user-select:none">
         <input type="checkbox" id="ccSelectAll" onchange="ccToggleAll(this.checked)"
-          style="width:16px;height:16px;accent-color:var(--accent)"> 전체 선택
+          style="width:16px;height:16px;accent-color:var(--accent)"> 신규·변경 전체
       </label>
       <span id="ccSelCount" style="margin-left:auto;font-size:12px;color:var(--text3)">0개 선택</span>
     </div>
     ${flightHtml}
     <button class="submit-btn" id="ccBatchBtn" onclick="importSelectedFlights()" style="margin-top:10px">
-      선택 가져오기 (0개)
+      선택 항목 적용
     </button>`;
 
   crewW.style.display = 'none'; // 선택 비행 기준으로 ccUpdateCount에서 동적 표시
   wrap.style.display = '';
+  ccUpdateCount();
 }
 
 function ccToggleAll(checked) {
-  document.querySelectorAll('.cc-flight-check').forEach(cb => cb.checked = checked);
+  document.querySelectorAll('.cc-flight-check:not(:disabled)').forEach(cb => cb.checked = checked);
   ccUpdateCount();
 }
 
 function ccUpdateCount() {
   const checkedBoxes = [...document.querySelectorAll('.cc-flight-check:checked')];
   const checked = checkedBoxes.length;
-  const total   = document.querySelectorAll('.cc-flight-check').length;
+  const total   = document.querySelectorAll('.cc-flight-check:not(:disabled)').length;
   const selEl   = document.getElementById('ccSelCount');
   const btnEl   = document.getElementById('ccBatchBtn');
   const allEl   = document.getElementById('ccSelectAll');
-  if (selEl) selEl.textContent = `${checked}개 선택`;
-  if (btnEl) btnEl.textContent = `선택 가져오기 (${checked}개)`;
-  if (allEl) allEl.checked = checked > 0 && checked === total;
+  if (selEl) selEl.textContent = `${checked}개 적용 선택`;
+  if (btnEl) {
+    btnEl.textContent = checked ? `선택 항목 적용 (${checked}개)` : '적용할 항목을 선택해 주세요';
+    btnEl.disabled = checked === 0;
+  }
+  if (allEl) {
+    allEl.checked = total > 0 && checked === total;
+    allEl.indeterminate = checked > 0 && checked < total;
+    allEl.disabled = total === 0;
+  }
 
   // 선택한 비행의 편조를 하단 패널에 동적 표시
   const crewW  = document.getElementById('ccCrewWrap');
@@ -3812,6 +3980,10 @@ function importSelectedFlights() {
     const previous = existingIdx >= 0 ? flights[existingIdx] : null;
     const merged = _mergeCrewConnexFlight(f, previous);
     if (existingIdx >= 0) {
+      const changed = CC_AUTO_FIELDS.some(field =>
+        _ccCompareValue(_ccAutoFieldValue(previous, field.key)) !== _ccCompareValue(_ccAutoFieldValue(merged, field.key))
+      );
+      if (!changed) continue;
       flights[existingIdx] = merged;
       updated++;
     } else {
@@ -3828,8 +4000,8 @@ function importSelectedFlights() {
   renderFlights();
   const parts = [];
   if (added) parts.push(`신규 ${added}편`);
-  if (updated) parts.push(`기존 ${updated}편 갱신`);
-  showToast(`동기화 완료 — ${parts.join(' · ')} ✈`);
+  if (updated) parts.push(`변경 ${updated}편 적용`);
+  showToast(parts.length ? `동기화 완료 — ${parts.join(' · ')} ✈` : '적용할 변경이 없습니다');
 }
 
 function importCcFlight(idx) {
