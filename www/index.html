@@ -20,6 +20,7 @@
   <title>Pilot Logbook</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="logten-export.js"></script>
   <!-- Firebase v10 compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -92,10 +93,12 @@
     /* ── Header ── */
     .header {
       background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+      padding: calc(16px + constant(safe-area-inset-top)) 20px 12px;
       padding: calc(16px + env(safe-area-inset-top)) 20px 12px;
       position: sticky;
       top: 0;
       z-index: 100;
+      isolation: isolate;
       border-bottom: 1px solid rgba(59,130,246,0.2);
     }
     body.day .header {
@@ -1374,7 +1377,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="add-btn" style="background:rgba(16,58,100,0.6);border:1px solid rgba(59,130,246,0.35)" onclick="openCrewConnex()">🌐 CC</button>
         <button class="add-btn" style="background:rgba(30,80,30,0.6);border:1px solid rgba(34,197,94,0.35)" onclick="toggleRangePanel()">📊 합산</button>
-        <button class="add-btn" style="background:rgba(80,40,10,0.6);border:1px solid rgba(251,146,60,0.35)" onclick="openPrintModal()">🖨 인쇄</button>
+        <button class="add-btn" style="background:rgba(80,40,10,0.6);border:1px solid rgba(251,146,60,0.35)" onclick="openPrintModal()">🖨 출력</button>
         <button class="add-btn" onclick="openModal()">+ 입력</button>
       </div>
     </div>
@@ -1708,11 +1711,18 @@
   <div class="modal" style="max-height:80vh">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <div class="modal-title">🖨 월별 비행 인쇄</div>
+      <div class="modal-title">🖨 출력 및 내보내기</div>
       <button class="modal-close" onclick="closePrintModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div style="font-size:13px;color:var(--text2);margin-bottom:14px">인쇄할 월을 선택하세요</div>
+      <button onclick="exportLogTenCsv()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:14px">📤 LogTen CSV 전체 내보내기</button>
+      <div style="font-size:11px;color:var(--text3);line-height:1.55;margin:-6px 2px 14px">전체 비행기록을 UTF-8 CSV로 저장합니다. Mac용 LogTen에서는 File → Import from File → Flights를 사용하세요. iPhone만 사용하면 파일 앱에 저장한 뒤 LogTen 지원팀에 전달할 수 있습니다. OUT/IN은 앱에 저장된 현지시간 기준입니다.</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">월별 인쇄 언어</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <button id="printLangKo" onclick="setPrintLanguage('ko')" style="border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">한국어</button>
+        <button id="printLangEn" onclick="setPrintLanguage('en')" style="border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">English</button>
+      </div>
+      <div id="printMonthPrompt" style="font-size:13px;color:var(--text2);margin-bottom:14px">인쇄할 월을 선택하세요</div>
       <div id="printMonthList" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto"></div>
     </div>
   </div>
@@ -2625,19 +2635,46 @@ function calcRangeSum() {
 }
 
 // ── 월별 인쇄 ─────────────────────────────────────────────────────
-function openPrintModal() {
-  if (!flights.length) { showToast('비행 기록이 없습니다'); return; }
-  // 월 목록 생성 (최신순)
+let printLanguage = localStorage.getItem('pilotLogbookPrintLanguage') || 'ko';
+
+function renderPrintMonthList() {
+  const isEnglish = printLanguage === 'en';
   const months = [...new Set(flights.map(f => f.date.slice(0,7)))].sort().reverse();
   const list = document.getElementById('printMonthList');
-  list.innerHTML = months.map(m => {
-    const [y, mo] = m.split('-');
-    const cnt = flights.filter(f => f.date.startsWith(m)).length;
-    return `<button onclick="printMonth('${m}')" style="display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;color:var(--text1);font-size:14px;cursor:pointer;text-align:left">
-      <span>${y}년 ${parseInt(mo)}월</span>
-      <span style="font-size:12px;color:var(--text3)">${cnt}편 →</span>
+  document.getElementById('printMonthPrompt').textContent = isEnglish
+    ? 'Select a month to print'
+    : '인쇄할 월을 선택하세요';
+  list.innerHTML = months.map(month => {
+    const [year, monthNumber] = month.split('-');
+    const count = flights.filter(f => f.date.startsWith(month)).length;
+    const label = isEnglish
+      ? new Date(`${month}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      : `${year}년 ${parseInt(monthNumber)}월`;
+    const countLabel = isEnglish ? `${count} flights` : `${count}편`;
+    return `<button onclick="printMonth('${month}','${printLanguage}')" style="display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;color:var(--text1);font-size:14px;cursor:pointer;text-align:left">
+      <span>${label}</span>
+      <span style="font-size:12px;color:var(--text3)">${countLabel} →</span>
     </button>`;
   }).join('');
+
+  ['ko', 'en'].forEach(lang => {
+    const button = document.getElementById(lang === 'ko' ? 'printLangKo' : 'printLangEn');
+    const active = lang === printLanguage;
+    button.style.background = active ? 'var(--accent)' : 'var(--surface2)';
+    button.style.border = `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`;
+    button.style.color = active ? '#fff' : 'var(--text2)';
+  });
+}
+
+function setPrintLanguage(language) {
+  printLanguage = language === 'en' ? 'en' : 'ko';
+  localStorage.setItem('pilotLogbookPrintLanguage', printLanguage);
+  renderPrintMonthList();
+}
+
+function openPrintModal() {
+  if (!flights.length) { showToast('비행 기록이 없습니다'); return; }
+  renderPrintMonthList();
   document.getElementById('printModalOverlay').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
@@ -2647,10 +2684,43 @@ function closePrintModal() {
   document.body.style.overflow = '';
 }
 
-function printMonth(ym) {
+async function exportLogTenCsv() {
+  if (!flights.length) { showToast('비행 기록이 없습니다'); return; }
+  if (!window.PilotLogbookExport) { showToast('내보내기 기능을 불러오지 못했습니다'); return; }
+
+  try {
+    const csv = window.PilotLogbookExport.buildLogTenCsv(flights, {
+      calculateCredits: calcCreditedTime,
+    });
+    const fileName = `Pilot_Logbook_LogTen_${new Date().toISOString().slice(0,10)}.csv`;
+    const file = new File([`\uFEFF${csv}`], fileName, { type: 'text/csv;charset=utf-8' });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      showToast('LogTen CSV를 내보냈습니다');
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('LogTen CSV를 저장했습니다');
+  } catch (error) {
+    if (error && error.name === 'AbortError') return;
+    showToast('LogTen CSV 내보내기에 실패했습니다');
+  }
+}
+
+function printMonth(ym, language = printLanguage) {
+  const isEnglish = language === 'en';
   const [y, mo] = ym.split('-');
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const label = `${monthNames[parseInt(mo)-1]} ${y}`;
+  const label = isEnglish ? `${monthNames[parseInt(mo)-1]} ${y}` : `${y}년 ${parseInt(mo)}월`;
   const sel = flights.filter(f => f.date.startsWith(ym)).sort((a,b) => a.date.localeCompare(b.date));
   let total=0, night=0, ifr=0, to=0, ldg=0;
   sel.forEach(f => {
@@ -2679,7 +2749,18 @@ function printMonth(ym) {
       <td>${f.ldgPf !== undefined ? (f.ldgPf==='PF'?1:0) : (parseInt(f.landings||f.ldCnt||1)>0?1:0)}</td>
     </tr>`).join('');
 
-  const printDate = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+  const printDate = new Date().toLocaleDateString(isEnglish ? 'en-GB' : 'ko-KR', {
+    day: '2-digit', month: isEnglish ? 'short' : 'long', year: 'numeric',
+  });
+  const labels = isEnglish ? {
+    back: '← Back', print: 'Print', date: 'Date', flight: 'Flight', from: 'From', to: 'To',
+    out: 'OUT', in: 'IN', aircraft: 'A/C', registration: 'Reg', duty: 'Duty', block: 'Block',
+    night: 'Night', instrument: 'Instrument', sectors: 'Sectors', total: 'Total',
+  } : {
+    back: '← 뒤로', print: '인쇄', date: '날짜', flight: '편명', from: '출발', to: '도착',
+    out: 'OUT', in: 'IN', aircraft: '기종', registration: '등록', duty: 'Duty', block: '비행시간',
+    night: '야간', instrument: '계기', sectors: '구간', total: '합계',
+  };
 
   // Show in-page overlay (works in Android WebView)
   const pv = document.getElementById('printView');
@@ -2694,24 +2775,24 @@ function printMonth(ym) {
       #pv-summary b { font-size:14px; color:#1e3a5f; }
     </style>
     <div id="pv-toolbar" style="display:flex;gap:10px;margin-bottom:16px">
-      <button id="pv-back"  style="padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;background:#e5e7eb;color:#111;cursor:pointer">← 뒤로</button>
-      <button id="pv-print" style="padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;background:#1e3a5f;color:#fff;cursor:pointer">인쇄</button>
+      <button id="pv-back"  style="padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;background:#e5e7eb;color:#111;cursor:pointer">${labels.back}</button>
+      <button id="pv-print" style="padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;background:#1e3a5f;color:#fff;cursor:pointer">${labels.print}</button>
     </div>
     <h2 style="font-size:16px;margin:0 0 4px">${label}</h2>
     <div style="font-size:12px;color:#555;margin-bottom:14px">Kyungtae Kang · ${printDate}</div>
     <table id="pv-table">
       <thead><tr>
-        <th>#</th><th>Date</th><th>Flight</th><th>From</th><th>To</th>
-        <th>STD</th><th>STA</th><th>A/C</th><th>Reg</th><th>Duty</th>
-        <th>Block</th><th>Night</th><th>IFR</th><th>T/O</th><th>LDG</th>
+        <th>#</th><th>${labels.date}</th><th>${labels.flight}</th><th>${labels.from}</th><th>${labels.to}</th>
+        <th>${labels.out}</th><th>${labels.in}</th><th>${labels.aircraft}</th><th>${labels.registration}</th><th>${labels.duty}</th>
+        <th>${labels.block}</th><th>${labels.night}</th><th>${labels.instrument}</th><th>T/O</th><th>LDG</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div id="pv-summary">
-      <div>Sectors: <b>${sel.length}</b></div>
-      <div>Total: <b>${toHHMM(total)}</b></div>
-      <div>Night: <b>${toHHMM(night)}</b></div>
-      <div>IFR: <b>${toHHMM(ifr)}</b></div>
+      <div>${labels.sectors}: <b>${sel.length}</b></div>
+      <div>${labels.total}: <b>${toHHMM(total)}</b></div>
+      <div>${labels.night}: <b>${toHHMM(night)}</b></div>
+      <div>${labels.instrument}: <b>${toHHMM(ifr)}</b></div>
       <div>T/O: <b>${to}</b></div>
       <div>LDG: <b>${ldg}</b></div>
     </div>`;
