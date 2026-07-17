@@ -2818,6 +2818,7 @@ function printMonth(ym, language = printLanguage) {
 function closePrintView() {
   document.getElementById('printView').style.display = 'none';
   document.body.style.overflow = '';
+  openPrintModal();
 }
 
 // 출발/도착시간 변경 시 총 비행시간 자동계산
