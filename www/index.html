@@ -22,6 +22,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="logten-export.js"></script>
   <script src="csv-import.js"></script>
+  <script src="career-entries.js"></script>
   <!-- Firebase v10 compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -702,6 +703,21 @@
       color: var(--text2);
       margin-bottom: 14px;
     }
+    .career-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+    .career-head .chart-title { margin:0; }
+    .career-add { border:0; border-radius:18px; padding:7px 12px; background:var(--accent); color:#fff; font-size:12px; font-weight:700; cursor:pointer; }
+    .career-note { color:var(--text3); font-size:11px; line-height:1.55; margin-bottom:12px; }
+    .career-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-bottom:12px; }
+    .career-summary > div { background:var(--surface2); border-radius:9px; padding:8px 6px; text-align:center; }
+    .career-summary strong { display:block; color:var(--text1); font-size:13px; }
+    .career-summary span { display:block; color:var(--text3); font-size:9px; margin-top:2px; }
+    .career-entry { border:1px solid var(--border); border-radius:10px; padding:11px; margin-top:8px; background:rgba(255,255,255,.02); }
+    .career-entry-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+    .career-entry-title { font-size:13px; font-weight:800; color:var(--text1); }
+    .career-entry-period { font-size:10px; color:var(--text3); margin-top:3px; }
+    .career-entry-times { display:flex; flex-wrap:wrap; gap:5px 10px; margin-top:9px; font-size:11px; color:var(--text2); }
+    .career-entry-actions { display:flex; gap:6px; margin-top:9px; }
+    .career-entry-actions button { flex:1; border-radius:8px; padding:7px; font-size:11px; font-weight:700; cursor:pointer; }
     .bar-chart { display: flex; flex-direction: column; gap: 8px; }
     .bar-row {
       display: flex;
@@ -1489,6 +1505,16 @@
 
   <!-- Charts Tab -->
   <div id="tab-charts" class="tab-pane">
+    <div class="chart-card" id="careerCard">
+      <div class="career-head">
+        <div class="chart-title">🧳 기존 경력 · 항공사/기종별</div>
+        <button class="career-add" onclick="openCareerModal()">+ 경력 추가</button>
+      </div>
+      <div class="career-note">이전 항공사 경력은 전체 총시간·PIC·SIC·야간·계기·착륙에 합산됩니다. 개별 비행이 아니므로 최근 90일, 월별 통계, 자격 유지 및 LogTen CSV에는 포함되지 않습니다.</div>
+      <div id="careerSummary" class="career-summary"></div>
+      <div id="careerEntryList"></div>
+    </div>
+
     <!-- 연도 선택 -->
     <div id="chartYearNav" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;margin-bottom:4px"></div>
 
@@ -1707,6 +1733,56 @@
   </div>
 </div>
 
+<!-- Existing Career Modal -->
+<div class="modal-overlay" id="careerModalOverlay" onclick="if(event.target===this)closeCareerModal()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="careerModalTitle">기존 경력 추가</div>
+      <button class="modal-close" onclick="closeCareerModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="careerEditId" />
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">항공사</label>
+          <input type="text" class="form-input" id="careerAirline" placeholder="예: 이스타항공" maxlength="80" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">기종</label>
+          <input type="text" class="form-input" id="careerAircraft" placeholder="예: B737-800" maxlength="40" list="careerAircraftList" style="text-transform:uppercase" />
+          <datalist id="careerAircraftList"><option value="B737-800"><option value="B737-8"><option value="A320"><option value="A321"><option value="Q400"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">근무 시작월</label>
+          <input type="month" class="form-input" id="careerStartMonth" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">근무 종료월</label>
+          <input type="month" class="form-input" id="careerEndMonth" />
+        </div>
+      </div>
+      <div class="form-section-title">누적 비행시간</div>
+      <div class="form-row triple">
+        <div class="form-group"><label class="form-label">총 비행</label><input type="text" class="form-input" id="careerTotal" placeholder="2500:00" inputmode="numeric" onblur="formatTimeInput(this)" /></div>
+        <div class="form-group"><label class="form-label">PIC</label><input type="text" class="form-input" id="careerPic" placeholder="1200:00" inputmode="numeric" onblur="formatTimeInput(this)" /></div>
+        <div class="form-group"><label class="form-label">SIC</label><input type="text" class="form-input" id="careerSic" placeholder="1300:00" inputmode="numeric" onblur="formatTimeInput(this)" /></div>
+      </div>
+      <div class="form-row triple">
+        <div class="form-group"><label class="form-label">야간</label><input type="text" class="form-input" id="careerNight" placeholder="0:00" inputmode="numeric" onblur="formatTimeInput(this)" /></div>
+        <div class="form-group"><label class="form-label">계기</label><input type="text" class="form-input" id="careerIfr" placeholder="0:00" inputmode="numeric" onblur="formatTimeInput(this)" /></div>
+        <div class="form-group"><label class="form-label">착륙</label><input type="number" class="form-input" id="careerLandings" placeholder="0" min="0" step="1" inputmode="numeric" /></div>
+      </div>
+      <div class="form-row single">
+        <div class="form-group"><label class="form-label">비고</label><textarea class="form-input" id="careerNotes" rows="3" maxlength="500" style="resize:vertical;line-height:1.5" placeholder="경력증명서 기준, 직책 변경 등 (선택)"></textarea></div>
+      </div>
+      <button class="submit-btn" onclick="saveCareerEntry()">경력 저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- Print Modal -->
 <div class="modal-overlay" id="printModalOverlay" onclick="if(event.target===this)closePrintModal()">
   <div class="modal" style="max-height:80vh">
@@ -1759,9 +1835,9 @@
       </div>
 
       <div class="delete-account-panel" id="deleteAccountPanel">
-        <div style="font-size:14px;font-weight:800;color:var(--danger)">계정과 모든 비행기록을 삭제합니다</div>
+        <div style="font-size:14px;font-weight:800;color:var(--danger)">계정과 모든 비행기록·기존 경력을 삭제합니다</div>
         <div style="font-size:11px;line-height:1.65;color:var(--text2);margin-top:7px">
-          Firebase 로그인 계정, 클라우드 비행기록, 이 기기의 로컬 기록이 영구 삭제되며 복구할 수 없습니다. 필요한 기록은 먼저 인쇄 또는 PDF로 보관해 주세요.
+          Firebase 로그인 계정, 클라우드 비행기록과 기존 경력, 이 기기의 로컬 기록이 영구 삭제되며 복구할 수 없습니다. 필요한 기록은 먼저 인쇄 또는 PDF로 보관해 주세요.
         </div>
         <div id="deletePasswordWrap" style="display:none">
           <input type="password" class="form-input" id="deleteAccountPassword" autocomplete="current-password" placeholder="본인 확인용 현재 비밀번호" />
@@ -2099,8 +2175,11 @@ async function signOutUser() {
   if (_unsubSnapshot) { _unsubSnapshot(); _unsubSnapshot = null; }
   await auth.signOut();
   flights = [];
+  careerEntries = [];
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(CAREER_STORAGE_KEY);
   renderFlights();
+  renderCareerEntries();
 }
 
 function resetDeleteAccountPanel() {
@@ -2223,7 +2302,9 @@ async function deleteAccountPermanently() {
     await user.delete();
 
     flights = [];
+    careerEntries = [];
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CAREER_STORAGE_KEY);
     const ccUsername = document.getElementById('ccUsername');
     const ccPassword = document.getElementById('ccPassword');
     if (ccUsername) ccUsername.value = '';
@@ -2252,6 +2333,7 @@ async function saveToFirestore(uid) {
   try {
     await db.collection('users').doc(uid).collection('data').doc('flights')
       .set({ flights: JSON.parse(JSON.stringify(flights)),
+             careerEntries: JSON.parse(JSON.stringify(careerEntries)),
              updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     _lastSavedAt = Date.now();
     const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
@@ -2280,6 +2362,7 @@ function scheduleFirestoreSave(immediate = false) {
 // ── saveData: localStorage + Firestore ──────────────────────────
 function saveData(immediate = false) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
+  try { localStorage.setItem(CAREER_STORAGE_KEY, JSON.stringify(careerEntries)); } catch(e) {}
   scheduleFirestoreSave(immediate);
 }
 
@@ -2295,7 +2378,12 @@ function subscribeToFirestore(uid) {
     if (Date.now() - _lastSavedAt < 1000) return;
 
     if (snap.exists) {
-      const incoming = snap.data().flights || [];
+      const snapshotData = snap.data();
+      const incoming = snapshotData.flights || [];
+      const hasCloudCareer = Array.isArray(snapshotData.careerEntries);
+      const incomingCareer = hasCloudCareer
+        ? window.PilotLogbookCareer.sanitizeEntries(snapshotData.careerEntries)
+        : careerEntries;
       let _snapChanged = false;
       incoming.forEach(f => {
         if (!f.id) { f.id = simpleUid(); _snapChanged = true; }
@@ -2312,19 +2400,22 @@ function subscribeToFirestore(uid) {
       });
 
       flights = incoming;
+      careerEntries = incomingCareer;
       Object.entries(activeNotes).forEach(([fid, val]) => {
         const idx = flights.findIndex(f => f.id === fid);
         if (idx >= 0) flights[idx].personalMemo = val;
       });
 
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
+      try { localStorage.setItem(CAREER_STORAGE_KEY, JSON.stringify(careerEntries)); } catch(e) {}
       renderFlights();
-      if (_snapChanged) saveData(); // id/acType 수정사항 Firestore에 즉시 반영
+      renderCareerEntries();
+      if (_snapChanged || (!hasCloudCareer && careerEntries.length > 0)) saveData(); // 마이그레이션·기존 로컬 경력 업로드
       const t = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
       setSyncStatus('✓ ' + t + ' 동기화됨');
     } else {
       // Firestore 문서 없음 → 로컬 데이터 올리기
-      if (flights.length > 0) saveToFirestore(uid);
+      if (flights.length > 0 || careerEntries.length > 0) saveToFirestore(uid);
       else renderFlights();
       setSyncStatus('✓ 준비 완료');
     }
@@ -2344,7 +2435,12 @@ document.addEventListener('visibilitychange', () => {
         if (!snap.exists) return;
         // 내가 쓴 게 더 최신이면 무시
         if (Date.now() - _lastSavedAt < 3000) return;
-        const incoming = snap.data().flights || [];
+        const snapshotData = snap.data();
+        const incoming = snapshotData.flights || [];
+        const hasCloudCareer = Array.isArray(snapshotData.careerEntries);
+        const incomingCareer = hasCloudCareer
+          ? window.PilotLogbookCareer.sanitizeEntries(snapshotData.careerEntries)
+          : careerEntries;
         let _visChanged = false;
         incoming.forEach(f => {
           if (!f.id) { f.id = simpleUid(); _visChanged = true; }
@@ -2352,9 +2448,12 @@ document.addEventListener('visibilitychange', () => {
           if (normalizeFlightTextFields(f)) _visChanged = true;
         });
         flights = incoming;
+        careerEntries = incomingCareer;
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
-        if (_visChanged) saveData(); // id/acType 수정사항 Firestore에 즉시 반영
+        try { localStorage.setItem(CAREER_STORAGE_KEY, JSON.stringify(careerEntries)); } catch(e) {}
+        if (_visChanged || (!hasCloudCareer && careerEntries.length > 0)) saveData(); // 마이그레이션·기존 로컬 경력 업로드
         renderFlights();
+        renderCareerEntries();
         setSyncStatus('✓ 포그라운드 동기화');
       }).catch(() => {});
   }
@@ -2498,8 +2597,11 @@ auth.onAuthStateChanged(user => {
     document.getElementById('infoModalOverlay').classList.remove('show');
     document.body.style.overflow = '';
     flights = [];
+    careerEntries = [];
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CAREER_STORAGE_KEY);
     renderFlights();
+    renderCareerEntries();
     setSyncStatus('');
   }
 });
@@ -2510,6 +2612,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 // ─── State ──────────────────────────────────────────────────────
 const STORAGE_KEY = 'pilotLogbook';
+const CAREER_STORAGE_KEY = 'pilotLogbookCareerEntries';
 
 function getCrewInfo(f) {
   return (f && (f.crewInfo ?? f.remarks)) || '';
@@ -2552,9 +2655,19 @@ function loadData() {
   }
 }
 
+function loadCareerEntries() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CAREER_STORAGE_KEY) || '[]');
+    return window.PilotLogbookCareer ? window.PilotLogbookCareer.sanitizeEntries(raw) : [];
+  } catch (e) {
+    console.warn('기존 경력 localStorage 읽기 실패:', e);
+    return [];
+  }
+}
 
 
 let flights = loadData();
+let careerEntries = loadCareerEntries();
 let editingId = null;
 
 function parseHHMM(s) {
@@ -2595,6 +2708,116 @@ function toHHMM(mins) {
   const h = Math.floor(Math.abs(mins) / 60);
   const m = Math.abs(mins) % 60;
   return `${h}:${String(m).padStart(2,'0')}`;
+}
+
+// ── 이전 항공사·기종별 기존 경력 ────────────────────────────────
+function getCareerTotals() {
+  return window.PilotLogbookCareer
+    ? window.PilotLogbookCareer.summarize(careerEntries)
+    : { total:0, pic:0, sic:0, night:0, ifr:0, landings:0 };
+}
+
+function careerMonthLabel(value) {
+  const match = /^(\d{4})-(\d{2})$/.exec(value || '');
+  return match ? `${match[1]}.${match[2]}` : '—';
+}
+
+function renderCareerEntries() {
+  const summaryEl = document.getElementById('careerSummary');
+  const listEl = document.getElementById('careerEntryList');
+  if (!summaryEl || !listEl) return;
+  const totals = getCareerTotals();
+  summaryEl.innerHTML = [
+    ['총 비행', toHHMM(totals.total)], ['PIC', toHHMM(totals.pic)], ['SIC', toHHMM(totals.sic)],
+    ['야간', toHHMM(totals.night)], ['계기', toHHMM(totals.ifr)], ['착륙', `${totals.landings}회`],
+  ].map(([label, value]) => `<div><strong>${value}</strong><span>${label}</span></div>`).join('');
+
+  if (!careerEntries.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:12px">등록된 기존 경력이 없습니다.</div>';
+    return;
+  }
+  listEl.innerHTML = [...careerEntries].sort((a, b) => b.endMonth.localeCompare(a.endMonth)).map(entry => `
+    <div class="career-entry">
+      <div class="career-entry-head">
+        <div><div class="career-entry-title">${escHtml(entry.airline)} · ${escHtml(entry.aircraftType)}</div><div class="career-entry-period">${careerMonthLabel(entry.startMonth)} ~ ${careerMonthLabel(entry.endMonth)}</div></div>
+        <span class="badge badge-pic">기존 경력</span>
+      </div>
+      <div class="career-entry-times">
+        <span>총 ${entry.total}</span><span>PIC ${entry.pic}</span><span>SIC ${entry.sic}</span><span>야간 ${entry.night}</span><span>계기 ${entry.ifr}</span><span>착륙 ${entry.landings}회</span>
+      </div>
+      ${entry.notes ? `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin-top:8px;white-space:pre-wrap">${escHtml(entry.notes)}</div>` : ''}
+      <div class="career-entry-actions">
+        <button onclick="openCareerModal('${entry.id}')" style="background:rgba(59,130,246,.15);color:var(--accent);border:1px solid rgba(59,130,246,.3)">수정</button>
+        <button onclick="deleteCareerEntry('${entry.id}')" style="background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.25)">삭제</button>
+      </div>
+    </div>`).join('');
+}
+
+function openCareerModal(entryId = '') {
+  const entry = careerEntries.find(item => item.id === entryId);
+  document.getElementById('careerModalTitle').textContent = entry ? '기존 경력 수정' : '기존 경력 추가';
+  document.getElementById('careerEditId').value = entry?.id || '';
+  document.getElementById('careerAirline').value = entry?.airline || '';
+  document.getElementById('careerAircraft').value = entry?.aircraftType || '';
+  document.getElementById('careerStartMonth').value = entry?.startMonth || '';
+  document.getElementById('careerEndMonth').value = entry?.endMonth || '';
+  document.getElementById('careerTotal').value = entry?.total || '';
+  document.getElementById('careerPic').value = entry?.pic || '';
+  document.getElementById('careerSic').value = entry?.sic || '';
+  document.getElementById('careerNight').value = entry?.night || '';
+  document.getElementById('careerIfr').value = entry?.ifr || '';
+  document.getElementById('careerLandings').value = entry?.landings ?? '';
+  document.getElementById('careerNotes').value = entry?.notes || '';
+  document.getElementById('careerModalOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('careerAirline').focus(), 50);
+}
+
+function closeCareerModal() {
+  document.getElementById('careerModalOverlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function saveCareerEntry() {
+  if (!window.PilotLogbookCareer) { showToast('기존 경력 기능을 불러오지 못했습니다'); return; }
+  const editId = document.getElementById('careerEditId').value;
+  const previous = careerEntries.find(entry => entry.id === editId);
+  const result = window.PilotLogbookCareer.validateEntry({
+    airline: document.getElementById('careerAirline').value,
+    aircraftType: document.getElementById('careerAircraft').value,
+    startMonth: document.getElementById('careerStartMonth').value,
+    endMonth: document.getElementById('careerEndMonth').value,
+    total: document.getElementById('careerTotal').value,
+    pic: document.getElementById('careerPic').value,
+    sic: document.getElementById('careerSic').value,
+    night: document.getElementById('careerNight').value,
+    ifr: document.getElementById('careerIfr').value,
+    landings: document.getElementById('careerLandings').value,
+    notes: document.getElementById('careerNotes').value,
+  });
+  if (!result.ok) { showToast(result.error); return; }
+
+  const now = new Date().toISOString();
+  const entry = { ...result.entry, id: previous?.id || uid(), createdAt: previous?.createdAt || now, updatedAt: now };
+  if (previous) careerEntries[careerEntries.findIndex(item => item.id === previous.id)] = entry;
+  else careerEntries.push(entry);
+  saveData(true);
+  closeCareerModal();
+  renderCareerEntries();
+  updateStats();
+  if (document.getElementById('tab-charts').classList.contains('active')) renderCharts();
+  showToast(previous ? '기존 경력이 수정되었습니다' : '기존 경력이 저장되었습니다');
+}
+
+function deleteCareerEntry(entryId) {
+  const entry = careerEntries.find(item => item.id === entryId);
+  if (!entry || !confirm(`${entry.airline} · ${entry.aircraftType} 기존 경력을 삭제할까요?`)) return;
+  careerEntries = careerEntries.filter(item => item.id !== entryId);
+  saveData(true);
+  renderCareerEntries();
+  updateStats();
+  if (document.getElementById('tab-charts').classList.contains('active')) renderCharts();
+  showToast('기존 경력이 삭제되었습니다');
 }
 
 // ── 기간 합산 ─────────────────────────────────────────────────────
@@ -2917,6 +3140,8 @@ function renderFlights() {
       <div class="empty-sub">상단 업로드 탭에서 제주항공<br>ePaper PDF를 업로드하거나<br>직접 입력해 주세요.</div>
     </div>`;
     document.getElementById('monthNav').style.display = 'none';
+    updateStats();
+    renderCareerEntries();
     return;
   }
 
@@ -3185,7 +3410,8 @@ function flightCard(f) {
 
 // ─── Stats ──────────────────────────────────────────────────────
 function updateStats() {
-  let total=0, pic=0, sic=0, night=0, ifr=0, landings=0, ald=0;
+  const prior = getCareerTotals();
+  let total=prior.total, pic=prior.pic, sic=prior.sic, night=prior.night, ifr=prior.ifr, landings=prior.landings, ald=0;
   const now = new Date();
   let last90 = 0;
 
@@ -3226,6 +3452,7 @@ function getChartFlights() {
 }
 
 function renderCharts() {
+  renderCareerEntries();
   // 연도 선택 버튼 렌더링
   const years = [...new Set(flights.map(f => f.date ? f.date.slice(0,4) : null).filter(Boolean))].sort();
   const nav = document.getElementById('chartYearNav');
@@ -3260,7 +3487,8 @@ function renderChartSummary() {
   const fs = getChartFlights();
   const el = document.getElementById('chartSummary');
   if (!el) return;
-  let total=0, pic=0, sic=0, night=0, ldg=0;
+  const prior = chartYear === 'all' ? getCareerTotals() : { total:0, pic:0, sic:0, night:0, landings:0 };
+  let total=prior.total, pic=prior.pic, sic=prior.sic, night=prior.night, ldg=prior.landings;
   fs.forEach(f => {
     const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
     total += dur;
@@ -3363,7 +3591,8 @@ function renderMonthlyChart() {
 
 function renderDonut() {
   const fs = getChartFlights();
-  let pic=0, sic=0, night=0;
+  const prior = chartYear === 'all' ? getCareerTotals() : { pic:0, sic:0, night:0 };
+  let pic=prior.pic, sic=prior.sic, night=prior.night;
   fs.forEach(f => {
     const cr = calcCreditedTime(f);
     pic  += cr.pic;
@@ -3592,6 +3821,7 @@ function handleModalKey(e) {
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     if (document.getElementById('modalOverlay').classList.contains('show')) closeModal();
+    if (document.getElementById('careerModalOverlay').classList.contains('show')) closeCareerModal();
     if (document.getElementById('ccModalOverlay').classList.contains('show')) closeCrewConnex();
     if (document.getElementById('printModalOverlay').classList.contains('show')) closePrintModal();
     if (document.getElementById('infoModalOverlay').classList.contains('show')) closeInfoPage();
