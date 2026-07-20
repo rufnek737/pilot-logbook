@@ -21,6 +21,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="logten-export.js"></script>
+  <script src="csv-import.js"></script>
   <!-- Firebase v10 compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -1434,7 +1435,7 @@
       <div class="empty-state">
         <span class="empty-icon">🛫</span>
         <div class="empty-title">비행 기록이 없습니다</div>
-        <div class="empty-sub">상단 업로드 탭에서 제주항공<br>ePaper PDF를 업로드하거나<br>직접 입력해 주세요.</div>
+        <div class="empty-sub">상단 업로드 탭에서 제주항공<br>PDF·Excel·CSV를 업로드하거나<br>직접 입력해 주세요.</div>
       </div>
     </div>
   </div>
@@ -1443,30 +1444,30 @@
   <div id="tab-upload" class="tab-pane">
     <div class="upload-section">
       <div class="upload-zone" id="uploadZone">
-        <input type="file" accept=".pdf,.xlsx,.xls" id="pdfInput" onchange="handleFileSelect(event)" />
+        <input type="file" accept=".pdf,.xlsx,.xls,.csv,text/csv" id="pdfInput" onchange="handleFileSelect(event)" />
         <span class="upload-icon">📑</span>
         <div class="upload-title">비행 기록 업로드</div>
-        <div class="upload-sub">PDF 또는 Excel 파일을 끌어다 놓거나 탭하여 선택</div>
+        <div class="upload-sub">PDF, Excel 또는 CSV 파일을 끌어다 놓거나 탭하여 선택</div>
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px">
           <button class="upload-btn" onclick="document.getElementById('pdfInput').click()" style="margin:0">
             📂 파일 선택
           </button>
         </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--text3)">ePaper PDF · flightHistory Excel (.xlsx)</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">ePaper PDF · flightHistory Excel/CSV · Pilot Logbook LogTen CSV</div>
       </div>
     </div>
 
     <div style="margin:12px 0;padding:12px 16px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:12px">
       <div style="font-size:12px;color:var(--text2);line-height:1.6">
         <span style="color:var(--danger);font-weight:700">⚠ 기존 데이터 초기화</span><br>
-        dutyCode가 잘못 저장된 경우 삭제 후 PDF를 다시 업로드하세요.
+        dutyCode가 잘못 저장된 경우 삭제 후 파일을 다시 업로드하세요.
       </div>
       <button onclick="resetAllData()" style="flex-shrink:0;background:rgba(239,68,68,0.15);color:var(--danger);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">🗑 전체 삭제</button>
     </div>
 
     <div class="parse-progress" id="parseProgress">
       <div class="progress-label">
-        <span id="progressText">PDF 분석 중...</span>
+        <span id="progressText">파일 분석 중...</span>
         <span id="progressPct">0%</span>
       </div>
       <div class="progress-bar-wrap">
@@ -3666,11 +3667,11 @@ function escHtml(s) {
 }
 
 function resetAllData() {
-  if (!confirm(`저장된 비행 기록 ${flights.length}개를 모두 삭제합니다.\nPDF를 다시 업로드하면 정확한 dutyCode로 저장됩니다.\n\n계속하시겠습니까?`)) return;
+  if (!confirm(`저장된 비행 기록 ${flights.length}개를 모두 삭제합니다.\n지원 파일을 다시 업로드하면 정확한 dutyCode로 저장됩니다.\n\n계속하시겠습니까?`)) return;
   flights = [];
   saveData();
   renderFlights();
-  showToast('전체 데이터가 삭제됐습니다. PDF를 다시 업로드해 주세요.');
+  showToast('전체 데이터가 삭제됐습니다. 파일을 다시 업로드해 주세요.');
 }
 
 function deleteEntry(id) {
@@ -3690,17 +3691,105 @@ uploadZone.addEventListener('drop', e => {
   uploadZone.classList.remove('drag-over');
   const file = e.dataTransfer.files[0];
   if (!file) return;
-  if (file.name.match(/\.xlsx?$/i)) processExcel(file);
+  if (file.name.match(/\.csv$/i) || file.type === 'text/csv') processCsv(file);
+  else if (file.name.match(/\.xlsx?$/i)) processExcel(file);
   else if (file.type === 'application/pdf' || file.name.match(/\.pdf$/i)) processPDF(file);
-  else showToast('PDF 또는 Excel(.xlsx) 파일만 업로드할 수 있습니다');
+  else showToast('PDF, Excel 또는 CSV 파일만 업로드할 수 있습니다');
 });
 
 function handleFileSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
-  if (file.name.match(/\.xlsx?$/i)) processExcel(file);
-  else processPDF(file);
+  if (file.name.match(/\.csv$/i) || file.type === 'text/csv') processCsv(file);
+  else if (file.name.match(/\.xlsx?$/i)) processExcel(file);
+  else if (file.type === 'application/pdf' || file.name.match(/\.pdf$/i)) processPDF(file);
+  else showToast('PDF, Excel 또는 CSV 파일만 업로드할 수 있습니다');
   e.target.value = '';
+}
+
+async function processCsv(file) {
+  const progress = document.getElementById('parseProgress');
+  const bar = document.getElementById('progressBar');
+  const pct = document.getElementById('progressPct');
+  const txt = document.getElementById('progressText');
+  const result = document.getElementById('parseResult');
+  const preview = document.getElementById('parsePreview');
+  const previewList = document.getElementById('previewList');
+
+  progress.classList.add('show');
+  preview.classList.remove('show');
+  bar.style.width = '20%'; pct.textContent = '20%';
+  txt.textContent = 'CSV 파일 읽는 중...';
+  result.textContent = '';
+
+  try {
+    if (!window.PilotLogbookCsvImport) throw new Error('CSV 파서 로드에 실패했습니다.');
+    if (file.size > 10 * 1024 * 1024) throw new Error('CSV 파일은 10MB 이하만 업로드할 수 있습니다.');
+    const buffer = await file.arrayBuffer();
+    let csvText = new TextDecoder('utf-8').decode(buffer);
+    if (csvText.includes('\uFFFD')) {
+      try { csvText = new TextDecoder('euc-kr').decode(buffer); } catch (_) {}
+    }
+
+    bar.style.width = '50%'; pct.textContent = '50%';
+    txt.textContent = 'CSV 형식 확인 중...';
+    const rows = window.PilotLogbookCsvImport.parseCsvText(csvText);
+    const csvResult = window.PilotLogbookCsvImport.parseCsvRows(rows);
+    const parsed = window.PilotLogbookCsvImport.deduplicateFlights(
+      csvResult.flights.map(flight => ({ ...flight, id: uid() }))
+    );
+
+    const flightKey = flight => `${flight.date}-${flight.flight}-${flight.dep}-${flight.arr}`;
+    const existingMap = new Map(flights.map((flight, index) => [flightKey(flight), index]));
+    const newFlights = parsed.filter(flight => !existingMap.has(flightKey(flight)));
+    const updateFlights = parsed.filter(flight => existingMap.has(flightKey(flight)));
+
+    bar.style.width = '75%'; pct.textContent = '75%';
+    txt.textContent = `${csvResult.label} 미리보기`;
+    result.textContent = `✅ ${parsed.length}편 파싱 · 신규 ${newFlights.length}편 · 기존 ${updateFlights.length}편`;
+    previewList.innerHTML = parsed.slice(0, 10).map(flight => {
+      const updating = existingMap.has(flightKey(flight));
+      return `<div class="preview-item">
+        <span class="preview-date">${escHtml(flight.date)}</span>
+        <span class="preview-route">${escHtml(flight.dep)}→${escHtml(flight.arr)}</span>
+        <span class="preview-flt">${escHtml(flight.flight)}</span>
+        <span class="preview-time">${escHtml(flight.total)}</span>
+        <span style="font-size:10px;color:${updating ? 'var(--warning)' : 'var(--success)'}">${updating ? '기존 갱신' : '신규'}</span>
+      </div>`;
+    }).join('') + (parsed.length > 10 ? `<div style="text-align:center;color:var(--text3);font-size:12px;padding:8px">외 ${parsed.length - 10}편...</div>` : '');
+    preview.classList.add('show');
+
+    const confirmed = confirm(
+      `${csvResult.label}\n신규 ${newFlights.length}편 · 기존 ${updateFlights.length}편 갱신\n\n` +
+      '기존 기록의 계기·야간시간, PF/PM, 오토랜딩과 개인 메모는 보존됩니다.\n진행하시겠습니까?'
+    );
+    if (!confirmed) {
+      bar.style.width = '100%'; pct.textContent = '100%';
+      txt.textContent = '취소됨';
+      result.textContent = 'CSV 가져오기를 취소했습니다.';
+      return;
+    }
+
+    newFlights.forEach(flight => flights.push(flight));
+    updateFlights.forEach(flight => {
+      const index = existingMap.get(flightKey(flight));
+      flights[index] = window.PilotLogbookCsvImport.mergeCsvFlight(flights[index], flight);
+    });
+    flights.sort((a, b) => b.date.localeCompare(a.date));
+    saveData();
+    renderFlights();
+
+    bar.style.width = '100%'; pct.textContent = '100%';
+    txt.textContent = '완료';
+    result.innerHTML = `✅ <strong>신규 ${newFlights.length}편</strong> 저장 · 기존 ${updateFlights.length}편 갱신`;
+    document.getElementById('goLogbookBtn').style.display = 'block';
+    showToast(`CSV 신규 ${newFlights.length}편 · 기존 ${updateFlights.length}편 갱신`);
+  } catch (error) {
+    bar.style.width = '100%'; pct.textContent = '100%';
+    txt.textContent = 'CSV 오류';
+    result.textContent = '❌ 오류: ' + error.message;
+    console.error('processCsv error:', error);
+  }
 }
 
 async function processExcel(file) {

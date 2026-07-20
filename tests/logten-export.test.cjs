@@ -57,6 +57,9 @@ test('app wires the export, bilingual print, and CSS-owned iOS safe area', () =>
 
   assert.equal(capacitorConfig.ios.contentInset, 'never');
   assert.match(html, /<script src="logten-export\.js"><\/script>/);
+  assert.match(html, /<script src="csv-import\.js"><\/script>/);
+  assert.match(html, /accept="\.pdf,\.xlsx,\.xls,\.csv,text\/csv"/);
+  assert.match(html, /async function processCsv\(file\)/);
   assert.match(html, /function exportLogTenCsv\(\)/);
   assert.match(html, /navigator\.share\(\{ files: \[file\] \}\)/);
   assert.match(html, /setPrintLanguage\('en'\)/);
