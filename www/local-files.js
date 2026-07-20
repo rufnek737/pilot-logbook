@@ -132,6 +132,20 @@
     if (usedBytes + addedBytes > MAX_OWNER_BYTES) throw makeError('이 기기의 첨부파일은 사용자당 최대 50MB까지 저장할 수 있습니다.', 'owner-size');
   }
 
+  async function validateFiles(ownerId, careerId, fileList, pendingFileList) {
+    const owner = cleanId(ownerId);
+    const career = cleanId(careerId);
+    if (!owner || !career) throw makeError('로그인 정보 또는 경력 항목을 확인할 수 없습니다.', 'missing-owner');
+    const files = Array.from(fileList || []);
+    const pending = Array.from(pendingFileList || []).map(file => ({
+      careerId: career,
+      size: Number(file && file.size) || 0,
+    }));
+    const existing = await listForOwner(owner);
+    validateNewFiles(existing.concat(pending), career, files);
+    return true;
+  }
+
   async function addFiles(ownerId, careerId, fileList) {
     const owner = cleanId(ownerId);
     const career = cleanId(careerId);
@@ -319,7 +333,7 @@
 
   return {
     MAX_FILE_BYTES, MAX_OWNER_BYTES, MAX_FILES_PER_CAREER,
-    normalizedType, cleanFileName, listForOwner, listForCareer, addFiles, getFile,
+    normalizedType, cleanFileName, listForOwner, listForCareer, validateFiles, addFiles, getFile,
     deleteFile, deleteForCareer, deleteForOwner, exportForOwner, restoreForOwner, formatBytes,
   };
 });

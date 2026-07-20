@@ -29,6 +29,29 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script>
+    (function initNativeSafeArea() {
+      async function syncNativeSafeAreaTop() {
+        const capacitor = window.Capacitor;
+        if (!capacitor || !capacitor.isNativePlatform?.() || capacitor.getPlatform?.() !== 'ios') return;
+        try {
+          const info = await capacitor.Plugins?.StatusBar?.getInfo();
+          const height = Number(info?.height);
+          if (Number.isFinite(height) && height > 0 && height <= 120) {
+            document.documentElement.style.setProperty('--native-safe-top', `${Math.round(height)}px`);
+          }
+        } catch (_) {}
+      }
+
+      syncNativeSafeAreaTop();
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', syncNativeSafeAreaTop, { once: true });
+      }
+      window.addEventListener('resize', syncNativeSafeAreaTop);
+      window.addEventListener('orientationchange', syncNativeSafeAreaTop);
+      document.addEventListener('resume', syncNativeSafeAreaTop);
+    })();
+  </script>
   <style>
     :root {
       --bg: #0a0e1a;
@@ -48,6 +71,9 @@
       --radius: 12px;
       --radius-sm: 8px;
       --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --native-safe-top: 0px;
+      --app-safe-top: max(env(safe-area-inset-top), var(--native-safe-top));
+      --app-header-height: 76px;
     }
     body.day {
       --bg: #f0f4f8;
@@ -90,6 +116,7 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      padding-top: var(--app-safe-top);
       -webkit-font-smoothing: antialiased;
       overscroll-behavior: none;
     }
@@ -104,16 +131,29 @@
     }
 
     /* ── Header ── */
+    .status-bar-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--app-safe-top);
+      background: #0f172a;
+      z-index: 101;
+      pointer-events: none;
+    }
+    body.day .status-bar-background { background: #1e3a5f; }
     .header {
       background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
-      padding: calc(16px + constant(safe-area-inset-top)) 20px 12px;
-      padding: calc(16px + env(safe-area-inset-top)) 20px 12px;
-      position: sticky;
-      top: 0;
+      padding: 16px 20px 12px;
+      position: fixed;
+      top: var(--app-safe-top);
+      left: 0;
+      right: 0;
       z-index: 100;
       isolation: isolate;
       border-bottom: 1px solid rgba(59,130,246,0.2);
     }
+    .header-spacer { height: var(--app-header-height); }
     body.day .header {
       background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
     }
@@ -743,6 +783,10 @@
     .career-file-meta { color:var(--text3); font-size:9px; margin-top:2px; }
     .career-file-row button { border:1px solid var(--border); border-radius:7px; padding:5px 7px; background:var(--surface2); color:var(--text2); font-size:10px; cursor:pointer; }
     .career-attach-btn { width:100%; margin-top:7px; border:1px dashed var(--border); border-radius:8px; padding:7px; background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer; }
+    .career-modal-files { margin:16px 0 14px; padding:12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface2); }
+    .career-modal-files .career-files { margin:0; padding:0; border:0; }
+    .career-file-pending { color:var(--warning); }
+    .career-file-help { color:var(--text3); font-size:10px; line-height:1.5; margin:7px 0 0; }
     .backup-box { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
     .backup-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0; }
     .backup-actions button { border-radius:10px; padding:11px 8px; font-size:12px; font-weight:750; cursor:pointer; }
@@ -1333,7 +1377,8 @@
   </div>
 </div>
 
-<!-- Header -->
+<!-- Status bar safe area + Header -->
+<div class="status-bar-background" aria-hidden="true"></div>
 <header class="header">
   <div class="header-top">
     <div class="logo">
@@ -1353,6 +1398,20 @@
     </div>
   </div>
 </header>
+<div class="header-spacer" aria-hidden="true"></div>
+<script>
+  (function keepHeaderSpaceInSync() {
+    const header = document.querySelector('.header');
+    if (!header) return;
+    const update = () => {
+      const height = Math.ceil(header.getBoundingClientRect().height);
+      if (height > 0) document.documentElement.style.setProperty('--app-header-height', `${height}px`);
+    };
+    update();
+    window.addEventListener('resize', update);
+    if (window.ResizeObserver) new ResizeObserver(update).observe(header);
+  })();
+</script>
 <div id="syncStatus"></div>
 
 <!-- Print Overlay -->
@@ -1806,7 +1865,15 @@
       <div class="form-row single">
         <div class="form-group"><label class="form-label">비고</label><textarea class="form-input" id="careerNotes" rows="3" maxlength="500" style="resize:vertical;line-height:1.5" placeholder="경력증명서 기준, 직책 변경 등 (선택)"></textarea></div>
       </div>
-      <button class="submit-btn" onclick="saveCareerEntry()">경력 저장</button>
+      <div class="career-modal-files">
+        <div class="career-files">
+          <div class="career-files-head"><div class="career-files-title">경력 증빙 서류</div><span class="local-only-badge">이 기기에만 저장</span></div>
+          <div id="careerModalAttachmentList" style="font-size:10px;color:var(--text3)">첨부된 파일 없음 · 경력당 최대 3개</div>
+          <button class="career-attach-btn" type="button" onclick="selectCareerModalAttachment()">＋ PDF·사진 첨부</button>
+          <div class="career-file-help">PDF·JPG·PNG, 파일당 10MB 이하. 새로 선택한 파일은 아래의 경력 저장을 눌러야 함께 보관됩니다.</div>
+        </div>
+      </div>
+      <button class="submit-btn" id="careerSaveButton" onclick="saveCareerEntry()">경력 저장</button>
     </div>
   </div>
 </div>
@@ -2797,6 +2864,10 @@ function getCareerTotals() {
 }
 
 let pendingCareerAttachmentId = '';
+let activeCareerDraftId = '';
+let stagedCareerAttachmentFiles = [];
+let savingCareerEntry = false;
+const CAREER_MODAL_ATTACHMENT_TARGET = '__career_modal__';
 
 function attachmentOwnerId() {
   return currentUser?.uid || '';
@@ -2877,10 +2948,36 @@ function selectCareerAttachment(careerId) {
   input.click();
 }
 
+function selectCareerModalAttachment() {
+  if (!attachmentOwnerId()) { showToast('로그인 후 첨부파일을 저장할 수 있습니다'); return; }
+  if (!activeCareerDraftId) { showToast('경력 입력창을 다시 열어 주세요'); return; }
+  pendingCareerAttachmentId = CAREER_MODAL_ATTACHMENT_TARGET;
+  const input = document.getElementById('careerAttachmentInput');
+  input.value = '';
+  input.click();
+}
+
 async function handleCareerAttachmentFiles(fileList) {
   const careerId = pendingCareerAttachmentId;
   pendingCareerAttachmentId = '';
   if (!careerId || !fileList?.length || !window.PilotLogbookLocalFiles) return;
+  if (careerId === CAREER_MODAL_ATTACHMENT_TARGET) {
+    try {
+      await window.PilotLogbookLocalFiles.validateFiles(
+        attachmentOwnerId(),
+        activeCareerDraftId,
+        fileList,
+        stagedCareerAttachmentFiles,
+      );
+      const selected = Array.from(fileList);
+      stagedCareerAttachmentFiles.push(...selected);
+      await renderCareerModalAttachmentList();
+      showToast(`${selected.length}개 파일을 선택했습니다 · 경력 저장 시 보관됩니다`);
+    } catch (error) {
+      showToast(error?.message || '첨부파일을 선택하지 못했습니다', 3500);
+    }
+    return;
+  }
   try {
     const added = await window.PilotLogbookLocalFiles.addFiles(attachmentOwnerId(), careerId, fileList);
     markBackupNeeded();
@@ -2889,6 +2986,49 @@ async function handleCareerAttachmentFiles(fileList) {
   } catch (error) {
     showToast(error?.message || '첨부파일을 저장하지 못했습니다', 3500);
   }
+}
+
+function careerAttachmentRows(records, careerId) {
+  return records.map(record => `
+    <div class="career-file-row">
+      <div class="career-file-info">
+        <div class="career-file-name">${escHtml(record.name)}</div>
+        <div class="career-file-meta">${window.PilotLogbookLocalFiles.formatBytes(record.size)} · ${String(record.createdAt || '').slice(0,10)}</div>
+      </div>
+      <button type="button" onclick="openCareerAttachment('${record.id}')">열기</button>
+      <button type="button" onclick="deleteCareerAttachment('${careerId}','${record.id}')" style="color:var(--danger)">삭제</button>
+    </div>`).join('');
+}
+
+async function renderCareerModalAttachmentList() {
+  const host = document.getElementById('careerModalAttachmentList');
+  if (!host) return;
+  const editId = document.getElementById('careerEditId')?.value || '';
+  let records = [];
+  try {
+    if (editId && attachmentOwnerId() && window.PilotLogbookLocalFiles) {
+      records = await window.PilotLogbookLocalFiles.listForCareer(attachmentOwnerId(), editId);
+    }
+  } catch (_) {
+    host.textContent = '첨부파일을 불러오지 못했습니다.';
+    return;
+  }
+
+  const storedRows = records.length ? careerAttachmentRows(records, editId) : '';
+  const stagedRows = stagedCareerAttachmentFiles.map((file, index) => `
+    <div class="career-file-row">
+      <div class="career-file-info">
+        <div class="career-file-name">${escHtml(file.name)}</div>
+        <div class="career-file-meta career-file-pending">${window.PilotLogbookLocalFiles.formatBytes(file.size)} · 저장 대기</div>
+      </div>
+      <button type="button" onclick="removeStagedCareerAttachment(${index})" style="color:var(--danger)">선택 취소</button>
+    </div>`).join('');
+  host.innerHTML = storedRows + stagedRows || '첨부된 파일 없음 · 경력당 최대 3개';
+}
+
+function removeStagedCareerAttachment(index) {
+  stagedCareerAttachmentFiles.splice(index, 1);
+  renderCareerModalAttachmentList();
 }
 
 async function openCareerAttachment(attachmentId) {
@@ -2920,6 +3060,9 @@ async function deleteCareerAttachment(careerId, attachmentId) {
     await window.PilotLogbookLocalFiles.deleteFile(attachmentOwnerId(), attachmentId);
     markBackupNeeded();
     await renderCareerAttachmentList(careerId);
+    if (document.getElementById('careerModalOverlay').classList.contains('show') && activeCareerDraftId === careerId) {
+      await renderCareerModalAttachmentList();
+    }
     showToast('첨부파일이 삭제되었습니다');
   } catch (_) {
     showToast('첨부파일을 삭제하지 못했습니다');
@@ -2928,6 +3071,8 @@ async function deleteCareerAttachment(careerId, attachmentId) {
 
 function openCareerModal(entryId = '') {
   const entry = careerEntries.find(item => item.id === entryId);
+  activeCareerDraftId = entry?.id || uid();
+  stagedCareerAttachmentFiles = [];
   document.getElementById('careerModalTitle').textContent = entry ? '기존 경력 수정' : '기존 경력 추가';
   document.getElementById('careerEditId').value = entry?.id || '';
   document.getElementById('careerAirline').value = entry?.airline || '';
@@ -2943,15 +3088,21 @@ function openCareerModal(entryId = '') {
   document.getElementById('careerNotes').value = entry?.notes || '';
   document.getElementById('careerModalOverlay').classList.add('show');
   syncBodyScrollLock();
+  renderCareerModalAttachmentList();
   setTimeout(() => document.getElementById('careerAirline').focus(), 50);
 }
 
-function closeCareerModal() {
+function closeCareerModal(saved = false) {
+  if (!saved && stagedCareerAttachmentFiles.length && !confirm('아직 저장하지 않은 첨부파일 선택을 취소할까요?')) return;
   document.getElementById('careerModalOverlay').classList.remove('show');
+  pendingCareerAttachmentId = '';
+  activeCareerDraftId = '';
+  stagedCareerAttachmentFiles = [];
   syncBodyScrollLock();
 }
 
-function saveCareerEntry() {
+async function saveCareerEntry() {
+  if (savingCareerEntry) return;
   if (!window.PilotLogbookCareer) { showToast('기존 경력 기능을 불러오지 못했습니다'); return; }
   const editId = document.getElementById('careerEditId').value;
   const previous = careerEntries.find(entry => entry.id === editId);
@@ -2971,15 +3122,30 @@ function saveCareerEntry() {
   if (!result.ok) { showToast(result.error); return; }
 
   const now = new Date().toISOString();
-  const entry = { ...result.entry, id: previous?.id || uid(), createdAt: previous?.createdAt || now, updatedAt: now };
-  if (previous) careerEntries[careerEntries.findIndex(item => item.id === previous.id)] = entry;
-  else careerEntries.push(entry);
-  saveData(true);
-  closeCareerModal();
-  renderCareerEntries();
-  updateStats();
-  if (document.getElementById('tab-charts').classList.contains('active')) renderCharts();
-  showToast(previous ? '기존 경력이 수정되었습니다' : '기존 경력이 저장되었습니다');
+  const entry = { ...result.entry, id: previous?.id || activeCareerDraftId || uid(), createdAt: previous?.createdAt || now, updatedAt: now };
+  const saveButton = document.getElementById('careerSaveButton');
+  savingCareerEntry = true;
+  if (saveButton) { saveButton.disabled = true; saveButton.textContent = '저장 중...'; }
+  try {
+    if (stagedCareerAttachmentFiles.length) {
+      if (!attachmentOwnerId() || !window.PilotLogbookLocalFiles) throw new Error('로그인 정보 또는 첨부파일 저장 기능을 확인할 수 없습니다.');
+      await window.PilotLogbookLocalFiles.addFiles(attachmentOwnerId(), entry.id, stagedCareerAttachmentFiles);
+      markBackupNeeded();
+    }
+    if (previous) careerEntries[careerEntries.findIndex(item => item.id === previous.id)] = entry;
+    else careerEntries.push(entry);
+    saveData(true);
+    closeCareerModal(true);
+    renderCareerEntries();
+    updateStats();
+    if (document.getElementById('tab-charts').classList.contains('active')) renderCharts();
+    showToast(previous ? '기존 경력이 수정되었습니다' : '기존 경력이 저장되었습니다');
+  } catch (error) {
+    showToast(error?.message || '기존 경력을 저장하지 못했습니다', 3500);
+  } finally {
+    savingCareerEntry = false;
+    if (saveButton) { saveButton.disabled = false; saveButton.textContent = '경력 저장'; }
+  }
 }
 
 async function deleteCareerEntry(entryId) {

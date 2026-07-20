@@ -22,7 +22,8 @@
     },
     "StatusBar": {
       "style": "Dark",
-      "backgroundColor": "#0a1440"
+      "backgroundColor": "#0a1440",
+      "overlaysWebView": true
     },
     "GoogleAuth": {
       "serverClientId": "824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com"

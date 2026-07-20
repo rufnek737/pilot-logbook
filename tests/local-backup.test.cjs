@@ -60,10 +60,14 @@ test('app keeps evidence files out of Firestore and exposes device backup guidan
   assert.match(html, /<script src="pilot-backup\.js"><\/script>/);
   assert.match(html, /이 기기에만 저장/);
   assert.match(html, /휴대폰 이동용 전체 백업/);
+  assert.match(html, /id="careerModalAttachmentList"/);
+  assert.match(html, /selectCareerModalAttachment\(\)/);
+  assert.match(html, /경력 저장 시 보관됩니다/);
   assert.match(html, /async function exportFullBackup/);
   assert.match(html, /async function restoreFullBackup/);
   assert.doesNotMatch(firestoreSave, /attachment|첨부/);
   assert.match(localSource, /indexedDB\.open/);
+  assert.match(localSource, /async function validateFiles/);
   assert.match(localSource, /record\.ownerId === owner/);
   assert.match(localSource, /storageKey: `\$\{owner\}:\$\{id\}`/);
   assert.doesNotMatch(localSource, /deleteObjectStore/);
@@ -76,4 +80,21 @@ test('FAQ and privacy policy explain local-only files and manual restore', () =>
   assert.match(faq, /경력 증빙 첨부파일은 클라우드 동기화 대상이 아니므로/);
   assert.match(privacy, /기존 경력 증빙 PDF·사진은 계정별로 구분된 기기 내부 저장소에만 보관/);
   assert.match(terms, /백업하지 않은 기기 전용 첨부파일은 운영자가 복구할 수 없습니다/);
+});
+
+test('native status bar height keeps the fixed header below the phone clock', () => {
+  const config = JSON.parse(fs.readFileSync(path.join(root, 'capacitor.config.json'), 'utf8'));
+  const html = fs.readFileSync(path.join(root, 'www/index.html'), 'utf8');
+  assert.equal(config.plugins.StatusBar.overlaysWebView, true);
+  assert.match(html, /StatusBar\?\.getInfo\(\)/);
+  assert.match(html, /--native-safe-top/);
+  assert.match(html, /--app-safe-top: max\(env\(safe-area-inset-top\), var\(--native-safe-top\)\)/);
+  assert.match(html, /body \{[\s\S]*?padding-top: var\(--app-safe-top\)/);
+  assert.match(html, /\.header \{[^}]*position: fixed;[^}]*top: var\(--app-safe-top\)/);
+  assert.match(html, /class="status-bar-background"/);
+  assert.match(html, /class="header-spacer"/);
+  assert.match(html, /--app-header-height/);
+  assert.match(html, /ResizeObserver\(update\)\.observe\(header\)/);
+  assert.doesNotMatch(html, /\.header \{[^}]*position: sticky/);
+  assert.doesNotMatch(html, /\.header \{[^}]*padding-top: calc\(16px \+ max/);
 });
