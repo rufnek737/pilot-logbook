@@ -60,17 +60,22 @@
 
   <details>
     <summary>비행기록은 어디에 저장되나요?</summary>
-    <div class="answer"><p>기기 내부 저장소와 로그인 계정의 Firebase Firestore에 저장됩니다. PDF·Excel 원본 파일은 기기에서 처리되며 원본 자체를 Pilot Logbook 서버에 보관하지 않습니다.</p></div>
+    <div class="answer"><p>비행기록과 기존 경력 수치는 기기 내부 저장소와 로그인 계정의 Firebase Firestore에 저장됩니다. 파싱을 위해 선택한 PDF·Excel·CSV 원본과 기존 경력에 첨부한 증빙 PDF·사진은 Pilot Logbook 서버에 업로드하지 않습니다. 경력 증빙 첨부파일은 선택한 휴대폰 안에만 저장됩니다.</p></div>
   </details>
 
   <details>
     <summary>기기를 변경하면 기록을 복원할 수 있나요?</summary>
-    <div class="answer"><p>동일한 계정으로 로그인하면 Firestore에 동기화된 비행기록을 불러올 수 있습니다. 동기화가 끝나기 전에 앱을 삭제하거나 로그아웃하지 않도록 저장 상태를 확인해 주세요.</p></div>
+    <div class="answer"><p>동일한 계정으로 로그인하면 Firestore에 동기화된 비행기록과 기존 경력 수치를 불러올 수 있습니다. 경력 증빙 첨부파일은 클라우드 동기화 대상이 아니므로 기존 휴대폰의 ‘출력 → 휴대폰 이동용 전체 백업 → 백업 만들기’에서 백업 파일을 파일 앱·iCloud Drive·Google Drive에 보관한 뒤 새 휴대폰에서 ‘백업 복원’을 실행해야 합니다.</p></div>
+  </details>
+
+  <details>
+    <summary>경력 증빙 첨부파일을 잃지 않으려면 어떻게 해야 하나요?</summary>
+    <div class="answer"><p>첨부파일은 선택한 기기에만 저장되며 서버에는 보관되지 않습니다. 앱 삭제, 휴대폰 초기화·분실·고장 전에 전체 백업 파일을 만들어 기기 밖의 안전한 위치에 보관해야 합니다. 백업하지 않은 기기 전용 첨부파일은 운영자가 복구할 수 없습니다.</p></div>
   </details>
 
   <details>
     <summary>회원 탈퇴 시 어떤 정보가 삭제되나요?</summary>
-    <div class="answer"><p>Firebase 로그인 계정, 클라우드 비행기록, 현재 기기의 로컬 비행기록이 삭제됩니다. 삭제 후에는 복구할 수 없으므로 필요한 기록을 먼저 인쇄하거나 PDF로 보관해야 합니다.</p></div>
+    <div class="answer"><p>Firebase 로그인 계정, 클라우드 비행기록, 현재 기기의 로컬 비행기록과 해당 계정의 경력 증빙 첨부파일이 삭제됩니다. 삭제 후에는 복구할 수 없으므로 필요한 기록과 첨부파일을 먼저 전체 백업으로 보관해야 합니다.</p></div>
   </details>
 
   <details>
@@ -85,7 +90,7 @@
 
   <div class="notice">CrewConnex는 제3자 서비스입니다. Pilot Logbook은 사용자가 제공한 로그인 정보로 일회성 조회를 수행하며 아이디와 비밀번호를 서비스 코드에 영구 저장하지 않습니다.</div>
 
-  <footer>시행일: 2026년 7월 17일 · 운영: Pilot Logbook · <a href="privacy.html">개인정보처리방침</a> · <a href="terms.html">이용약관</a></footer>
+  <footer>시행일: 2026년 7월 20일 · 운영: Pilot Logbook · <a href="privacy.html">개인정보처리방침</a> · <a href="terms.html">이용약관</a></footer>
 </main>
 </body>
 </html>

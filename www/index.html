@@ -23,6 +23,8 @@
   <script src="logten-export.js"></script>
   <script src="csv-import.js"></script>
   <script src="career-entries.js"></script>
+  <script src="local-files.js"></script>
+  <script src="pilot-backup.js"></script>
   <!-- Firebase v10 compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -718,6 +720,19 @@
     .career-entry-times { display:flex; flex-wrap:wrap; gap:5px 10px; margin-top:9px; font-size:11px; color:var(--text2); }
     .career-entry-actions { display:flex; gap:6px; margin-top:9px; }
     .career-entry-actions button { flex:1; border-radius:8px; padding:7px; font-size:11px; font-weight:700; cursor:pointer; }
+    .career-files { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+    .career-files-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:7px; }
+    .career-files-title { font-size:11px; font-weight:800; color:var(--text2); }
+    .local-only-badge { padding:3px 7px; border-radius:10px; background:rgba(245,158,11,.12); color:var(--warning); font-size:9px; font-weight:800; }
+    .career-file-row { display:flex; align-items:center; gap:7px; padding:7px 0; border-top:1px dashed var(--border); }
+    .career-file-info { min-width:0; flex:1; }
+    .career-file-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text1); font-size:11px; font-weight:650; }
+    .career-file-meta { color:var(--text3); font-size:9px; margin-top:2px; }
+    .career-file-row button { border:1px solid var(--border); border-radius:7px; padding:5px 7px; background:var(--surface2); color:var(--text2); font-size:10px; cursor:pointer; }
+    .career-attach-btn { width:100%; margin-top:7px; border:1px dashed var(--border); border-radius:8px; padding:7px; background:transparent; color:var(--accent); font-size:11px; font-weight:700; cursor:pointer; }
+    .backup-box { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+    .backup-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0; }
+    .backup-actions button { border-radius:10px; padding:11px 8px; font-size:12px; font-weight:750; cursor:pointer; }
     .bar-chart { display: flex; flex-direction: column; gap: 8px; }
     .bar-row {
       display: flex;
@@ -1783,6 +1798,8 @@
   </div>
 </div>
 
+<input type="file" id="careerAttachmentInput" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple hidden onchange="handleCareerAttachmentFiles(this.files)" />
+
 <!-- Print Modal -->
 <div class="modal-overlay" id="printModalOverlay" onclick="if(event.target===this)closePrintModal()">
   <div class="modal" style="max-height:80vh">
@@ -1794,6 +1811,18 @@
     <div class="modal-body">
       <button onclick="exportLogTenCsv()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:14px">📤 LogTen CSV 전체 내보내기</button>
       <div style="font-size:11px;color:var(--text3);line-height:1.55;margin:-6px 2px 14px">전체 비행기록을 UTF-8 CSV로 저장합니다. Mac용 LogTen에서는 File → Import from File → Flights를 사용하세요. iPhone/iPad만 사용하면 파일 앱에 저장한 뒤 LogTen 지원팀에 전달할 수 있습니다. Android에서는 공유 화면 또는 다운로드로 파일 앱·Drive 등에 저장한 뒤 Mac으로 옮기거나 LogTen 지원팀에 전달하세요. LogTen은 Android를 지원하지 않습니다. OUT/IN은 앱에 저장된 현지시간 기준입니다.</div>
+      <div class="backup-box">
+        <div style="font-size:12px;font-weight:800;color:var(--text1)">📦 휴대폰 이동용 전체 백업</div>
+        <div style="font-size:11px;color:var(--text3);line-height:1.55;margin-top:5px">비행기록·기존 경력·개인 메모와 기기에만 저장된 증빙 첨부파일을 하나의 백업 파일로 보관합니다. 새 휴대폰에서는 같은 계정으로 로그인한 뒤 이 파일을 복원하세요.</div>
+        <div class="backup-actions">
+          <button onclick="exportFullBackup()" style="background:var(--accent);border:1px solid var(--accent);color:#fff">백업 만들기</button>
+          <button onclick="document.getElementById('backupRestoreInput').click()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text1)">백업 복원</button>
+        </div>
+        <div id="backupStatus" style="font-size:10px;color:var(--text3);line-height:1.5">백업 기록 없음</div>
+        <div style="font-size:10px;color:var(--warning);line-height:1.5;margin-top:6px">첨부파일은 서버에 저장되지 않습니다. 앱 삭제·휴대폰 분실 전에 백업 파일을 파일 앱, iCloud Drive 또는 Google Drive에 보관하세요.</div>
+        <input type="file" id="backupRestoreInput" accept=".pilotlogbook-backup,.json,application/json" hidden onchange="restoreFullBackup(this.files && this.files[0]);this.value=''" />
+      </div>
+      <div style="height:14px"></div>
       <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">월별 인쇄 언어</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         <button id="printLangKo" onclick="setPrintLanguage('ko')" style="border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">한국어</button>
@@ -2301,6 +2330,14 @@ async function deleteAccountPermanently() {
     button.textContent = '로그인 계정 삭제 중...';
     await user.delete();
 
+    try {
+      if (window.PilotLogbookLocalFiles) await window.PilotLogbookLocalFiles.deleteForOwner(uid);
+      localStorage.removeItem(`pilotLogbookBackup:last:${uid}`);
+      localStorage.removeItem(`pilotLogbookBackup:dirty:${uid}`);
+    } catch (localError) {
+      console.warn('현재 기기 첨부파일 삭제 실패:', localError);
+    }
+
     flights = [];
     careerEntries = [];
     localStorage.removeItem(STORAGE_KEY);
@@ -2363,6 +2400,7 @@ function scheduleFirestoreSave(immediate = false) {
 function saveData(immediate = false) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
   try { localStorage.setItem(CAREER_STORAGE_KEY, JSON.stringify(careerEntries)); } catch(e) {}
+  markBackupNeeded();
   scheduleFirestoreSave(immediate);
 }
 
@@ -2717,6 +2755,12 @@ function getCareerTotals() {
     : { total:0, pic:0, sic:0, night:0, ifr:0, landings:0 };
 }
 
+let pendingCareerAttachmentId = '';
+
+function attachmentOwnerId() {
+  return currentUser?.uid || '';
+}
+
 function careerMonthLabel(value) {
   const match = /^(\d{4})-(\d{2})$/.exec(value || '');
   return match ? `${match[1]}.${match[2]}` : '—';
@@ -2746,11 +2790,99 @@ function renderCareerEntries() {
         <span>총 ${entry.total}</span><span>PIC ${entry.pic}</span><span>SIC ${entry.sic}</span><span>야간 ${entry.night}</span><span>계기 ${entry.ifr}</span><span>착륙 ${entry.landings}회</span>
       </div>
       ${entry.notes ? `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin-top:8px;white-space:pre-wrap">${escHtml(entry.notes)}</div>` : ''}
+      <div class="career-files">
+        <div class="career-files-head"><div class="career-files-title">증빙 첨부파일</div><span class="local-only-badge">이 기기에만 저장</span></div>
+        <div id="career-files-${entry.id}" style="font-size:10px;color:var(--text3)">파일을 확인하는 중...</div>
+        <button class="career-attach-btn" onclick="selectCareerAttachment('${entry.id}')">＋ PDF·사진 첨부</button>
+      </div>
       <div class="career-entry-actions">
         <button onclick="openCareerModal('${entry.id}')" style="background:rgba(59,130,246,.15);color:var(--accent);border:1px solid rgba(59,130,246,.3)">수정</button>
         <button onclick="deleteCareerEntry('${entry.id}')" style="background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.25)">삭제</button>
       </div>
     </div>`).join('');
+  careerEntries.forEach(entry => renderCareerAttachmentList(entry.id));
+}
+
+async function renderCareerAttachmentList(careerId) {
+  const initialHost = document.getElementById(`career-files-${careerId}`);
+  if (!initialHost || !window.PilotLogbookLocalFiles) return;
+  const ownerId = attachmentOwnerId();
+  if (!ownerId) { initialHost.textContent = '로그인 후 첨부파일을 사용할 수 있습니다.'; return; }
+  try {
+    const records = await window.PilotLogbookLocalFiles.listForCareer(ownerId, careerId);
+    const host = document.getElementById(`career-files-${careerId}`);
+    if (!host) return;
+    if (!records.length) { host.textContent = '첨부된 파일 없음 · 경력당 최대 3개'; return; }
+    host.innerHTML = records.map(record => `
+      <div class="career-file-row">
+        <div class="career-file-info">
+          <div class="career-file-name">${escHtml(record.name)}</div>
+          <div class="career-file-meta">${window.PilotLogbookLocalFiles.formatBytes(record.size)} · ${String(record.createdAt || '').slice(0,10)}</div>
+        </div>
+        <button onclick="openCareerAttachment('${record.id}')">열기</button>
+        <button onclick="deleteCareerAttachment('${careerId}','${record.id}')" style="color:var(--danger)">삭제</button>
+      </div>`).join('');
+  } catch (error) {
+    const host = document.getElementById(`career-files-${careerId}`);
+    if (host) host.textContent = '첨부파일을 불러오지 못했습니다.';
+  }
+}
+
+function selectCareerAttachment(careerId) {
+  if (!attachmentOwnerId()) { showToast('로그인 후 첨부파일을 저장할 수 있습니다'); return; }
+  pendingCareerAttachmentId = careerId;
+  const input = document.getElementById('careerAttachmentInput');
+  input.value = '';
+  input.click();
+}
+
+async function handleCareerAttachmentFiles(fileList) {
+  const careerId = pendingCareerAttachmentId;
+  pendingCareerAttachmentId = '';
+  if (!careerId || !fileList?.length || !window.PilotLogbookLocalFiles) return;
+  try {
+    const added = await window.PilotLogbookLocalFiles.addFiles(attachmentOwnerId(), careerId, fileList);
+    markBackupNeeded();
+    await renderCareerAttachmentList(careerId);
+    showToast(`${added.length}개 파일을 이 기기에 저장했습니다`);
+  } catch (error) {
+    showToast(error?.message || '첨부파일을 저장하지 못했습니다', 3500);
+  }
+}
+
+async function openCareerAttachment(attachmentId) {
+  if (!window.PilotLogbookLocalFiles) return;
+  try {
+    const record = await window.PilotLogbookLocalFiles.getFile(attachmentOwnerId(), attachmentId);
+    if (!record) { showToast('첨부파일을 찾을 수 없습니다'); return; }
+    const file = new File([record.blob], record.name, { type: record.type });
+    const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform());
+    if (isNative && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) {
+    if (error?.name !== 'AbortError') showToast('첨부파일을 열지 못했습니다');
+  }
+}
+
+async function deleteCareerAttachment(careerId, attachmentId) {
+  if (!confirm('이 기기에서 첨부파일을 삭제할까요?')) return;
+  try {
+    await window.PilotLogbookLocalFiles.deleteFile(attachmentOwnerId(), attachmentId);
+    markBackupNeeded();
+    await renderCareerAttachmentList(careerId);
+    showToast('첨부파일이 삭제되었습니다');
+  } catch (_) {
+    showToast('첨부파일을 삭제하지 못했습니다');
+  }
 }
 
 function openCareerModal(entryId = '') {
@@ -2809,9 +2941,17 @@ function saveCareerEntry() {
   showToast(previous ? '기존 경력이 수정되었습니다' : '기존 경력이 저장되었습니다');
 }
 
-function deleteCareerEntry(entryId) {
+async function deleteCareerEntry(entryId) {
   const entry = careerEntries.find(item => item.id === entryId);
-  if (!entry || !confirm(`${entry.airline} · ${entry.aircraftType} 기존 경력을 삭제할까요?`)) return;
+  if (!entry || !confirm(`${entry.airline} · ${entry.aircraftType} 기존 경력과 이 기기의 첨부파일을 삭제할까요?`)) return;
+  try {
+    if (window.PilotLogbookLocalFiles && attachmentOwnerId()) {
+      await window.PilotLogbookLocalFiles.deleteForCareer(attachmentOwnerId(), entryId);
+    }
+  } catch (_) {
+    showToast('첨부파일을 삭제하지 못해 경력 삭제를 중단했습니다');
+    return;
+  }
   careerEntries = careerEntries.filter(item => item.id !== entryId);
   saveData(true);
   renderCareerEntries();
@@ -2897,8 +3037,8 @@ function setPrintLanguage(language) {
 }
 
 function openPrintModal() {
-  if (!flights.length) { showToast('비행 기록이 없습니다'); return; }
   renderPrintMonthList();
+  renderBackupStatus();
   document.getElementById('printModalOverlay').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
@@ -2937,6 +3077,130 @@ async function exportLogTenCsv() {
   } catch (error) {
     if (error && error.name === 'AbortError') return;
     showToast('LogTen CSV 내보내기에 실패했습니다');
+  }
+}
+
+function backupStateKey(kind) {
+  const ownerId = attachmentOwnerId();
+  return ownerId ? `pilotLogbookBackup:${kind}:${ownerId}` : '';
+}
+
+function markBackupNeeded() {
+  const key = backupStateKey('dirty');
+  if (!key) return;
+  try { localStorage.setItem(key, '1'); } catch (_) {}
+  const status = document.getElementById('backupStatus');
+  if (status && document.getElementById('printModalOverlay')?.classList.contains('show')) renderBackupStatus();
+}
+
+async function renderBackupStatus() {
+  const status = document.getElementById('backupStatus');
+  if (!status) return;
+  status.style.color = 'var(--text3)';
+  const ownerId = attachmentOwnerId();
+  if (!ownerId) { status.textContent = '로그인 후 백업을 만들 수 있습니다.'; return; }
+  const lastKey = backupStateKey('last');
+  const dirtyKey = backupStateKey('dirty');
+  const last = localStorage.getItem(lastKey);
+  const dirty = localStorage.getItem(dirtyKey) === '1';
+  let fileSummary = '';
+  try {
+    const localFiles = await window.PilotLogbookLocalFiles.listForOwner(ownerId);
+    const bytes = localFiles.reduce((sum, record) => sum + (Number(record.size) || 0), 0);
+    fileSummary = ` · 첨부 ${localFiles.length}개 ${window.PilotLogbookLocalFiles.formatBytes(bytes)}`;
+  } catch (_) {}
+  if (!last) {
+    status.textContent = `백업 기록 없음${fileSummary}`;
+    return;
+  }
+  const label = new Date(last).toLocaleString('ko-KR', { year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  status.textContent = `마지막 백업 ${label}${fileSummary}${dirty ? ' · 이후 변경사항 있음' : ''}`;
+  status.style.color = dirty ? 'var(--warning)' : 'var(--text3)';
+}
+
+async function exportFullBackup() {
+  if (!currentUser || !window.PilotLogbookLocalFiles || !window.PilotLogbookBackup) {
+    showToast('로그인 또는 백업 기능을 확인해 주세요');
+    return;
+  }
+  try {
+    showToast('전체 백업을 준비하고 있습니다', 5000);
+    const allowedCareerIds = careerEntries.map(entry => entry.id);
+    const attachments = await window.PilotLogbookLocalFiles.exportForOwner(currentUser.uid, allowedCareerIds);
+    if (!flights.length && !careerEntries.length && !attachments.length) { showToast('백업할 기록이 없습니다'); return; }
+    const exportedAt = new Date().toISOString();
+    const payload = window.PilotLogbookBackup.buildPayload({ flights, careerEntries, attachments, exportedAt });
+    const fileName = `Pilot_Logbook_Backup_${exportedAt.slice(0,10)}.pilotlogbook-backup`;
+    const file = new File([JSON.stringify(payload)], fileName, { type: 'application/json' });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Pilot Logbook 전체 백업' });
+    } else {
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    localStorage.setItem(backupStateKey('last'), exportedAt);
+    localStorage.removeItem(backupStateKey('dirty'));
+    await renderBackupStatus();
+    showToast('전체 백업 파일을 만들었습니다');
+  } catch (error) {
+    if (error?.name === 'AbortError') return;
+    console.error('전체 백업 실패:', error);
+    showToast(error?.message || '전체 백업을 만들지 못했습니다', 4000);
+  }
+}
+
+function normalizeBackupFlight(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('백업에 올바르지 않은 비행기록이 있습니다.');
+  const flight = JSON.parse(JSON.stringify(raw));
+  flight.id = String(flight.id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || uid();
+  const shortFields = ['date','flight','dep','arr','acType','reg','dutyCode','role','depTime','arrTime','total','night','ifr','toPf','ldgPf','ald'];
+  shortFields.forEach(key => {
+    if (flight[key] != null) flight[key] = String(flight[key]).replace(/[<>&"'`]/g, '').slice(0, 80);
+  });
+  ['crewInfo','remarks','personalMemo'].forEach(key => {
+    if (flight[key] != null) flight[key] = String(flight[key]).slice(0, 4000);
+  });
+  if (flight.date && !/^\d{4}-\d{2}-\d{2}$/.test(flight.date)) throw new Error('백업에 날짜 형식이 잘못된 비행기록이 있습니다.');
+  normalizeFlightTextFields(flight);
+  return flight;
+}
+
+async function restoreFullBackup(file) {
+  if (!file) return;
+  if (!currentUser || !window.PilotLogbookLocalFiles || !window.PilotLogbookBackup) { showToast('로그인 후 백업을 복원해 주세요'); return; }
+  if (file.size > 75 * 1024 * 1024) { showToast('백업 파일은 75MB 이하여야 합니다'); return; }
+  try {
+    showToast('백업 파일을 확인하고 있습니다', 5000);
+    const payload = window.PilotLogbookBackup.parse(await file.text());
+    const restoredCareers = window.PilotLogbookCareer.sanitizeEntries(payload.careerEntries);
+    if (restoredCareers.length !== payload.careerEntries.length) throw new Error('백업에 올바르지 않은 기존 경력 정보가 있습니다.');
+    const restoredFlights = payload.flights.map(normalizeBackupFlight);
+    const mergedFlights = window.PilotLogbookBackup.mergeFlights(flights, restoredFlights);
+    const mergedCareers = window.PilotLogbookBackup.mergeCareers(careerEntries, restoredCareers);
+    const message = `백업을 현재 기록과 합쳐 복원할까요?\n\n비행 ${restoredFlights.length}편 · 기존 경력 ${restoredCareers.length}건 · 첨부 ${payload.attachments.length}개\n같은 ID의 기록은 백업 내용으로 갱신되고 현재 기기에만 있던 다른 기록은 유지됩니다.`;
+    if (!confirm(message)) return;
+
+    const allowedCareerIds = mergedCareers.map(entry => entry.id);
+    await window.PilotLogbookLocalFiles.restoreForOwner(currentUser.uid, payload.attachments, allowedCareerIds);
+    flights = mergedFlights;
+    careerEntries = mergedCareers;
+    saveData(true);
+    renderFlights();
+    renderCareerEntries();
+    renderCharts();
+    await renderBackupStatus();
+    closePrintModal();
+    showToast(`백업을 복원했습니다 · 비행 ${restoredFlights.length}편 · 첨부 ${payload.attachments.length}개`, 4000);
+  } catch (error) {
+    console.error('전체 백업 복원 실패:', error);
+    showToast(error?.message || '백업을 복원하지 못했습니다', 4500);
   }
 }
 
