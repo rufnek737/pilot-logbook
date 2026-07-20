@@ -93,6 +93,15 @@
       -webkit-font-smoothing: antialiased;
       overscroll-behavior: none;
     }
+    html.modal-scroll-locked { overflow: hidden; overscroll-behavior: none; }
+    body.modal-scroll-locked {
+      position: fixed;
+      left: 0;
+      right: 0;
+      width: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
 
     /* ── Header ── */
     .header {
@@ -553,6 +562,7 @@
       -webkit-backdrop-filter: blur(8px);
       z-index: 200;
       align-items: flex-end;
+      overscroll-behavior: none;
     }
     .modal-overlay.show { display: flex; }
     .modal {
@@ -564,6 +574,9 @@
       padding: 0 0 env(safe-area-inset-bottom);
       max-height: 90vh;
       overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
       animation: slideUp 0.3s ease;
     }
     @keyframes slideUp {
@@ -1983,6 +1996,38 @@ let currentUser = null;
 let _unsubSnapshot = null;
 let _saveTimer = null;
 let _lastSavedAt = 0;  // 마지막 Firestore 저장 시각 (ms)
+let _lockedBodyScrollY = 0;
+let _isBodyScrollLocked = false;
+
+function hasOpenScrollLockSurface() {
+  const openModal = document.querySelector('.modal-overlay.show');
+  const printView = document.getElementById('printView');
+  return !!openModal || !!(printView && printView.style.display !== 'none');
+}
+
+function lockBodyScroll() {
+  if (_isBodyScrollLocked) return;
+  _lockedBodyScrollY = window.scrollY || window.pageYOffset || 0;
+  document.documentElement.classList.add('modal-scroll-locked');
+  document.body.classList.add('modal-scroll-locked');
+  document.body.style.top = `-${_lockedBodyScrollY}px`;
+  _isBodyScrollLocked = true;
+}
+
+function unlockBodyScroll() {
+  if (!_isBodyScrollLocked) return;
+  const restoreY = _lockedBodyScrollY;
+  document.documentElement.classList.remove('modal-scroll-locked');
+  document.body.classList.remove('modal-scroll-locked');
+  document.body.style.top = '';
+  _isBodyScrollLocked = false;
+  requestAnimationFrame(() => window.scrollTo(0, restoreY));
+}
+
+function syncBodyScrollLock() {
+  if (hasOpenScrollLockSurface()) lockBodyScroll();
+  else unlockBodyScroll();
+}
 
 // ── 인앱 브라우저 감지 ───────────────────────────────────────────
 const ua = navigator.userAgent.toLowerCase();
@@ -2162,30 +2207,26 @@ function openAccountMenu() {
   }
   resetDeleteAccountPanel();
   document.getElementById('accountModalOverlay').classList.add('show');
-  document.body.style.overflow = 'hidden';
+  syncBodyScrollLock();
 }
 
 function closeAccountMenu() {
   document.getElementById('accountModalOverlay').classList.remove('show');
   resetDeleteAccountPanel();
-  if (!document.getElementById('infoModalOverlay').classList.contains('show')) {
-    document.body.style.overflow = '';
-  }
+  syncBodyScrollLock();
 }
 
 function openInfoPage(path, title) {
   document.getElementById('infoModalTitle').textContent = title;
   document.getElementById('infoFrame').src = path;
   document.getElementById('infoModalOverlay').classList.add('show');
-  document.body.style.overflow = 'hidden';
+  syncBodyScrollLock();
 }
 
 function closeInfoPage() {
   document.getElementById('infoModalOverlay').classList.remove('show');
   document.getElementById('infoFrame').src = 'about:blank';
-  if (!document.getElementById('accountModalOverlay').classList.contains('show')) {
-    document.body.style.overflow = '';
-  }
+  syncBodyScrollLock();
 }
 
 function contactSupport() {
@@ -2633,7 +2674,7 @@ auth.onAuthStateChanged(user => {
     chip.style.display = 'none';
     document.getElementById('accountModalOverlay').classList.remove('show');
     document.getElementById('infoModalOverlay').classList.remove('show');
-    document.body.style.overflow = '';
+    syncBodyScrollLock();
     flights = [];
     careerEntries = [];
     localStorage.removeItem(STORAGE_KEY);
@@ -2901,13 +2942,13 @@ function openCareerModal(entryId = '') {
   document.getElementById('careerLandings').value = entry?.landings ?? '';
   document.getElementById('careerNotes').value = entry?.notes || '';
   document.getElementById('careerModalOverlay').classList.add('show');
-  document.body.style.overflow = 'hidden';
+  syncBodyScrollLock();
   setTimeout(() => document.getElementById('careerAirline').focus(), 50);
 }
 
 function closeCareerModal() {
   document.getElementById('careerModalOverlay').classList.remove('show');
-  document.body.style.overflow = '';
+  syncBodyScrollLock();
 }
 
 function saveCareerEntry() {
@@ -3040,12 +3081,12 @@ function openPrintModal() {
   renderPrintMonthList();
   renderBackupStatus();
   document.getElementById('printModalOverlay').classList.add('show');
-  document.body.style.overflow = 'hidden';
+  syncBodyScrollLock();
 }
 
 function closePrintModal() {
   document.getElementById('printModalOverlay').classList.remove('show');
-  document.body.style.overflow = '';
+  syncBodyScrollLock();
 }
 
 async function exportLogTenCsv() {
@@ -3299,13 +3340,11 @@ function printMonth(ym, language = printLanguage) {
   });
 
   pv.style.display = 'block';
-  document.body.style.overflow = 'hidden';
   closePrintModal();
 }
 
 function closePrintView() {
   document.getElementById('printView').style.display = 'none';
-  document.body.style.overflow = '';
   openPrintModal();
 }
 
@@ -4013,7 +4052,7 @@ function openModal(prefill) {
   }
 
   document.getElementById('modalOverlay').classList.add('show');
-  document.body.style.overflow = 'hidden';
+  syncBodyScrollLock();
 }
 
 function editEntry(id) {
@@ -4047,7 +4086,7 @@ function editEntry(id) {
   document.getElementById('fCrewInfo').value = getCrewInfo(f);
   document.getElementById('fPersonalMemo').value = getPersonalMemo(f);
   document.getElementById('modalOverlay').classList.add('show');
-  document.body.style.overflow = 'hidden';
+  syncBodyScrollLock();
 }
 
 function closeModal() {
@@ -4055,10 +4094,8 @@ function closeModal() {
   if (_ccOrigin) {
     _ccOrigin = false;
     document.getElementById('ccModalOverlay').classList.add('show');
-    document.body.style.overflow = 'hidden';
-  } else {
-    document.body.style.overflow = '';
   }
+  syncBodyScrollLock();
 }
 
 function closeModalOnOverlay(e) {
@@ -4677,20 +4714,12 @@ function openCrewConnex() {
   document.getElementById('ccResultWrap').style.display = 'none';
   document.getElementById('ccStatus').textContent = '';
   document.getElementById('ccModalOverlay').classList.add('show');
-  const scrollY = window.scrollY;
-  document.body.style.position = 'fixed';
-  document.body.style.top = `-${scrollY}px`;
-  document.body.style.width = '100%';
-  document.body.dataset.scrollY = scrollY;
+  syncBodyScrollLock();
 }
 
 function closeCrewConnex() {
   document.getElementById('ccModalOverlay').classList.remove('show');
-  const scrollY = parseInt(document.body.dataset.scrollY || '0');
-  document.body.style.position = '';
-  document.body.style.top = '';
-  document.body.style.width = '';
-  window.scrollTo(0, scrollY);
+  syncBodyScrollLock();
   // 닫을 때 로그인 폼 복원
   document.getElementById('ccPaneAuto').style.display = '';
   document.getElementById('ccResultWrap').style.display = 'none';

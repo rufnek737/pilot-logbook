@@ -4,7 +4,7 @@
   "description": "",
   "main": "DailyNewsBriefing_Final.js",
   "scripts": {
-    "test": "node --test workers/crewconnex.test.js tests/security-config.test.mjs tests/logten-export.test.cjs tests/csv-import.test.cjs tests/career-entries.test.cjs tests/local-backup.test.cjs"
+    "test": "node --test workers/crewconnex.test.js tests/security-config.test.mjs tests/logten-export.test.cjs tests/csv-import.test.cjs tests/career-entries.test.cjs tests/local-backup.test.cjs tests/modal-scroll-lock.test.cjs"
   },
   "repository": {
     "type": "git",
