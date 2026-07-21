@@ -25,6 +25,9 @@
       "backgroundColor": "#0a1440",
       "overlaysWebView": true
     },
+    "Keyboard": {
+      "resize": "none"
+    },
     "GoogleAuth": {
       "serverClientId": "824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com"
     }
