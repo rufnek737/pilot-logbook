@@ -1693,7 +1693,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">편명</label>
-          <input type="text" class="form-input" id="fFlight" placeholder="7C1001" style="text-transform:uppercase" />
+          <input type="text" class="form-input" id="fFlight" placeholder="7C1001" style="text-transform:uppercase" onblur="formatFlightInput(this)" />
         </div>
       </div>
 
@@ -1733,7 +1733,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">등록부호</label>
-          <input type="text" class="form-input" id="fReg" placeholder="HL8000" style="text-transform:uppercase" />
+          <input type="text" class="form-input" id="fReg" placeholder="HL8000" style="text-transform:uppercase" onblur="formatRegInput(this)" />
         </div>
       </div>
 
@@ -2894,6 +2894,20 @@ function parseHHMM(s) {
   const f = parseFloat(s);
   if (!isNaN(f)) return Math.round(f * 60);
   return 0;
+}
+
+// 편명 자동 포맷: 숫자만 입력 시 7C 자동 부착 (1202 → 7C1202)
+function formatFlightInput(el) {
+  const v = el.value.trim().toUpperCase();
+  if (/^\d{3,4}$/.test(v)) el.value = '7C' + v;
+  else el.value = v;
+}
+
+// 등록부호 자동 포맷: 숫자만 입력 시 HL 자동 부착 (8552 → HL8552)
+function formatRegInput(el) {
+  const v = el.value.trim().toUpperCase();
+  if (/^\d{4,5}$/.test(v)) el.value = 'HL' + v;
+  else el.value = v;
 }
 
 // 시간 입력 자동 포맷: 0050→00:50 / 150→1:50 / 050→0:50
