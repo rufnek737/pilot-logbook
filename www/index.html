@@ -25,6 +25,7 @@
   <script src="career-entries.js"></script>
   <script src="local-files.js"></script>
   <script src="pilot-backup.js"></script>
+  <script src="sim-records.js"></script>
   <!-- Firebase v10 compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -274,6 +275,10 @@
       letter-spacing: 0.5px;
       text-transform: uppercase;
     }
+    .stat-detail { margin-top:2px; font-size:9px; color:var(--text3); white-space:nowrap; }
+    .record-type-note { margin:-2px 0 12px; color:var(--text3); font-size:11px; line-height:1.5; }
+    .sim-approved-row { display:flex; align-items:flex-start; gap:9px; padding:11px 12px; border:1px solid var(--border); border-radius:9px; background:var(--surface2); color:var(--text2); font-size:12px; line-height:1.45; }
+    .sim-approved-row input { width:18px; height:18px; flex:0 0 auto; margin-top:1px; }
     .stat-card.accent .stat-value { color: var(--accent); }
     .stat-card.success .stat-value { color: var(--success); }
     .stat-card.warning .stat-value { color: var(--warning); }
@@ -1465,6 +1470,11 @@
     <div class="stat-card">
       <div class="stat-value" id="statLandings">0</div>
       <div class="stat-label">착륙</div>
+      <div class="stat-detail" id="statLandingBreakdown">실비행 0 · SIM 0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statSimHours">0:00</div>
+      <div class="stat-label">SIM 훈련</div>
     </div>
     <div class="stat-card">
       <div class="stat-value" id="statLast90">0:00</div>
@@ -1686,18 +1696,29 @@
     <div class="modal-body">
       <input type="hidden" id="editId" />
 
+      <div class="form-row single">
+        <div class="form-group">
+          <label class="form-label">기록 종류</label>
+          <select class="form-input" id="fRecordType" onchange="toggleRecordTypeFields()">
+            <option value="FLIGHT">실비행</option>
+            <option value="SIM">SIM 훈련</option>
+          </select>
+        </div>
+      </div>
+      <div class="record-type-note" id="recordTypeNote">실제 비행시간과 자격 통계에 반영됩니다.</div>
+
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">날짜</label>
           <input type="date" class="form-input" id="fDate" />
         </div>
-        <div class="form-group">
+        <div class="form-group flight-only">
           <label class="form-label">편명</label>
           <input type="text" class="form-input" id="fFlight" placeholder="7C1001" style="text-transform:uppercase" onblur="formatFlightInput(this)" />
         </div>
       </div>
 
-      <div class="form-row">
+      <div class="form-row flight-only">
         <div class="form-group">
           <label class="form-label">출발지 (ICAO/IATA)</label>
           <input type="text" class="form-input" id="fDep" placeholder="GMP" maxlength="4" style="text-transform:uppercase" />
@@ -1708,8 +1729,8 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
+      <div class="form-row flight-only">
+        <div class="form-group flight-only">
           <label class="form-label">출발시간 (Local)</label>
           <input type="text" class="form-input" id="fDepTime" placeholder="1630" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this); autoCalcTotal()" />
         </div>
@@ -1731,30 +1752,55 @@
             <option value="OTHER">기타</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group flight-only">
           <label class="form-label">등록부호</label>
           <input type="text" class="form-input" id="fReg" placeholder="HL8000" style="text-transform:uppercase" onblur="formatRegInput(this)" />
         </div>
       </div>
 
-      <div class="form-section-title">비행 시간</div>
+      <div class="form-section-title" id="timeSectionTitle">비행 시간</div>
 
       <div class="form-row triple">
         <div class="form-group">
-          <label class="form-label">총 비행 (h:mm)</label>
+          <label class="form-label" id="totalTimeLabel">총 비행 (h:mm)</label>
           <input type="text" class="form-input" id="fTotal" placeholder="130" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this)" />
         </div>
-        <div class="form-group">
+        <div class="form-group flight-only">
           <label class="form-label">야간 (h:mm)</label>
           <input type="text" class="form-input" id="fNight" placeholder="050" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this)" />
         </div>
-        <div class="form-group">
+        <div class="form-group flight-only">
           <label class="form-label">계기 (h:mm)</label>
           <input type="text" class="form-input" id="fIfr" placeholder="050" inputmode="numeric" maxlength="5" onblur="formatTimeInput(this)" />
         </div>
       </div>
 
-      <div class="form-row">
+      <div class="form-section-title sim-only" style="display:none">SIM 훈련 정보</div>
+      <div class="form-row sim-only" style="display:none">
+        <div class="form-group">
+          <label class="form-label">장비 구분</label>
+          <select class="form-input" id="fSimDevice">
+            <option value="FFS">FFS</option><option value="FTD">FTD</option><option value="OTHER">기타</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">훈련 종류</label>
+          <select class="form-input" id="fSimTraining">
+            <option value="LPC">LPC</option><option value="OPC">OPC</option><option value="LOFT">LOFT</option><option value="RECURRENT">정기훈련</option><option value="OTHER">기타</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row triple sim-only" style="display:none">
+        <div class="form-group"><label class="form-label">이륙 횟수</label><input type="number" class="form-input" id="fSimTakeoffs" min="0" step="1" value="0" /></div>
+        <div class="form-group"><label class="form-label">주간 착륙</label><input type="number" class="form-input" id="fSimDayLandings" min="0" step="1" value="0" /></div>
+        <div class="form-group"><label class="form-label">야간 착륙</label><input type="number" class="form-input" id="fSimNightLandings" min="0" step="1" value="0" /></div>
+      </div>
+      <label class="sim-approved-row sim-only" style="display:none">
+        <input type="checkbox" id="fSimApproved" />
+        <span><b>자격 인정 가능 SIM</b><br>승인된 훈련장비의 착륙으로 확인된 경우에만 선택하세요.</span>
+      </label>
+
+      <div class="form-row flight-only">
         <div class="form-group">
           <label class="form-label">역할 (Fallback)</label>
           <select class="form-input" id="fRole">
@@ -1774,7 +1820,7 @@
         </div>
       </div>
 
-      <div class="form-row">
+      <div class="form-row flight-only">
         <div class="form-group">
           <label class="form-label">Duty Code</label>
           <select class="form-input" id="fDutyCode">
@@ -1812,7 +1858,7 @@
         </div>
       </div>
 
-      <div class="form-row single">
+      <div class="form-row single flight-only">
         <div class="form-group">
           <label class="form-label">착륙 (LDG)</label>
           <select class="form-input" id="fLdgPf">
@@ -1823,8 +1869,8 @@
         </div>
       </div>
 
-      <div class="form-section-title">편조</div>
-      <div class="form-row single">
+      <div class="form-section-title flight-only">편조</div>
+      <div class="form-row single flight-only">
         <div class="form-group">
           <input type="text" class="form-input" id="fCrewInfo" placeholder="CrewConnex에서 자동으로 가져온 편조" />
         </div>
@@ -1914,7 +1960,7 @@
     </div>
     <div class="modal-body">
       <button onclick="exportLogTenCsv()" style="width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:14px">📤 LogTen CSV 전체 내보내기</button>
-      <div style="font-size:11px;color:var(--text3);line-height:1.55;margin:-6px 2px 14px">전체 비행기록을 UTF-8 CSV로 저장합니다. Mac용 LogTen에서는 File → Import from File → Flights를 사용하세요. iPhone/iPad만 사용하면 파일 앱에 저장한 뒤 LogTen 지원팀에 전달할 수 있습니다. Android에서는 공유 화면 또는 다운로드로 파일 앱·Drive 등에 저장한 뒤 Mac으로 옮기거나 LogTen 지원팀에 전달하세요. LogTen은 Android를 지원하지 않습니다. OUT/IN은 앱에 저장된 현지시간 기준입니다.</div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.55;margin:-6px 2px 14px">실비행 기록을 UTF-8 CSV로 저장하며 SIM 훈련은 포함하지 않습니다. Mac용 LogTen에서는 File → Import from File → Flights를 사용하세요. iPhone/iPad만 사용하면 파일 앱에 저장한 뒤 LogTen 지원팀에 전달할 수 있습니다. Android에서는 공유 화면 또는 다운로드로 파일 앱·Drive 등에 저장한 뒤 Mac으로 옮기거나 LogTen 지원팀에 전달하세요. LogTen은 Android를 지원하지 않습니다. OUT/IN은 앱에 저장된 현지시간 기준입니다.</div>
       <div class="backup-box">
         <div style="font-size:12px;font-weight:800;color:var(--text1)">📦 휴대폰 이동용 전체 백업</div>
         <div style="font-size:11px;color:var(--text3);line-height:1.55;margin-top:5px">비행기록·기존 경력·개인 메모와 기기에만 저장된 증빙 첨부파일을 하나의 백업 파일로 보관합니다. 새 휴대폰에서는 같은 계정으로 로그인한 뒤 이 파일을 복원하세요.</div>
@@ -3270,7 +3316,7 @@ function calcRangeSum() {
   const from = document.getElementById('rangeFrom').value;
   const to   = document.getElementById('rangeTo').value;
   if (!from || !to) { showToast('날짜를 선택해주세요'); return; }
-  const sel = flights.filter(f => f.date >= from && f.date <= to);
+  const sel = flights.filter(f => f.date >= from && f.date <= to && !window.PilotLogbookSim.isSim(f));
   if (!sel.length) { showToast('해당 기간에 비행이 없습니다'); return; }
   let total = 0, night = 0, ifr = 0, pic = 0, sic = 0;
   sel.forEach(f => {
@@ -3345,7 +3391,9 @@ async function exportLogTenCsv() {
   if (!window.PilotLogbookExport) { showToast('내보내기 기능을 불러오지 못했습니다'); return; }
 
   try {
-    const csv = window.PilotLogbookExport.buildLogTenCsv(flights, {
+    const exportFlights = flights.filter(f => !window.PilotLogbookSim.isSim(f));
+    if (!exportFlights.length) { showToast('내보낼 실비행 기록이 없습니다'); return; }
+    const csv = window.PilotLogbookExport.buildLogTenCsv(exportFlights, {
       calculateCredits: calcCreditedTime,
     });
     const fileName = `Pilot_Logbook_LogTen_${new Date().toISOString().slice(0,10)}.csv`;
@@ -3452,13 +3500,15 @@ function normalizeBackupFlight(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('백업에 올바르지 않은 비행기록이 있습니다.');
   const flight = JSON.parse(JSON.stringify(raw));
   flight.id = String(flight.id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || uid();
-  const shortFields = ['date','flight','dep','arr','acType','reg','dutyCode','role','depTime','arrTime','total','night','ifr','toPf','ldgPf','ald'];
+  const shortFields = ['date','flight','dep','arr','acType','reg','dutyCode','role','recordType','depTime','arrTime','total','night','ifr','toPf','ldgPf','ald','simDevice','simTraining'];
   shortFields.forEach(key => {
     if (flight[key] != null) flight[key] = String(flight[key]).replace(/[<>&"'`]/g, '').slice(0, 80);
   });
   ['crewInfo','remarks','personalMemo'].forEach(key => {
     if (flight[key] != null) flight[key] = String(flight[key]).slice(0, 4000);
   });
+  ['simTakeoffs','simDayLandings','simNightLandings'].forEach(key => { flight[key] = window.PilotLogbookSim.count(flight[key]); });
+  flight.simApproved = flight.simApproved === true;
   if (flight.date && !/^\d{4}-\d{2}-\d{2}$/.test(flight.date)) throw new Error('백업에 날짜 형식이 잘못된 비행기록이 있습니다.');
   normalizeFlightTextFields(flight);
   return flight;
@@ -3502,31 +3552,38 @@ function printMonth(ym, language = printLanguage) {
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const label = isEnglish ? `${monthNames[parseInt(mo)-1]} ${y}` : `${y}년 ${parseInt(mo)}월`;
   const sel = flights.filter(f => f.date.startsWith(ym)).sort((a,b) => a.date.localeCompare(b.date));
-  let total=0, night=0, ifr=0, to=0, ldg=0;
+  let total=0, simTotal=0, night=0, ifr=0, to=0, actualLdg=0, simLdg=0, sectors=0;
   sel.forEach(f => {
+    if (window.PilotLogbookSim.isSim(f)) {
+      simTotal += parseHHMM(f.total);
+      to += window.PilotLogbookSim.count(f.simTakeoffs);
+      simLdg += window.PilotLogbookSim.simLandingCount(f);
+      return;
+    }
+    sectors++;
     total += f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
     night += parseHHMM(f.night);
     ifr   += parseHHMM(f.ifr);
     to  += (f.toPf !== undefined ? f.toPf === 'PF' : (parseInt(f.takeoffs||f.toCnt||0)>0)) ? 1 : 0;
-    ldg += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||0)>0)) ? 1 : 0;
+    actualLdg += window.PilotLogbookSim.actualLandingCount(f);
   });
   const rows = sel.map((f,i) => `
     <tr>
       <td>${i+1}</td>
       <td>${f.date}</td>
-      <td>${f.flight||''}</td>
-      <td>${f.dep||''}</td>
-      <td>${f.arr||''}</td>
+      <td>${window.PilotLogbookSim.isSim(f) ? `SIM ${f.simTraining||''}` : (f.flight||'')}</td>
+      <td>${window.PilotLogbookSim.isSim(f) ? (f.simDevice||'SIM') : (f.dep||'')}</td>
+      <td>${window.PilotLogbookSim.isSim(f) ? 'SIM' : (f.arr||'')}</td>
       <td>${f.depTime||''}</td>
       <td>${f.arrTime||''}</td>
       <td>${f.acType||''}</td>
       <td>${f.reg||''}</td>
-      <td>${f.dutyCode||''}</td>
+      <td>${window.PilotLogbookSim.isSim(f) ? 'SIM' : (f.dutyCode||'')}</td>
       <td style="font-weight:600">${f.total || toHHMM(calcDuration(f.depTime,f.arrTime))}</td>
       <td>${f.night||''}</td>
       <td>${f.ifr||''}</td>
-      <td>${f.toPf !== undefined ? (f.toPf==='PF'?1:0) : (parseInt(f.takeoffs||f.toCnt||1)>0?1:0)}</td>
-      <td>${f.ldgPf !== undefined ? (f.ldgPf==='PF'?1:0) : (parseInt(f.landings||f.ldCnt||1)>0?1:0)}</td>
+      <td>${window.PilotLogbookSim.isSim(f) ? window.PilotLogbookSim.count(f.simTakeoffs) : (f.toPf !== undefined ? (f.toPf==='PF'?1:0) : (parseInt(f.takeoffs||f.toCnt||1)>0?1:0))}</td>
+      <td>${window.PilotLogbookSim.recordLandingCount(f)}</td>
     </tr>`).join('');
 
   const printDate = new Date().toLocaleDateString(isEnglish ? 'en-GB' : 'ko-KR', {
@@ -3570,12 +3627,13 @@ function printMonth(ym, language = printLanguage) {
       <tbody>${rows}</tbody>
     </table>
     <div id="pv-summary">
-      <div>${labels.sectors}: <b>${sel.length}</b></div>
+      <div>${labels.sectors}: <b>${sectors}</b></div>
       <div>${labels.total}: <b>${toHHMM(total)}</b></div>
+      <div>SIM: <b>${toHHMM(simTotal)}</b></div>
       <div>${labels.night}: <b>${toHHMM(night)}</b></div>
       <div>${labels.instrument}: <b>${toHHMM(ifr)}</b></div>
       <div>T/O: <b>${to}</b></div>
-      <div>LDG: <b>${ldg}</b></div>
+      <div>LDG: <b>${actualLdg + simLdg}</b> (${isEnglish?'Actual':'실비행'} ${actualLdg} · SIM ${simLdg})</div>
     </div>`;
 
   // Attach button handlers after innerHTML is set
@@ -3868,20 +3926,20 @@ function dutyCodeBadgeClass(dc) {
 
 function flightCard(f) {
   const isNight = parseHHMM(f.night) > 0;
-  const isSim   = f.role === 'SIM';
+  const isSim   = window.PilotLogbookSim.isSim(f);
   const crewInfo = getCrewInfo(f);
   const personalMemo = getPersonalMemo(f);
 
   // 배지: duty code 우선, 없으면 role
   const dc = f.dutyCode || '';
-  const dcLabel = dc || f.role || 'SIC';
-  const dcClass = dc ? dutyCodeBadgeClass(dc) : (f.role === 'PIC' || f.role === 'INST' ? 'badge-pic' : 'badge-sic');
+  const dcLabel = isSim ? 'SIM' : (dc || f.role || 'SIC');
+  const dcClass = isSim ? 'badge-sim' : (dc ? dutyCodeBadgeClass(dc) : (f.role === 'PIC' || f.role === 'INST' ? 'badge-pic' : 'badge-sic'));
   const dcBadge = `<span class="badge ${dcClass}">${dcLabel}</span>`;
   const nightBadge = isNight ? `<span class="badge badge-night">야간</span>` : '';
   const aldBadge   = f.ald === 'Y' ? `<span class="badge badge-ald">ALD</span>` : '';
 
   const duration = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
-  const cr = calcCreditedTime(f);
+  const cr = isSim ? { pic:0, sic:0 } : calcCreditedTime(f);
   let creditLabel;
   if (cr.pic > 0 && cr.sic > 0) {
     // 3NC 등 PIC/SIC 분할: 둘 다 표시
@@ -3896,36 +3954,32 @@ function flightCard(f) {
     creditLabel = `<span style="color:var(--text3)">—</span>`;
   }
 
+  const simLandings = window.PilotLogbookSim.simLandingCount(f);
+  const actualLandings = window.PilotLogbookSim.actualLandingCount(f);
+  const takeoffs = isSim ? window.PilotLogbookSim.count(f.simTakeoffs) : (f.toPf !== undefined ? (f.toPf==='PF'?1:0) : (parseInt(f.takeoffs||f.toCnt||1)>0?1:0));
+  const routeMarkup = isSim ? `<div class="route-row" style="justify-content:center;text-align:center">
+      <div><div class="apt-code" style="font-size:18px">${escHtml(f.simDevice || 'SIM')} · ${escHtml(f.simTraining || '훈련')}</div>
+      <div class="apt-time">주간 착륙 ${window.PilotLogbookSim.count(f.simDayLandings)} · 야간 착륙 ${window.PilotLogbookSim.count(f.simNightLandings)}${f.simApproved ? ' · 자격 인정 표시' : ''}</div></div>
+    </div>` : `<div class="route-row">
+      <div class="apt"><div class="apt-code">${f.dep || '???'}</div><div class="apt-time">${f.depTime || '--:--'}</div></div>
+      <div class="route-line"><div class="route-dot"></div><div class="route-track"></div><div class="route-plane">✈</div><div class="route-track2"></div><div class="route-dot"></div></div>
+      <div class="apt"><div class="apt-code">${f.arr || '???'}</div><div class="apt-time">${f.arrTime || '--:--'}</div></div>
+    </div>`;
+
   return `<div class="flight-card ${isNight?'night':''} ${isSim?'sim':''}">
     <div class="card-top">
       <div>
         <div class="card-date">${f.date}</div>
-        <div class="card-flt">${f.flight || '—'}</div>
+        <div class="card-flt">${isSim ? escHtml(f.simTraining || 'SIM 훈련') : (f.flight || '—')}</div>
         <div class="card-ac">${f.acType || ''} ${f.reg ? '· '+f.reg : ''}</div>
       </div>
       <div class="card-badges">${dcBadge}${nightBadge}${aldBadge}</div>
     </div>
-    <div class="route-row">
-      <div class="apt">
-        <div class="apt-code">${f.dep || '???'}</div>
-        <div class="apt-time">${f.depTime || '--:--'}</div>
-      </div>
-      <div class="route-line">
-        <div class="route-dot"></div>
-        <div class="route-track"></div>
-        <div class="route-plane">✈</div>
-        <div class="route-track2"></div>
-        <div class="route-dot"></div>
-      </div>
-      <div class="apt">
-        <div class="apt-code">${f.arr || '???'}</div>
-        <div class="apt-time">${f.arrTime || '--:--'}</div>
-      </div>
-    </div>
+    ${routeMarkup}
     <div class="card-footer">
       <div class="card-stat">
         <div class="card-stat-val" style="color:var(--accent)">${toHHMM(duration)}</div>
-        <div class="card-stat-lbl">비행시간</div>
+        <div class="card-stat-lbl">${isSim ? 'SIM 시간' : '비행시간'}</div>
       </div>
       <div class="card-stat">
         <div class="card-stat-val">${creditLabel}</div>
@@ -3940,18 +3994,18 @@ function flightCard(f) {
         <div class="card-stat-lbl">계기</div>
       </div>
       <div class="card-stat">
-        <div class="card-stat-val" style="font-size:11px">${f.toPf !== undefined ? (f.toPf==='PF'?1:0) : (parseInt(f.takeoffs||f.toCnt||1)>0?1:0)}</div>
+        <div class="card-stat-val" style="font-size:11px">${takeoffs}</div>
         <div class="card-stat-lbl">T/O</div>
       </div>
       <div class="card-stat">
-        <div class="card-stat-val" style="font-size:11px">${f.ldgPf !== undefined ? (f.ldgPf==='PF'?1:0) : (parseInt(f.landings||f.ldCnt||1)>0?1:0)}</div>
+        <div class="card-stat-val" style="font-size:11px">${isSim ? simLandings : actualLandings}</div>
         <div class="card-stat-lbl">LDG</div>
       </div>
     </div>
-    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+    ${isSim ? '' : `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
       <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:5px">편조</div>
       <div style="font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap;word-break:break-word">${crewInfo ? escHtml(crewInfo) : '—'}</div>
-    </div>
+    </div>`}
     <div style="margin-top:10px">
       <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:5px">개인 메모</div>
       <textarea class="notes-ta" id="personal-memo-${f.id}" placeholder="개인 메모 (선택)" onblur="savePersonalMemo('${f.id}',this.value)">${escHtml(personalMemo)}</textarea>
@@ -3966,19 +4020,24 @@ function flightCard(f) {
 // ─── Stats ──────────────────────────────────────────────────────
 function updateStats() {
   const prior = getCareerTotals();
-  let total=prior.total, pic=prior.pic, sic=prior.sic, night=prior.night, ifr=prior.ifr, landings=prior.landings, ald=0;
+  let total=prior.total, pic=prior.pic, sic=prior.sic, night=prior.night, ifr=prior.ifr, actualLandings=prior.landings, simLandings=0, simMinutes=0, ald=0;
   const now = new Date();
   let last90 = 0;
 
   flights.forEach(f => {
     const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    if (window.PilotLogbookSim.isSim(f)) {
+      simMinutes += dur;
+      simLandings += window.PilotLogbookSim.simLandingCount(f);
+      return;
+    }
     total += dur;
     const cr = calcCreditedTime(f);
     pic += cr.pic;
     sic += cr.sic;
     night   += parseHHMM(f.night) || 0;
     ifr     += parseHHMM(f.ifr)   || 0;
-    landings += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||1)>0)) ? 1 : 0;
+    actualLandings += window.PilotLogbookSim.actualLandingCount(f);
     if (f.ald === 'Y') ald++;
 
     const fDate = new Date(f.date);
@@ -3991,11 +4050,17 @@ function updateStats() {
   document.getElementById('statSicHours').textContent   = toHHMM(sic);
   document.getElementById('statNightHours').textContent = toHHMM(night);
   document.getElementById('statIfrHours').textContent   = toHHMM(ifr);
-  document.getElementById('statLandings').textContent   = landings;
+  document.getElementById('statLandings').textContent   = actualLandings + simLandings;
+  document.getElementById('statLandingBreakdown').textContent = `실비행 ${actualLandings} · SIM ${simLandings}`;
+  document.getElementById('statSimHours').textContent = toHHMM(simMinutes);
   document.getElementById('statAld').textContent        = ald;
   document.getElementById('statLast90').textContent     = toHHMM(last90);
   const totalFlightsLabel = document.getElementById('totalFlightsLabel');
-  if (totalFlightsLabel) totalFlightsLabel.textContent = `${flights.length} 비행`;
+  if (totalFlightsLabel) {
+    const actualCount = flights.filter(f => !window.PilotLogbookSim.isSim(f)).length;
+    const simCount = flights.length - actualCount;
+    totalFlightsLabel.textContent = simCount ? `${actualCount} 비행 · SIM ${simCount}` : `${actualCount} 비행`;
+  }
 }
 
 // ─── Charts ─────────────────────────────────────────────────────
@@ -4043,23 +4108,30 @@ function renderChartSummary() {
   const el = document.getElementById('chartSummary');
   if (!el) return;
   const prior = chartYear === 'all' ? getCareerTotals() : { total:0, pic:0, sic:0, night:0, landings:0 };
-  let total=prior.total, pic=prior.pic, sic=prior.sic, night=prior.night, ldg=prior.landings;
+  let total=prior.total, pic=prior.pic, sic=prior.sic, night=prior.night, actualLdg=prior.landings, simLdg=0, simMinutes=0, actualCount=0;
   fs.forEach(f => {
     const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    if (window.PilotLogbookSim.isSim(f)) {
+      simMinutes += dur;
+      simLdg += window.PilotLogbookSim.simLandingCount(f);
+      return;
+    }
+    actualCount++;
     total += dur;
     const cr = calcCreditedTime(f);
     pic += cr.pic; sic += cr.sic;
     night += parseHHMM(f.night) || 0;
-    ldg += parseInt(f.landings) || 0;
+    actualLdg += window.PilotLogbookSim.actualLandingCount(f);
   });
   const label = chartYear === 'all' ? '전체' : chartYear + '년';
   el.innerHTML = [
-    { lbl: '비행편수', val: fs.length + '편', color: 'var(--text1)' },
+    { lbl: '비행편수', val: actualCount + '편', color: 'var(--text1)' },
     { lbl: '총 비행시간', val: toHHMM(total), color: 'var(--accent)' },
     { lbl: 'PIC', val: toHHMM(pic), color: '#3b82f6' },
     { lbl: 'SIC', val: toHHMM(sic), color: '#10b981' },
     { lbl: '야간', val: toHHMM(night), color: '#f59e0b' },
-    { lbl: '착륙', val: ldg + '회', color: 'var(--text2)' },
+    { lbl: 'SIM 훈련', val: toHHMM(simMinutes), color: 'var(--text2)' },
+    { lbl: '착륙', val: (actualLdg + simLdg) + '회', color: 'var(--text2)' },
   ].map(s => `<div>
     <div style="font-size:16px;font-weight:700;color:${s.color}">${s.val}</div>
     <div style="font-size:11px;color:var(--text3);margin-top:2px">${s.lbl}</div>
@@ -4068,7 +4140,7 @@ function renderChartSummary() {
 
 function renderMonthlyChart() {
   const el = document.getElementById('monthlyChart');
-  const fs = getChartFlights();
+  const fs = getChartFlights().filter(f => !window.PilotLogbookSim.isSim(f));
   if (!fs.length) { el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">데이터 없음</div>'; return; }
 
   const titleEl = document.getElementById('monthlyChartTitle');
@@ -4145,7 +4217,7 @@ function renderMonthlyChart() {
 }
 
 function renderDonut() {
-  const fs = getChartFlights();
+  const fs = getChartFlights().filter(f => !window.PilotLogbookSim.isSim(f));
   const prior = chartYear === 'all' ? getCareerTotals() : { pic:0, sic:0, night:0 };
   let pic=prior.pic, sic=prior.sic, night=prior.night;
   fs.forEach(f => {
@@ -4196,7 +4268,7 @@ function renderDonut() {
 
 function renderAirportChart() {
   const el = document.getElementById('airportChart');
-  const fs = getChartFlights();
+  const fs = getChartFlights().filter(f => !window.PilotLogbookSim.isSim(f));
   if (!fs.length) { el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">데이터 없음</div>'; return; }
 
   const map = {};
@@ -4227,6 +4299,7 @@ function renderCurrency() {
 
   const now = new Date();
   const sorted = [...flights].sort((a,b)=>b.date.localeCompare(a.date));
+  const actualSorted = sorted.filter(f => !window.PilotLogbookSim.isSim(f));
 
   // 최근 90일 집계
   let ldg90=0, ldg90Day=0, ldg90Night=0, ald90=0;
@@ -4235,9 +4308,24 @@ function renderCurrency() {
     const d = new Date(f.date);
     const diff = (now-d)/(1000*60*60*24);
     if (diff<=90) {
-      ldg90 += (f.ldgPf !== undefined ? f.ldgPf === 'PF' : (parseInt(f.landings||f.ldCnt||1)>0)) ? 1 : 0;
-      ldg90Day    += parseInt(f.dayLdg)   || 0;
-      ldg90Night  += parseInt(f.nightLdg) || 0;
+      if (window.PilotLogbookSim.isSim(f)) {
+        if (f.simApproved === true) {
+          const simDay = window.PilotLogbookSim.count(f.simDayLandings);
+          const simNight = window.PilotLogbookSim.count(f.simNightLandings);
+          ldg90 += simDay + simNight;
+          ldg90Day += simDay;
+          ldg90Night += simNight;
+        }
+        return;
+      }
+      ldg90 += window.PilotLogbookSim.actualLandingCount(f);
+      const detailedDay = window.PilotLogbookSim.count(f.dayLdg);
+      const detailedNight = window.PilotLogbookSim.count(f.nightLdg);
+      if (detailedDay + detailedNight > 0) {
+        ldg90Day += detailedDay; ldg90Night += detailedNight;
+      } else if (window.PilotLogbookSim.actualLandingCount(f) > 0) {
+        ldg90Day += 1;
+      }
       if (f.ald === 'Y') ald90++;
       const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
       hrs90 += dur;
@@ -4248,9 +4336,9 @@ function renderCurrency() {
   });
 
   // 최종 비행일
-  const lastFlight = sorted[0];
-  const lastDate = new Date(lastFlight.date);
-  const daysSince = Math.floor((now-lastDate)/(1000*60*60*24));
+  const lastFlight = actualSorted[0] || null;
+  const lastDate = lastFlight ? new Date(lastFlight.date) : null;
+  const daysSince = lastDate ? Math.floor((now-lastDate)/(1000*60*60*24)) : null;
 
   function card(icon, name, detail, status, cls) {
     return `<div class="currency-card">
@@ -4265,20 +4353,32 @@ function renderCurrency() {
 
   const ldgOk    = ldg90 >= 3;
   const hrsOk    = hrs90 >= 60;
-  const recencyOk = daysSince <= 90;
+  const recencyOk = daysSince !== null && daysSince <= 90;
   const ifrOk    = ifr90 >= 60;
   const aldOk    = ald90 >= 1;
 
   el.innerHTML =
-    card('🛬', '최근 90일 착륙 (3회)',      `최근 90일: ${ldg90}회 (주간 ${ldg90Day} / 야간 ${ldg90Night})`, ldgOk?'충족':'미달', ldgOk?'ok':'fail') +
+    card('🛬', '최근 90일 착륙 (3회)',      `최근 90일: ${ldg90}회 (승인 SIM 포함 · 주간 ${ldg90Day} / 야간 ${ldg90Night})`, ldgOk?'충족':'미달', ldgOk?'ok':'fail') +
     card('⏱', '최근 90일 비행시간',          `${toHHMM(hrs90)} (PIC ${toHHMM(pic90)} / SIC ${toHHMM(sic90)})`, hrsOk?'충족':'확인', hrsOk?'ok':'warn') +
-    card('📅', '최종 비행일',                 `${daysSince}일 전 (${lastFlight.date})`, recencyOk?'유효':'확인', recencyOk?'ok':'warn') +
+    card('📅', '최종 비행일',                 lastFlight ? `${daysSince}일 전 (${lastFlight.date})` : '실비행 기록 없음', recencyOk?'유효':'확인', recencyOk?'ok':'warn') +
     card('🌙', '야간 착륙',                   `최근 90일: ${ldg90Night}회 야간`, ldg90Night>=1?'충족':'미달', ldg90Night>=1?'ok':'warn') +
     card('📡', '계기비행 시간 (최근 90일)',    `${toHHMM(ifr90)} (기준 60:00)`, ifrOk?'충족':'확인', ifrOk?'ok':'warn') +
     card('🟣', '오토랜딩 (최근 90일)',         `${ald90}회`, aldOk?'충족':'없음', aldOk?'ok':'warn');
 }
 
 // ─── Modal ───────────────────────────────────────────────────────
+function toggleRecordTypeFields() {
+  const isSim = document.getElementById('fRecordType').value === 'SIM';
+  document.querySelectorAll('#modalOverlay .flight-only').forEach(el => { el.style.display = isSim ? 'none' : ''; });
+  document.querySelectorAll('#modalOverlay .sim-only').forEach(el => { el.style.display = isSim ? '' : 'none'; });
+  document.getElementById('modalTitle').textContent = editingId ? (isSim ? 'SIM 훈련 수정' : '비행 기록 수정') : (isSim ? 'SIM 훈련 입력' : '비행 기록 입력');
+  document.getElementById('timeSectionTitle').textContent = isSim ? 'SIM 시간' : '비행 시간';
+  document.getElementById('totalTimeLabel').textContent = isSim ? 'SIM 훈련 (h:mm)' : '총 비행 (h:mm)';
+  document.getElementById('recordTypeNote').textContent = isSim
+    ? 'SIM 시간은 실제 비행시간과 분리되며, 착륙은 실비행·SIM 내역으로 나누어 표시됩니다.'
+    : '실제 비행시간과 자격 통계에 반영됩니다.';
+}
+
 function openModal(prefill) {
   editingId = null;
   document.getElementById('modalTitle').textContent = '비행 기록 입력';
@@ -4295,6 +4395,13 @@ function openModal(prefill) {
   document.getElementById('fAld').value       = 'N';
   document.getElementById('fToPf').value   = 'PF';
   document.getElementById('fLdgPf').value   = 'PF';
+  document.getElementById('fRecordType').value = 'FLIGHT';
+  document.getElementById('fSimDevice').value = 'FFS';
+  document.getElementById('fSimTraining').value = 'LPC';
+  document.getElementById('fSimTakeoffs').value = '0';
+  document.getElementById('fSimDayLandings').value = '0';
+  document.getElementById('fSimNightLandings').value = '0';
+  document.getElementById('fSimApproved').checked = false;
 
   if (prefill) {
     Object.entries(prefill).forEach(([k,v]) => {
@@ -4302,6 +4409,8 @@ function openModal(prefill) {
       if (el && v !== undefined) el.value = v;
     });
   }
+
+  toggleRecordTypeFields();
 
   document.getElementById('modalOverlay').classList.add('show');
   syncBodyScrollLock();
@@ -4313,6 +4422,7 @@ function editEntry(id) {
   editingId = id;
   document.getElementById('modalTitle').textContent = '비행 기록 수정';
   document.getElementById('editId').value = id;
+  document.getElementById('fRecordType').value = window.PilotLogbookSim.isSim(f) ? 'SIM' : 'FLIGHT';
   document.getElementById('fDate').value = f.date || '';
   document.getElementById('fFlight').value = f.flight || '';
   document.getElementById('fDep').value = f.dep || '';
@@ -4337,6 +4447,13 @@ function editEntry(id) {
   document.getElementById('fLdgPf').value  = _ldgPf;
   document.getElementById('fCrewInfo').value = getCrewInfo(f);
   document.getElementById('fPersonalMemo').value = getPersonalMemo(f);
+  document.getElementById('fSimDevice').value = f.simDevice || 'FFS';
+  document.getElementById('fSimTraining').value = f.simTraining || 'LPC';
+  document.getElementById('fSimTakeoffs').value = window.PilotLogbookSim.count(f.simTakeoffs);
+  document.getElementById('fSimDayLandings').value = window.PilotLogbookSim.count(f.simDayLandings);
+  document.getElementById('fSimNightLandings').value = window.PilotLogbookSim.count(f.simNightLandings);
+  document.getElementById('fSimApproved').checked = f.simApproved === true;
+  toggleRecordTypeFields();
   document.getElementById('modalOverlay').classList.add('show');
   syncBodyScrollLock();
 }
@@ -4384,6 +4501,8 @@ document.addEventListener('keydown', function(e) {
 
 function saveEntry() {
   const date = document.getElementById('fDate').value;
+  const recordType = document.getElementById('fRecordType').value;
+  const isSim = recordType === 'SIM';
   const dep = document.getElementById('fDep').value.toUpperCase().trim();
   const arr = document.getElementById('fArr').value.toUpperCase().trim();
   if (!date) { showToast('날짜를 입력해 주세요'); return; }
@@ -4395,12 +4514,23 @@ function saveEntry() {
     total = toHHMM(calcDuration(depTime, arrTime));
   }
 
+  if (isSim) {
+    const error = window.PilotLogbookSim.validateInput({
+      date, total,
+      simTakeoffs: Number(document.getElementById('fSimTakeoffs').value),
+      simDayLandings: Number(document.getElementById('fSimDayLandings').value),
+      simNightLandings: Number(document.getElementById('fSimNightLandings').value),
+    });
+    if (error) { showToast(error); return; }
+  }
+
   const existingIdx = editingId ? flights.findIndex(x => x.id === editingId) : -1;
   const previous = existingIdx >= 0 ? flights[existingIdx] : null;
   const crewInfo = document.getElementById('fCrewInfo').value.trim();
   const entry = {
     ...(previous || {}),
     id: editingId || uid(),
+    recordType,
     date,
     flight: document.getElementById('fFlight').value.toUpperCase().trim(),
     dep, arr, depTime, arrTime,
@@ -4420,6 +4550,22 @@ function saveEntry() {
     remarks: crewInfo, // 구버전 호환용 편조 사본
   };
 
+  if (isSim) {
+    entry.flight = `SIM ${document.getElementById('fSimTraining').value}`;
+    entry.dep = ''; entry.arr = ''; entry.depTime = ''; entry.arrTime = ''; entry.reg = '';
+    entry.night = ''; entry.ifr = ''; entry.role = 'SIM'; entry.dutyCode = ''; entry.dutyCodeManual = false;
+    entry.ald = 'N'; entry.toPf = ''; entry.ldgPf = ''; entry.crewInfo = ''; entry.remarks = '';
+    entry.simDevice = document.getElementById('fSimDevice').value;
+    entry.simTraining = document.getElementById('fSimTraining').value;
+    entry.simTakeoffs = window.PilotLogbookSim.count(document.getElementById('fSimTakeoffs').value);
+    entry.simDayLandings = window.PilotLogbookSim.count(document.getElementById('fSimDayLandings').value);
+    entry.simNightLandings = window.PilotLogbookSim.count(document.getElementById('fSimNightLandings').value);
+    entry.simApproved = document.getElementById('fSimApproved').checked;
+  } else {
+    delete entry.simDevice; delete entry.simTraining; delete entry.simTakeoffs;
+    delete entry.simDayLandings; delete entry.simNightLandings; delete entry.simApproved;
+  }
+
   if (editingId) {
     if (existingIdx >= 0) flights[existingIdx] = entry;
   } else {
@@ -4432,7 +4578,7 @@ function saveEntry() {
   saveData();
   renderFlights();
   if (wasFromCrewConnex && _ccData) renderCcResults(_ccData);
-  showToast(wasEditing ? '수정되었습니다' : '비행 기록이 저장되었습니다 ✈');
+  showToast(wasEditing ? '수정되었습니다' : (isSim ? 'SIM 훈련이 저장되었습니다' : '비행 기록이 저장되었습니다 ✈'));
 }
 
 
