@@ -1477,6 +1477,10 @@
       <div class="stat-label">SIM 훈련</div>
     </div>
     <div class="stat-card">
+      <div class="stat-value" id="statTrainingHours">0:00</div>
+      <div class="stat-label">훈련시간</div>
+    </div>
+    <div class="stat-card">
       <div class="stat-value" id="statLast90">0:00</div>
       <div class="stat-label">최근 90일</div>
     </div>
@@ -3775,8 +3779,9 @@ function calcCreditedTime(f) {
       return { pic: 0, sic: Math.round(block / 2) };
     case '3F':
       return { pic: 0, sic: Math.round(block * 2 / 3) };
-    case 'R':
-      return { pic: 0, sic: 0, total: block };
+    case 'R': case 'S':
+      // SP.5.1: Route Trainee/Student — 비행경력시간 산정 대상 아님, 훈련시간으로 별도 집계
+      return { pic: 0, sic: 0 };
     case 'K': case 'Y': case 'O':
     case '2NC': case '2NF': case 'D': case 'EX': case 'M':
       return { pic: 0, sic: 0 };
@@ -3784,6 +3789,13 @@ function calcCreditedTime(f) {
       if (f.role === 'PIC' || f.role === 'INST') return { pic: block, sic: 0 };
       return { pic: 0, sic: block };
   }
+}
+
+// SP.5.1 기준 R(Route Trainee)/S(Student, Local FLT)만 "훈련시간"으로 집계
+// (O/K/Y/2NC/2NF/D/EX/M은 산정불가일 뿐 훈련이 아니므로 제외)
+function isTrainingDuty(f) {
+  const dc = (f.dutyCode || '').toUpperCase();
+  return dc === 'R' || dc === 'S';
 }
 
 function showToast(msg, duration = 2500) {
@@ -4111,6 +4123,7 @@ function flightCard(f) {
 function updateStats() {
   const prior = getCareerTotals();
   let total=prior.total, pic=prior.pic, sic=prior.sic, night=prior.night, ifr=prior.ifr, actualLandings=prior.landings, simLandings=0, simMinutes=0, ald=0;
+  let trainingMinutes = 0; // R/S(SP.5.1 훈련) 듀티 편 — 총 비행시간과 별도 집계
   const now = new Date();
   let last90 = 0;
 
@@ -4121,6 +4134,7 @@ function updateStats() {
       simLandings += window.PilotLogbookSim.simLandingCount(f);
       return;
     }
+    if (isTrainingDuty(f)) trainingMinutes += dur;
     const cr = calcCreditedTime(f);
     const credited = cr.pic + cr.sic; // 듀티코드 가중치 반영된 인정시간 (산정불가/분담 편 정확히 반영)
     total += credited;
@@ -4141,6 +4155,7 @@ function updateStats() {
   document.getElementById('statSicHours').textContent   = toHHMM(sic);
   document.getElementById('statNightHours').textContent = toHHMM(night);
   document.getElementById('statIfrHours').textContent   = toHHMM(ifr);
+  document.getElementById('statTrainingHours').textContent = toHHMM(trainingMinutes);
   document.getElementById('statLandings').textContent   = actualLandings + simLandings;
   document.getElementById('statLandingBreakdown').textContent = `실비행 ${actualLandings} · SIM ${simLandings}`;
   document.getElementById('statSimHours').textContent = toHHMM(simMinutes);
@@ -4200,6 +4215,7 @@ function renderChartSummary() {
   if (!el) return;
   const prior = chartYear === 'all' ? getCareerTotals() : { total:0, pic:0, sic:0, night:0, landings:0 };
   let total=prior.total, pic=prior.pic, sic=prior.sic, night=prior.night, actualLdg=prior.landings, simLdg=0, simMinutes=0, actualCount=0;
+  let trainingMinutes = 0; // R/S(SP.5.1 훈련) 듀티 편 — 총 비행시간과 별도 집계
   fs.forEach(f => {
     const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
     if (window.PilotLogbookSim.isSim(f)) {
@@ -4208,6 +4224,7 @@ function renderChartSummary() {
       return;
     }
     actualCount++;
+    if (isTrainingDuty(f)) trainingMinutes += dur;
     const cr = calcCreditedTime(f);
     total += cr.pic + cr.sic; // 듀티코드 가중치 반영된 인정시간
     pic += cr.pic; sic += cr.sic;
@@ -4221,6 +4238,7 @@ function renderChartSummary() {
     { lbl: 'PIC', val: toHHMM(pic), color: '#3b82f6' },
     { lbl: 'SIC', val: toHHMM(sic), color: '#10b981' },
     { lbl: '야간', val: toHHMM(night), color: '#f59e0b' },
+    { lbl: '훈련시간', val: toHHMM(trainingMinutes), color: 'var(--text2)' },
     { lbl: 'SIM 훈련', val: toHHMM(simMinutes), color: 'var(--text2)' },
     { lbl: '착륙', val: (actualLdg + simLdg) + '회', color: 'var(--text2)' },
   ].map(s => `<div>
