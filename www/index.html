@@ -1516,6 +1516,7 @@
         <button class="add-btn" style="background:rgba(16,58,100,0.6);border:1px solid rgba(59,130,246,0.35)" onclick="openCrewConnex()">🌐 CC</button>
         <button class="add-btn" style="background:rgba(30,80,30,0.6);border:1px solid rgba(34,197,94,0.35)" onclick="toggleRangePanel()">📊 합산</button>
         <button class="add-btn" style="background:rgba(80,40,10,0.6);border:1px solid rgba(251,146,60,0.35)" onclick="openPrintModal()">🖨 출력</button>
+        <button class="add-btn" style="background:rgba(90,20,20,0.6);border:1px solid rgba(239,68,68,0.35)" onclick="toggleAuditPanel()">⚠️ 점검</button>
         <button class="add-btn" onclick="openModal()">+ 입력</button>
       </div>
     </div>
@@ -1566,6 +1567,17 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- 이상 기록 점검 패널 -->
+    <div id="auditPanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;display:none">
+      <div style="font-size:12px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">⚠️ 이상 기록 점검</div>
+      <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:10px">
+        저장된 총 비행시간이 출발·도착시간으로 계산한 값과 크게 다르거나, 값이 없거나 비정상적으로 큰 기록을 찾아줍니다.
+        PDF 파싱 오류로 의심되는 기록만 골라서 보여주므로, 종이 로그와 이 목록만 대조하면 됩니다.
+      </div>
+      <button onclick="runFlightAudit()" style="background:var(--danger);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">검사하기</button>
+      <div id="auditResult" style="margin-top:12px"></div>
     </div>
 
     <div id="flightList">
@@ -2005,7 +2017,7 @@
         <button class="account-menu-button" onclick="openInfoPage('faq.html','자주 묻는 질문')"><span>❓</span><span>자주 묻는 질문</span><span class="account-arrow">›</span></button>
         <button class="account-menu-button" onclick="openInfoPage('privacy.html','개인정보처리방침')"><span>🛡️</span><span>개인정보처리방침</span><span class="account-arrow">›</span></button>
         <button class="account-menu-button" onclick="openInfoPage('terms.html','이용약관')"><span>📄</span><span>이용약관 및 무료·유료 정책</span><span class="account-arrow">›</span></button>
-        <button class="account-menu-button" onclick="contactSupport()"><span>✉️</span><span>문의하기</span><span style="margin-left:auto;color:var(--text3);font-size:11px">rufnek737@gmail.com</span></button>
+        <button class="account-menu-button" onclick="contactSupport()"><span>✉️</span><span>문의하기</span><span style="margin-left:auto;color:var(--text3);font-size:11px">info@rufnekcrew.com</span></button>
       </div>
 
       <div class="account-action-row">
@@ -2414,7 +2426,7 @@ function closeInfoPage() {
 }
 
 function contactSupport() {
-  window.location.href = 'mailto:rufnek737@gmail.com?subject=Pilot%20Logbook%20문의';
+  window.location.href = 'mailto:info@rufnekcrew.com?subject=Pilot%20Logbook%20문의';
 }
 
 async function signOutUser() {
@@ -3298,6 +3310,66 @@ async function deleteCareerEntry(entryId) {
   showToast('기존 경력이 삭제되었습니다');
 }
 
+// ── 이상 기록 점검 (PDF 파싱 오류 후보 탐지) ──────────────────────
+function toggleAuditPanel() {
+  const p = document.getElementById('auditPanel');
+  const isHidden = p.style.display === 'none' || p.style.display === '';
+  p.style.display = isHidden ? 'block' : 'none';
+}
+
+// 같은 시간대(국내선)에서만 출발·도착 로컬시간 기반 계산이 총 비행시간과 일치해야 함
+// 국제선은 시차 때문에 로컬시간 차이가 실제 블록타임과 원래 다르므로 비교 대상에서 제외
+const KOREA_DOMESTIC_APTS = new Set(['GMP','ICN','CJU','PUS','TAE','KWJ','RSU','USN','HIN','KUV','WJU','YNY','CJJ','MWX','KPO']);
+
+function findSuspiciousFlights() {
+  const TOLERANCE_MIN = 10; // 저장값과 계산값의 허용 오차(분)
+  const MAX_REASONABLE_MIN = 20 * 60; // 20시간 — 국제선 포함 전체 기준 (이보다 크면 명백한 오류)
+  const MAX_DOMESTIC_MIN = 4 * 60; // 4시간 — 국내선은 아무리 길어도 이 시간을 넘을 수 없음
+  const results = [];
+  flights.forEach(f => {
+    if (window.PilotLogbookSim.isSim(f)) return;
+    const stored = parseHHMM(f.total);
+    const reasons = [];
+    const dep = (f.dep || '').trim().toUpperCase();
+    const arr = (f.arr || '').trim().toUpperCase();
+    const isDomestic = KOREA_DOMESTIC_APTS.has(dep) && KOREA_DOMESTIC_APTS.has(arr);
+    if (!stored) {
+      reasons.push('총 비행시간이 없거나 0');
+    } else {
+      if (stored > MAX_REASONABLE_MIN) reasons.push(`총 비행시간이 비정상적으로 큼 (${toHHMM(stored)})`);
+      else if (isDomestic && stored > MAX_DOMESTIC_MIN) reasons.push(`국내선인데 총 비행시간이 너무 큼 (${toHHMM(stored)})`);
+      if (isDomestic && f.depTime && f.arrTime) {
+        const computed = calcDuration(f.depTime, f.arrTime);
+        const diff = Math.abs(computed - stored);
+        if (diff > TOLERANCE_MIN) {
+          reasons.push(`출발·도착시간 계산값(${toHHMM(computed)})과 ${diff}분 차이`);
+        }
+      }
+    }
+    if (reasons.length) results.push({ f, reasons });
+  });
+  return results.sort((a, b) => b.f.date.localeCompare(a.f.date));
+}
+
+function runFlightAudit() {
+  const host = document.getElementById('auditResult');
+  const found = findSuspiciousFlights();
+  if (!found.length) {
+    host.innerHTML = `<div style="text-align:center;padding:12px;color:var(--success);font-size:13px">✓ 이상 기록이 발견되지 않았습니다</div>`;
+    return;
+  }
+  host.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px">⚠️ ${found.length}건 발견</div>` +
+    found.map(({ f, reasons }) => `
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:700">${f.date} · ${f.flight || '—'}</span>
+          <button onclick="editEntry('${f.id}')" style="background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">수정</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">${f.dep || '???'} → ${f.arr || '???'} · 저장된 총 비행 ${f.total || '—'}</div>
+        <div style="font-size:11px;color:var(--danger);margin-top:4px">${reasons.join(' / ')}</div>
+      </div>`).join('');
+}
+
 // ── 기간 합산 ─────────────────────────────────────────────────────
 function toggleRangePanel() {
   const p = document.getElementById('rangePanel');
@@ -3320,11 +3392,10 @@ function calcRangeSum() {
   if (!sel.length) { showToast('해당 기간에 비행이 없습니다'); return; }
   let total = 0, night = 0, ifr = 0, pic = 0, sic = 0;
   sel.forEach(f => {
-    const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
-    total += dur;
     night += parseHHMM(f.night);
     ifr   += parseHHMM(f.ifr);
-    const cr = calcCreditedTime(f);
+    const cr = calcCreditedTime(f); // 듀티코드 가중치 반영된 인정시간
+    total += cr.pic + cr.sic;
     pic += cr.pic; sic += cr.sic;
   });
   document.getElementById('rsTotal').textContent = toHHMM(total);
@@ -3561,7 +3632,8 @@ function printMonth(ym, language = printLanguage) {
       return;
     }
     sectors++;
-    total += f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    const cr = calcCreditedTime(f); // 듀티코드 가중치 반영된 인정시간
+    total += cr.pic + cr.sic;
     night += parseHHMM(f.night);
     ifr   += parseHHMM(f.ifr);
     to  += (f.toPf !== undefined ? f.toPf === 'PF' : (parseInt(f.takeoffs||f.toCnt||0)>0)) ? 1 : 0;
@@ -3727,7 +3799,10 @@ function scrollToMonth(mo) {
   const sorted = [...flights].sort((a,b) => b.date.localeCompare(a.date));
   const keys = [...new Set(sorted.map(f => f.date.slice(0,7)))];
   const idx = keys.indexOf(mo);
-  if (idx >= 0) goMonthPage(idx);
+  if (idx < 0) { showToast('해당 월에 비행 기록이 없습니다'); return; }
+  const logbookBtn = document.querySelectorAll('.tab-btn')[0];
+  if (logbookBtn) switchTab('logbook', logbookBtn);
+  goMonthPage(idx);
 }
 
 function switchTab(name, btn) {
@@ -3842,9 +3917,24 @@ function renderFlights() {
     }).join('<span style="color:var(--border);padding:0 4px;flex-shrink:0">│</span>');
   }
 
+  // 이 달의 총 비행시간·PIC·SIC 합계 (SIM 교육 제외, 듀티코드 가중치 반영된 인정시간 기준)
+  let moTotal = 0, moPic = 0, moSic = 0;
+  curArr.forEach(f => {
+    if (window.PilotLogbookSim.isSim(f)) return;
+    const cr = calcCreditedTime(f);
+    moTotal += cr.pic + cr.sic;
+    moPic += cr.pic;
+    moSic += cr.sic;
+  });
+
   // 현재 월 비행 카드 렌더링
   el.innerHTML = `<div class="month-group">
     <div class="month-label">${y}년 ${parseInt(m)}월 · ${curArr.length}편</div>
+    <div style="display:flex;gap:14px;font-size:12px;color:var(--text2);margin:-6px 0 12px 4px">
+      <span>총 <strong style="color:var(--accent)">${toHHMM(moTotal)}</strong></span>
+      <span>PIC <strong style="color:#3b82f6">${toHHMM(moPic)}</strong></span>
+      <span>SIC <strong style="color:#10b981">${toHHMM(moSic)}</strong></span>
+    </div>
     ${curArr.map(f => flightCard(f)).join('')}
   </div>`;
 
@@ -4031,8 +4121,9 @@ function updateStats() {
       simLandings += window.PilotLogbookSim.simLandingCount(f);
       return;
     }
-    total += dur;
     const cr = calcCreditedTime(f);
+    const credited = cr.pic + cr.sic; // 듀티코드 가중치 반영된 인정시간 (산정불가/분담 편 정확히 반영)
+    total += credited;
     pic += cr.pic;
     sic += cr.sic;
     night   += parseHHMM(f.night) || 0;
@@ -4042,7 +4133,7 @@ function updateStats() {
 
     const fDate = new Date(f.date);
     const diff = (now - fDate) / (1000*60*60*24);
-    if (diff <= 90) last90 += dur;
+    if (diff <= 90) last90 += credited;
   });
 
   document.getElementById('statTotalHours').textContent = toHHMM(total);
@@ -4117,8 +4208,8 @@ function renderChartSummary() {
       return;
     }
     actualCount++;
-    total += dur;
     const cr = calcCreditedTime(f);
+    total += cr.pic + cr.sic; // 듀티코드 가중치 반영된 인정시간
     pic += cr.pic; sic += cr.sic;
     night += parseHHMM(f.night) || 0;
     actualLdg += window.PilotLogbookSim.actualLandingCount(f);
@@ -4148,8 +4239,8 @@ function renderMonthlyChart() {
   const map = {};
   fs.forEach(f => {
     const k = f.date.slice(0,7);
-    const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
-    map[k] = (map[k]||0) + dur;
+    const cr = calcCreditedTime(f); // 듀티코드 가중치 반영된 인정시간
+    map[k] = (map[k]||0) + cr.pic + cr.sic;
   });
 
   let entries = Object.entries(map).sort((a,b)=>a[0].localeCompare(b[0]));
@@ -4171,7 +4262,7 @@ function renderMonthlyChart() {
       const maxM = Math.max(...data.months.map(m=>m[1]), 1);
       const monthRows = data.months.map(([k,v]) => {
         const mNum = parseInt(k.slice(5));
-        return `<div class="bar-row" style="margin-left:12px;opacity:0.85">
+        return `<div class="bar-row" onclick="scrollToMonth('${k}')" style="margin-left:12px;opacity:0.85;cursor:pointer">
           <div class="bar-label" style="font-size:11px">${mNum}월</div>
           <div class="bar-track">
             <div class="bar-fill" style="width:${Math.round(v/maxM*100)}%;background:var(--accent-glow)">${toHHMM(v)}</div>
@@ -4205,7 +4296,7 @@ function renderMonthlyChart() {
     el.innerHTML = allMonths.map(([k,v]) => {
       const mNum = parseInt(k.slice(5));
       const pct = Math.round(v/max*100);
-      return `<div class="bar-row">
+      return `<div class="bar-row" ${v>0?`onclick="scrollToMonth('${k}')" style="cursor:pointer"`:''}>
         <div class="bar-label">${mNum}월</div>
         <div class="bar-track">
           <div class="bar-fill" style="width:${pct}%;${v===0?'background:var(--surface3);min-width:0':''}">${v>0?toHHMM(v):''}</div>
@@ -4327,10 +4418,9 @@ function renderCurrency() {
         ldg90Day += 1;
       }
       if (f.ald === 'Y') ald90++;
-      const dur = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
-      hrs90 += dur;
       ifr90 += parseHHMM(f.ifr) || 0;
-      const cr = calcCreditedTime(f);
+      const cr = calcCreditedTime(f); // 듀티코드 가중치 반영된 인정시간
+      hrs90 += cr.pic + cr.sic;
       pic90 += cr.pic; sic90 += cr.sic;
     }
   });
@@ -4833,31 +4923,48 @@ async function processExcel(file) {
     bar.style.width = '75%'; pct.textContent = '75%';
     txt.textContent = '기존 데이터와 합치는 중...';
 
-    // 기존 flights 배열과 dedup 후 병합 (date+flight+dep+arr 기준)
-    const existingKeys = new Set(flights.map(f => `${f.date}_${f.flight}_${f.dep}${f.arr}`));
-    const newFlights = parsed.filter(f => !existingKeys.has(`${f.date}_${f.flight}_${f.dep}${f.arr}`));
-    const skipped = parsed.length - newFlights.length;
-    const saved   = newFlights.length;
-
-    if (saved > 0) {
-      flights = [...flights, ...newFlights].sort((a,b) => b.date.localeCompare(a.date));
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
-      if (currentUser) await saveToFirestore(currentUser.uid);
-    }
+    // 기존 flights와 date+flight+dep+arr 기준 매칭 — 이미 있으면 건너뛰지 않고
+    // dutyCode·시간 등을 최신 파일 값으로 업데이트 (사용자가 직접 수정한 값은 보존)
+    const flightKey = f => `${f.date}_${f.flight}_${f.dep}${f.arr}`;
+    const existingIndex = new Map(flights.map((f, i) => [flightKey(f), i]));
+    const newFlights = parsed.filter(f => !existingIndex.has(flightKey(f)));
+    const updateFlights = parsed.filter(f => existingIndex.has(flightKey(f)));
 
     bar.style.width = '100%'; pct.textContent = '100%';
-    result.innerHTML = `✅ <strong>${saved}편</strong> 저장 완료${skipped > 0 ? ` (${skipped}편 중복 건너뜀)` : ''}`;
 
-    previewList.innerHTML = parsed.slice(0,10).map(f =>
-      `<div class="preview-item">
+    previewList.innerHTML = parsed.slice(0,10).map(f => {
+      const updating = existingIndex.has(flightKey(f));
+      return `<div class="preview-item">
         <span class="preview-date">${f.date}</span>
         <span class="preview-route">${f.dep}→${f.arr}</span>
         <span class="preview-flt">${f.flight}</span>
         <span class="preview-time">${f.total}</span>
         <span class="badge ${dutyCodeBadgeClass(f.dutyCode)}">${f.dutyCode}</span>
-      </div>`
-    ).join('') + (parsed.length > 10 ? `<div style="text-align:center;color:var(--text3);font-size:12px;padding:8px">외 ${parsed.length-10}편...</div>` : '');
+        <span style="font-size:10px;color:${updating ? 'var(--warning)' : 'var(--success)'}">${updating ? '기존 갱신' : '신규'}</span>
+      </div>`;
+    }).join('') + (parsed.length > 10 ? `<div style="text-align:center;color:var(--text3);font-size:12px;padding:8px">외 ${parsed.length-10}편...</div>` : '');
     preview.classList.add('show');
+
+    const confirmed = confirm(
+      `신규 ${newFlights.length}편 · 기존 ${updateFlights.length}편 업데이트\n\n` +
+      '기존 기록의 계기·야간시간, PF/PM, 오토랜딩과 개인 메모는 보존되고,\n' +
+      '직접 수정한 Duty Code도 보존됩니다.\n진행하시겠습니까?'
+    );
+    if (!confirmed) {
+      result.textContent = '업로드를 취소했습니다.';
+      return;
+    }
+
+    newFlights.forEach(f => flights.push(f));
+    updateFlights.forEach(f => {
+      const idx = existingIndex.get(flightKey(f));
+      flights[idx] = window.PilotLogbookCsvImport.mergeCsvFlight(flights[idx], f);
+    });
+    flights.sort((a,b) => b.date.localeCompare(a.date));
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(flights)); } catch(e) {}
+    if (currentUser) await saveToFirestore(currentUser.uid);
+
+    result.innerHTML = `✅ 신규 <strong>${newFlights.length}편</strong> · 갱신 <strong>${updateFlights.length}편</strong> 완료`;
 
     // 로그북 바로가기 버튼 표시
     document.getElementById('goLogbookBtn').style.display = 'block';
