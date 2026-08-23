@@ -8,9 +8,13 @@ PODS:
   - Capacitor (8.4.0):
     - CapacitorCordova
   - CapacitorCordova (8.4.0)
+  - CapacitorKeyboard (8.0.5):
+    - Capacitor
   - CapacitorSplashScreen (8.0.1):
     - Capacitor
   - CapacitorStatusBar (8.0.2):
+    - Capacitor
+  - CapgoNativePurchases (8.6.5):
     - Capacitor
   - CodetrixStudioCapacitorGoogleAuth (0.0.1):
     - Capacitor
@@ -27,8 +31,10 @@ PODS:
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorKeyboard (from `../../node_modules/@capacitor/keyboard`)"
   - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
   - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
+  - "CapgoNativePurchases (from `../../node_modules/@capgo/native-purchases`)"
   - "CodetrixStudioCapacitorGoogleAuth (from `../../node_modules/@codetrix-studio/capacitor-google-auth`)"
 
 SPEC REPOS:
@@ -43,10 +49,14 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
+  CapacitorKeyboard:
+    :path: "../../node_modules/@capacitor/keyboard"
   CapacitorSplashScreen:
     :path: "../../node_modules/@capacitor/splash-screen"
   CapacitorStatusBar:
     :path: "../../node_modules/@capacitor/status-bar"
+  CapgoNativePurchases:
+    :path: "../../node_modules/@capgo/native-purchases"
   CodetrixStudioCapacitorGoogleAuth:
     :path: "../../node_modules/@codetrix-studio/capacitor-google-auth"
 
@@ -54,13 +64,15 @@ SPEC CHECKSUMS:
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
   Capacitor: 75bd117ba037a51bb0f19ded32c67f4b3bc16600
   CapacitorCordova: 71d81f350e6c30bf2a846593b5c480fbd68e9bac
+  CapacitorKeyboard: b6b0744890cdb1d9a96e2cafcc9253fdcc55de3b
   CapacitorSplashScreen: 4b46c72298db552b3c57ce021ef028b6dc7f1fa7
   CapacitorStatusBar: 01d5763b4ed720de5ce2edbc938de6a98f4c8f32
+  CapgoNativePurchases: ec5cb78e11e84ad1f557720275fa4d096331d80e
   CodetrixStudioCapacitorGoogleAuth: 9dcfabfb7dd804ad6231a1513bc6e81e620cbec6
   GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
   GTMAppAuth: 0ff230db599948a9ad7470ca667337803b3fc4dd
   GTMSessionFetcher: 3a63d75eecd6aa32c2fc79f578064e1214dfdec2
 
-PODFILE CHECKSUM: 2b81bd1af2b270e8c9abb546b9c78217dcde8f2c
+PODFILE CHECKSUM: 3d429d0841c423aaa7f291eb4c08d588ed313614
 
 COCOAPODS: 1.16.2

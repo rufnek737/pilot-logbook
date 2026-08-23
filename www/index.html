@@ -26,6 +26,7 @@
   <script src="local-files.js"></script>
   <script src="pilot-backup.js"></script>
   <script src="sim-records.js"></script>
+  <script src="billing.js"></script>
   <!-- Firebase v10 compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -1090,6 +1091,7 @@
 
     /* ── Account & policy ── */
     #accountModalOverlay { z-index: 320; }
+    #billingModalOverlay { z-index: 360; }
     #infoModalOverlay { z-index: 10020; }
     .account-profile {
       display: flex;
@@ -1178,6 +1180,25 @@
       cursor: pointer;
     }
     .delete-account-final:disabled { opacity:.4; cursor:default; }
+    .billing-summary { padding:13px 14px; border:1px solid var(--border); border-radius:12px; background:var(--surface2); }
+    .billing-plan-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+    .billing-plan { min-height:92px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:7px; padding:14px; border:1.5px solid var(--accent); border-radius:13px; background:var(--surface); color:var(--text); cursor:pointer; }
+    .billing-plan strong { font-size:14px; }
+    .billing-plan span { font-size:12px; color:var(--accent); font-weight:750; }
+    .billing-plan:disabled { opacity:.55; cursor:default; }
+    .billing-benefits { margin:14px 0 0; padding:0 0 0 19px; color:var(--text2); font-size:12px; line-height:1.8; }
+    .billing-secondary { width:100%; margin-top:10px; padding:12px; border:1px solid var(--border); border-radius:11px; background:var(--surface2); color:var(--text); font-size:13px; font-weight:750; cursor:pointer; }
+    .billing-overview-card { width:100%; margin:0 0 12px; padding:13px 15px; border:1px solid var(--border); border-radius:14px; background:var(--card); color:var(--text1); text-align:left; cursor:pointer; box-shadow:0 5px 18px rgba(15,23,42,.05); }
+    .billing-overview-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .billing-overview-title { display:block; font-size:13px; font-weight:850; }
+    .billing-overview-used { display:block; margin-top:3px; color:var(--text2); font-size:11px; font-weight:650; }
+    .billing-overview-link { flex:none; padding-top:1px; color:var(--accent); font-size:11px; font-weight:800; }
+    .billing-progress-track { height:7px; margin-top:10px; overflow:hidden; border-radius:999px; background:var(--surface2); }
+    .billing-progress-fill { width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--accent),#60a5fa); transition:width .25s ease; }
+    .billing-overview-remaining { margin-top:6px; color:var(--text3); font-size:10px; font-weight:700; }
+    #billingNoticeOverlay { z-index:240; }
+    .billing-notice-lead { padding:13px 14px; border-radius:12px; background:var(--surface2); color:var(--text1); font-size:14px; font-weight:850; line-height:1.5; }
+    .billing-notice-actions { display:grid; grid-template-columns:1fr 1.35fr; gap:9px; margin-top:15px; }
     .info-modal {
       height: min(88vh, 760px);
       display: flex;
@@ -1524,6 +1545,14 @@
         <button class="add-btn" onclick="openModal()">+ 입력</button>
       </div>
     </div>
+    <button class="billing-overview-card" id="billingOverviewCard" type="button" onclick="PilotLogbookBilling.open()" aria-label="자동 가져오기 이용 현황과 구독 보기">
+      <div class="billing-overview-top">
+        <span><strong class="billing-overview-title" id="billingOverviewTitle">✈️ 자동 가져오기 무료 이용</strong><span class="billing-overview-used" id="billingOverviewUsed">0 / 100편 사용</span></span>
+        <span class="billing-overview-link">구독 자세히 ›</span>
+      </div>
+      <div class="billing-progress-track" role="progressbar" aria-label="자동 가져오기 무료 사용량" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="billingProgressTrack"><div class="billing-progress-fill" id="billingProgressFill"></div></div>
+      <div class="billing-overview-remaining" id="billingOverviewRemaining">100편 남음</div>
+    </button>
     <div style="position:relative;margin-bottom:12px">
       <input type="search" id="searchInput" placeholder="🔍  메모·편명·공항·날짜 검색..." autocomplete="off"
         oninput="renderFlights()"
@@ -2018,6 +2047,7 @@
       </div>
 
       <div class="account-menu-list">
+        <button class="account-menu-button" onclick="PilotLogbookBilling.open()"><span>✈️</span><span><b>자동 가져오기 구독</b><small data-billing-status style="display:block;color:var(--text3);font-size:10px;margin-top:2px">상태 확인 중</small></span><span class="account-arrow">›</span></button>
         <button class="account-menu-button" onclick="openInfoPage('faq.html','자주 묻는 질문')"><span>❓</span><span>자주 묻는 질문</span><span class="account-arrow">›</span></button>
         <button class="account-menu-button" onclick="openInfoPage('privacy.html','개인정보처리방침')"><span>🛡️</span><span>개인정보처리방침</span><span class="account-arrow">›</span></button>
         <button class="account-menu-button" onclick="openInfoPage('terms.html','이용약관')"><span>📄</span><span>이용약관 및 무료·유료 정책</span><span class="account-arrow">›</span></button>
@@ -2042,6 +2072,64 @@
         <button class="delete-account-final" id="deleteAccountButton" onclick="deleteAccountPermanently()" disabled>계정 및 기록 영구 삭제</button>
         <div id="deleteAccountStatus" style="min-height:18px;margin-top:8px;font-size:11px;color:var(--text2);text-align:center"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Automatic import usage notice -->
+<div class="modal-overlay" id="billingNoticeOverlay" onclick="if(event.target===this)PilotLogbookBilling.closeNotice()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="billingNoticeTitle">✈️ 자동 가져오기 이용 안내</div>
+      <button class="modal-close" onclick="PilotLogbookBilling.closeNotice()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="billing-notice-lead" id="billingNoticeLead">처음 100편까지 결제 없이 자동으로 가져올 수 있습니다.</div>
+      <ul class="billing-benefits">
+        <li>새로 저장한 고유 비행만 1편으로 계산됩니다.</li>
+        <li>같은 비행 재가져오기와 덮어쓰기는 추가 계산되지 않습니다.</li>
+        <li>구독 중에는 CrewConnex 자동 가져오기를 무제한 이용합니다.</li>
+        <li>수동 입력·수정·통계·출력 기능은 계속 무료입니다.</li>
+      </ul>
+      <div class="billing-notice-actions">
+        <button class="billing-secondary" style="margin-top:0" onclick="PilotLogbookBilling.closeNotice()">확인</button>
+        <button class="submit-btn" onclick="PilotLogbookBilling.openFromNotice()">구독 자세히</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CrewConnex subscription modal -->
+<div class="modal-overlay" id="billingModalOverlay" onclick="if(event.target===this)PilotLogbookBilling.close()">
+  <div class="modal" style="max-height:82vh">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">✈️ 자동 가져오기 구독</div>
+      <button class="modal-close" onclick="PilotLogbookBilling.close()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="billing-summary">
+        <div data-billing-status style="font-size:15px;font-weight:800">상태 확인 중</div>
+        <div data-billing-used style="font-size:12px;color:var(--text2);margin-top:5px">사용량 확인 중</div>
+      </div>
+      <ul class="billing-benefits">
+        <li>처음 100편은 결제 없이 자동 가져오기</li>
+        <li>구독 중 CrewConnex 자동 가져오기 무제한</li>
+        <li>기존 기록·수동 입력·출력 기능은 계속 무료</li>
+      </ul>
+      <div id="billingActivePanel" style="display:none;margin-top:14px">
+        <div id="billingExpiry" style="font-size:12px;color:var(--success);line-height:1.6"></div>
+        <button class="billing-secondary" onclick="PilotLogbookBilling.manage()">App Store 구독 관리</button>
+      </div>
+      <div id="billingPurchasePanel">
+        <div class="billing-plan-grid">
+          <button id="billingMonthlyButton" class="billing-plan" onclick="PilotLogbookBilling.purchase('monthly')" disabled><strong>월간 구독</strong><span>App Store 정보 준비 중</span></button>
+          <button id="billingAnnualButton" class="billing-plan" onclick="PilotLogbookBilling.purchase('annual')" disabled><strong>연간 구독</strong><span>App Store 정보 준비 중</span></button>
+        </div>
+        <button class="billing-secondary" onclick="PilotLogbookBilling.restore()">이전 구매 복원</button>
+      </div>
+      <div id="billingPlatformNotice" style="font-size:11px;color:var(--text3);line-height:1.6;text-align:center;margin-top:12px">구독 상태를 확인하고 있습니다…</div>
     </div>
   </div>
 </div>
@@ -2078,6 +2166,10 @@
 
       <!-- Auto-login pane -->
       <div id="ccPaneAuto">
+        <div style="padding:10px 12px;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:11px;color:var(--text2)">
+          <b data-billing-status style="color:var(--text)">자동 가져오기 사용량 확인 중</b>
+          <span style="float:right;text-decoration:underline;cursor:pointer" onclick="PilotLogbookBilling.open()">구독 보기</span>
+        </div>
         <div class="form-row single">
           <div class="form-group">
             <label class="form-label">아이디</label>
@@ -2142,6 +2234,7 @@ const FIREBASE_CONFIG = {
 
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth = firebase.auth();
+window.auth = auth;
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 const db = firebase.firestore();
 
@@ -2850,6 +2943,7 @@ auth.getRedirectResult().then((result) => {
 // Auth 상태 감지
 auth.onAuthStateChanged(user => {
   currentUser = user;
+  window.PilotLogbookBilling?.onAuthChanged(user);
   const overlay = document.getElementById('authOverlay');
   const chip    = document.getElementById('userChip');
   if (user) {
@@ -4682,10 +4776,13 @@ function saveEntry() {
 
   const wasEditing = editingId;
   const wasFromCrewConnex = _ccOrigin;
+  const importedFlight = _ccPendingImportFlight;
+  _ccPendingImportFlight = null;
   closeModal();
   saveData();
   renderFlights();
   if (wasFromCrewConnex && _ccData) renderCcResults(_ccData);
+  if (wasFromCrewConnex && !wasEditing && importedFlight) _recordCcImports([importedFlight]);
   showToast(wasEditing ? '수정되었습니다' : (isSim ? 'SIM 훈련이 저장되었습니다' : '비행 기록이 저장되었습니다 ✈'));
 }
 
@@ -5231,6 +5328,19 @@ function parseJejuAirEpaper(text, filename, lines) {
 // ─── CrewConnex Import ───────────────────────────────────────────
 let _ccData = null;
 let _ccOrigin = false; // 상세 모달이 CC Import에서 열렸는지 추적
+let _ccPendingImportFlight = null;
+
+function _ccUsageFlight(f) {
+  return { date: f?.date, flight: f?.flight, from: f?.dep || f?.from, to: f?.arr || f?.to };
+}
+
+async function _recordCcImports(importedFlights) {
+  try {
+    await window.PilotLogbookBilling?.recordImports(importedFlights.map(_ccUsageFlight));
+  } catch (error) {
+    showToast(error?.message || '자동 가져오기 사용량을 갱신하지 못했습니다', 3500);
+  }
+}
 let _ccReview = [];
 
 function openCrewConnex() {
@@ -5293,6 +5403,12 @@ async function loginCrewConnex() {
     const data = await resp.json();
 
     if (!resp.ok || data.error) {
+      if (data.code === 'FREE_LIMIT_REACHED') {
+        statusEl.style.color = 'var(--warning)';
+        statusEl.textContent = '무료 자동 가져오기 100편을 모두 사용했습니다';
+        window.PilotLogbookBilling?.open();
+        return;
+      }
       const errMsg = data.error || '로그인 실패';
       if (errMsg.includes('로그인 성공') && errMsg.includes('Roster')) {
         statusEl.style.color = 'var(--success)';
@@ -5302,6 +5418,7 @@ async function loginCrewConnex() {
         statusEl.textContent = '❌ ' + errMsg;
       }
     } else {
+      if (data.billing) window.PilotLogbookBilling?.renderStatus(data.billing);
       statusEl.style.color = 'var(--success)';
       statusEl.textContent = `✅ ${data.flights?.length || 0}개 비행 추출됨`;
       renderCcResults(data);
@@ -5579,12 +5696,13 @@ function _mergeCrewConnexFlight(f, previous) {
   };
 }
 
-function importSelectedFlights() {
+async function importSelectedFlights() {
   const idxs = [...document.querySelectorAll('.cc-flight-check:checked')].map(cb => +cb.dataset.idx);
   if (!idxs.length) { showToast('가져올 비행을 선택해주세요'); return; }
 
   let added = 0;
   let updated = 0;
+  const newImports = [];
 
   for (const i of idxs) {
     const f = _ccData.flights[i];
@@ -5600,6 +5718,7 @@ function importSelectedFlights() {
       updated++;
     } else {
       flights.push(merged);
+      newImports.push(f);
       added++;
     }
   }
@@ -5610,6 +5729,7 @@ function importSelectedFlights() {
   window.scrollTo(0, 0);
   saveData();
   renderFlights();
+  if (newImports.length) await _recordCcImports(newImports);
   const parts = [];
   if (added) parts.push(`신규 ${added}편`);
   if (updated) parts.push(`변경 ${updated}편 적용`);
@@ -5623,6 +5743,7 @@ function importCcFlight(idx) {
   const merged = _mergeCrewConnexFlight(f, previous);
   // CC 모달을 완전히 닫지 않고 숨기기만 — 저장/닫기 후 복귀하기 위해
   _ccOrigin = true;
+  _ccPendingImportFlight = previous ? null : f;
   document.getElementById('ccModalOverlay').classList.remove('show');
   openModal({
     fDate: merged.date, fFlight: merged.flight, fDep: merged.dep, fArr: merged.arr,

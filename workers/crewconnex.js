@@ -17,6 +17,12 @@ const ALLOWED_ORIGINS = new Set([
   'https://localhost',
 ]);
 const MAX_REQUEST_BYTES = 4096;
+const AUTO_IMPORT_FREE_LIMIT = 100;
+const APP_BUNDLE_ID = 'com.rufnek.pilotlogbook';
+const SUBSCRIPTION_PRODUCTS = new Set([
+  'com.rufnek.pilotlogbook.autoimport.monthly',
+  'com.rufnek.pilotlogbook.autoimport.annual',
+]);
 
 let firebaseCertCache = { certificates: null, expiresAt: 0 };
 
@@ -141,7 +147,7 @@ export async function verifyFirebaseIdToken(token, projectId, options = {}) {
 function responseHeaders(origin) {
   const headers = {
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
     'Cache-Control': 'no-store',
     'Content-Type': 'application/json; charset=utf-8',
@@ -150,6 +156,188 @@ function responseHeaders(origin) {
   };
   if (ALLOWED_ORIGINS.has(origin)) headers['Access-Control-Allow-Origin'] = origin;
   return headers;
+}
+
+function billingEnforced(env) {
+  return String(env.BILLING_ENFORCED || '').toLowerCase() === 'true';
+}
+
+export function autoImportFlightKey(flight) {
+  return [flight?.date, flight?.flight, flight?.from, flight?.to]
+    .map(value => String(value || '').trim().toUpperCase())
+    .join('|');
+}
+
+async function readBillingStatus(env, uid) {
+  if (!env.BILLING_DB) {
+    return {
+      active: false,
+      productId: null,
+      expiresAt: null,
+      usedCount: 0,
+      freeLimit: AUTO_IMPORT_FREE_LIMIT,
+      remaining: AUTO_IMPORT_FREE_LIMIT,
+      enforced: billingEnforced(env),
+    };
+  }
+  const now = Date.now();
+  const [entitlement, usage] = await Promise.all([
+    env.BILLING_DB.prepare(`
+      SELECT product_id AS productId, expires_at AS expiresAt
+      FROM subscription_entitlements
+      WHERE uid = ?1 AND expires_at > ?2 AND revoked = 0
+      LIMIT 1
+    `).bind(uid, now).first(),
+    env.BILLING_DB.prepare(`
+      SELECT COUNT(*) AS usedCount FROM auto_import_flights WHERE uid = ?1
+    `).bind(uid).first(),
+  ]);
+  const usedCount = Number(usage?.usedCount || 0);
+  return {
+    active: Boolean(entitlement),
+    productId: entitlement?.productId || null,
+    expiresAt: entitlement?.expiresAt || null,
+    usedCount,
+    freeLimit: AUTO_IMPORT_FREE_LIMIT,
+    remaining: Math.max(0, AUTO_IMPORT_FREE_LIMIT - usedCount),
+    enforced: billingEnforced(env),
+  };
+}
+
+async function recordAutoImportFlights(env, uid, flights) {
+  if (!env.BILLING_DB || !Array.isArray(flights) || !flights.length) return;
+  const now = Date.now();
+  const statements = flights
+    .map(autoImportFlightKey)
+    .filter(key => key && key !== '|||')
+    .map(key => env.BILLING_DB.prepare(`
+      INSERT OR IGNORE INTO auto_import_flights (uid, flight_key, created_at)
+      VALUES (?1, ?2, ?3)
+    `).bind(uid, key, now));
+  if (statements.length) await env.BILLING_DB.batch(statements);
+}
+
+function base64UrlEncode(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function utf8Base64Url(value) {
+  return base64UrlEncode(new TextEncoder().encode(value));
+}
+
+function pemToBytes(pem) {
+  const body = String(pem || '')
+    .replace(/\\n/g, '\n')
+    .replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  if (!body) throw new Error('Missing App Store private key');
+  return Uint8Array.from(atob(body), ch => ch.charCodeAt(0));
+}
+
+async function createAppStoreToken(env, nowMs = Date.now()) {
+  if (!env.APP_STORE_ISSUER_ID || !env.APP_STORE_KEY_ID || !env.APP_STORE_PRIVATE_KEY) {
+    throw new Error('Missing App Store credentials');
+  }
+  const now = Math.floor(nowMs / 1000);
+  const header = utf8Base64Url(JSON.stringify({ alg: 'ES256', kid: env.APP_STORE_KEY_ID, typ: 'JWT' }));
+  const payload = utf8Base64Url(JSON.stringify({
+    iss: env.APP_STORE_ISSUER_ID,
+    iat: now,
+    exp: now + 300,
+    aud: 'appstoreconnect-v1',
+    bid: APP_BUNDLE_ID,
+  }));
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToBytes(env.APP_STORE_PRIVATE_KEY),
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign'],
+  );
+  const signature = new Uint8Array(await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    key,
+    new TextEncoder().encode(`${header}.${payload}`),
+  ));
+  return `${header}.${payload}.${base64UrlEncode(signature)}`;
+}
+
+function decodeJwsPayload(jws) {
+  const part = String(jws || '').split('.')[1];
+  if (!part) throw new Error('Invalid signed transaction');
+  return JSON.parse(new TextDecoder().decode(decodeBase64Url(part)));
+}
+
+async function fetchSubscriptionFromApple(env, transactionId, fetchImpl = fetch) {
+  const token = await createAppStoreToken(env);
+  const paths = [
+    'https://api.storekit.itunes.apple.com',
+    'https://api.storekit-sandbox.itunes.apple.com',
+  ];
+  let lastResponse;
+  for (const base of paths) {
+    const response = await fetchImpl(`${base}/inApps/v1/subscriptions/${encodeURIComponent(transactionId)}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    lastResponse = response;
+    if (response.ok) return { body: await response.json(), environment: base.includes('sandbox') ? 'Sandbox' : 'Production' };
+    if (![404, 400].includes(response.status)) break;
+  }
+  throw new Error(`Apple verification failed (${lastResponse?.status || 0})`);
+}
+
+export function selectActiveAppleSubscription(body, nowMs = Date.now()) {
+  const candidates = [];
+  for (const group of body?.data || []) {
+    if (![1, 4].includes(Number(group?.status))) continue;
+    for (const item of group?.lastTransactions || []) {
+      try {
+        const info = decodeJwsPayload(item?.signedTransactionInfo);
+        if (info.bundleId !== APP_BUNDLE_ID) continue;
+        if (!SUBSCRIPTION_PRODUCTS.has(info.productId)) continue;
+        if (Number(info.expiresDate || 0) <= nowMs || info.revocationDate) continue;
+        candidates.push(info);
+      } catch (_) { /* malformed entries are ignored */ }
+    }
+  }
+  candidates.sort((a, b) => Number(b.expiresDate || 0) - Number(a.expiresDate || 0));
+  return candidates[0] || null;
+}
+
+async function verifyAndStoreSubscription(env, uid, transactionId, fetchImpl) {
+  if (!env.BILLING_DB) throw new Error('Billing database unavailable');
+  const verified = await fetchSubscriptionFromApple(env, transactionId, fetchImpl);
+  const subscription = selectActiveAppleSubscription(verified.body);
+  if (!subscription) throw new Error('Active subscription not found');
+  const originalTransactionId = String(subscription.originalTransactionId || subscription.transactionId || '');
+  if (!originalTransactionId) throw new Error('Missing original transaction');
+
+  const owner = await env.BILLING_DB.prepare(`
+    SELECT uid FROM subscription_entitlements WHERE original_transaction_id = ?1 LIMIT 1
+  `).bind(originalTransactionId).first();
+  if (owner?.uid && owner.uid !== uid) throw new Error('Subscription belongs to another account');
+
+  await env.BILLING_DB.prepare(`
+    INSERT INTO subscription_entitlements
+      (uid, product_id, original_transaction_id, expires_at, environment, revoked, updated_at)
+    VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)
+    ON CONFLICT(uid) DO UPDATE SET
+      product_id = excluded.product_id,
+      original_transaction_id = excluded.original_transaction_id,
+      expires_at = excluded.expires_at,
+      environment = excluded.environment,
+      revoked = 0,
+      updated_at = excluded.updated_at
+  `).bind(
+    uid,
+    subscription.productId,
+    originalTransactionId,
+    Number(subscription.expiresDate),
+    verified.environment,
+    Date.now(),
+  ).run();
+  return readBillingStatus(env, uid);
 }
 
 function bearerToken(request) {
@@ -431,10 +619,16 @@ async function tryFetch(url, jar, referer) {
 export async function handleRequest(request, env = {}, dependencies = {}) {
     const origin = request.headers.get('origin') || '';
     const cors = responseHeaders(origin);
-    const ok = body => new Response(JSON.stringify(applyDutyCode(body, username)), {
+    let verifiedUser;
+    let username;
+    const ok = async body => {
+      const mapped = applyDutyCode(body, username);
+      const billing = verifiedUser ? await readBillingStatus(env, verifiedUser.uid) : null;
+      return new Response(JSON.stringify({ ...mapped, billing }), {
       status: 200,
       headers: cors,
-    });
+      });
+    };
     const fail = (status, error, code) => new Response(JSON.stringify({ error, code }), {
       status,
       headers: cors,
@@ -444,7 +638,13 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       return fail(403, '허용되지 않은 앱 환경입니다.', 'ORIGIN_NOT_ALLOWED');
     }
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (request.method !== 'POST') return fail(405, '지원하지 않는 요청입니다.', 'METHOD_NOT_ALLOWED');
+
+    const pathname = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
+    const isBillingStatus = pathname === '/billing/status';
+    const isBillingVerify = pathname === '/billing/verify';
+    const isBillingImports = pathname === '/billing/imports';
+    if (isBillingStatus && request.method !== 'GET') return fail(405, '지원하지 않는 요청입니다.', 'METHOD_NOT_ALLOWED');
+    if (!isBillingStatus && request.method !== 'POST') return fail(405, '지원하지 않는 요청입니다.', 'METHOD_NOT_ALLOWED');
 
     const contentLength = Number(request.headers.get('content-length') || 0);
     if (contentLength > MAX_REQUEST_BYTES) return fail(413, '요청 내용이 너무 큽니다.', 'REQUEST_TOO_LARGE');
@@ -454,12 +654,55 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       return fail(401, 'Pilot Logbook에 로그인한 뒤 다시 시도해 주세요.', 'AUTH_REQUIRED');
     }
 
-    let verifiedUser;
     try {
       const verifyToken = dependencies.verifyToken || verifyFirebaseIdToken;
       verifiedUser = await verifyToken(token, env.FIREBASE_PROJECT_ID || DEFAULT_FIREBASE_PROJECT_ID);
     } catch (_) {
       return fail(401, '로그인이 만료되었습니다. 다시 로그인해 주세요.', 'AUTH_INVALID');
+    }
+
+    if (isBillingStatus) {
+      try {
+        return new Response(JSON.stringify(await readBillingStatus(env, verifiedUser.uid)), { status: 200, headers: cors });
+      } catch (_) {
+        return fail(503, '구독 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
+      }
+    }
+
+    if (isBillingVerify) {
+      let body;
+      try { body = await request.json(); } catch (_) { return fail(400, '잘못된 요청입니다.', 'INVALID_REQUEST'); }
+      const transactionId = typeof body?.transactionId === 'string' ? body.transactionId.trim() : '';
+      if (!/^\d{6,32}$/.test(transactionId)) return fail(400, '구매 정보를 확인할 수 없습니다.', 'INVALID_TRANSACTION');
+      try {
+        const status = await verifyAndStoreSubscription(env, verifiedUser.uid, transactionId, dependencies.fetchImpl || fetch);
+        return new Response(JSON.stringify(status), { status: 200, headers: cors });
+      } catch (_) {
+        return fail(400, '활성 구독을 확인하지 못했습니다. App Store 계정을 확인해 주세요.', 'SUBSCRIPTION_NOT_ACTIVE');
+      }
+    }
+
+    if (isBillingImports) {
+      let body;
+      try { body = await request.json(); } catch (_) { return fail(400, '잘못된 요청입니다.', 'INVALID_REQUEST'); }
+      const flights = Array.isArray(body?.flights) ? body.flights.slice(0, 20) : [];
+      if (!flights.length) return fail(400, '저장된 비행 정보가 없습니다.', 'INVALID_REQUEST');
+      try {
+        await recordAutoImportFlights(env, verifiedUser.uid, flights);
+        return new Response(JSON.stringify(await readBillingStatus(env, verifiedUser.uid)), { status: 200, headers: cors });
+      } catch (_) {
+        return fail(503, '자동 가져오기 사용량을 저장하지 못했습니다.', 'BILLING_UNAVAILABLE');
+      }
+    }
+
+    let currentBilling;
+    try {
+      currentBilling = await readBillingStatus(env, verifiedUser.uid);
+    } catch (_) {
+      if (billingEnforced(env)) return fail(503, '구독 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
+    }
+    if (billingEnforced(env) && !currentBilling?.active && currentBilling?.remaining <= 0) {
+      return fail(402, '무료 자동 가져오기 100편을 모두 사용했습니다. 구독 후 무제한으로 이용할 수 있습니다.', 'FREE_LIMIT_REACHED');
     }
 
     if (!env.CREWCONNEX_RATE_LIMITER || typeof env.CREWCONNEX_RATE_LIMITER.limit !== 'function') {
@@ -474,7 +717,7 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       return fail(503, '가져오기 보안 설정을 확인 중입니다. 잠시 후 다시 시도해 주세요.', 'RATE_LIMIT_UNAVAILABLE');
     }
 
-    let username, password;
+    let password;
     try {
       const requestBody = await request.text();
       if (new TextEncoder().encode(requestBody).byteLength > MAX_REQUEST_BYTES) {

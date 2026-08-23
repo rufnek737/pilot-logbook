@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   applyDutyCode,
+  autoImportFlightKey,
   handleRequest,
   parseRosterHtml,
+  selectActiveAppleSubscription,
   verifyFirebaseIdToken,
 } from './crewconnex.js';
 
@@ -162,4 +164,50 @@ test('Roster parsing and automatic crew duty mapping remain unchanged', () => {
   const withDuty = applyDutyCode(parsed, '홍길동');
   assert.equal(withDuty.flights[0].dutyCode, '3PC');
   assert.equal(withDuty.flights[0].role, 'PIC');
+});
+
+test('Automatic import usage key is stable and identifies a unique flight', () => {
+  assert.equal(autoImportFlightKey({
+    date: '2026-08-23', flight: '7c101', from: 'icn', to: 'cju',
+  }), '2026-08-23|7C101|ICN|CJU');
+  assert.notEqual(
+    autoImportFlightKey({ date: '2026-08-23', flight: '7C101', from: 'ICN', to: 'CJU' }),
+    autoImportFlightKey({ date: '2026-08-24', flight: '7C101', from: 'ICN', to: 'CJU' }),
+  );
+});
+
+test('Apple subscription selection only accepts active Pilot Logbook products', () => {
+  const now = Date.now();
+  const jws = payload => `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`;
+  const active = selectActiveAppleSubscription({
+    data: [{
+      status: 1,
+      lastTransactions: [{ signedTransactionInfo: jws({
+        bundleId: 'com.rufnek.pilotlogbook',
+        productId: 'com.rufnek.pilotlogbook.autoimport.annual',
+        transactionId: '200000000000001',
+        originalTransactionId: '200000000000000',
+        expiresDate: now + 86_400_000,
+      }) }],
+    }],
+  }, now);
+  assert.equal(active.productId, 'com.rufnek.pilotlogbook.autoimport.annual');
+
+  const expired = selectActiveAppleSubscription({
+    data: [{ status: 1, lastTransactions: [{ signedTransactionInfo: jws({
+      bundleId: 'com.rufnek.pilotlogbook',
+      productId: 'com.rufnek.pilotlogbook.autoimport.monthly',
+      expiresDate: now - 1,
+    }) }] }],
+  }, now);
+  assert.equal(expired, null);
+
+  const otherApp = selectActiveAppleSubscription({
+    data: [{ status: 1, lastTransactions: [{ signedTransactionInfo: jws({
+      bundleId: 'com.example.other',
+      productId: 'com.rufnek.pilotlogbook.autoimport.monthly',
+      expiresDate: now + 86_400_000,
+    }) }] }],
+  }, now);
+  assert.equal(otherApp, null);
 });

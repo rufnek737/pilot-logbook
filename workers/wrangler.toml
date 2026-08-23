@@ -4,6 +4,12 @@ compatibility_date = "2024-01-01"
 
 [vars]
 FIREBASE_PROJECT_ID = "pilot-logbook-22bb8"
+BILLING_ENFORCED = "false"
+
+[[d1_databases]]
+binding = "BILLING_DB"
+database_name = "pilot-logbook-billing"
+database_id = "05382679-7df2-43ec-acef-0b20d36dddec"
 
 [[ratelimits]]
 name = "CREWCONNEX_RATE_LIMITER"
