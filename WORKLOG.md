@@ -2,6 +2,29 @@
 
 ---
 
+## 2026-08-23 (TestFlight 내부 테스트 시작 준비)
+
+### ✅ 완료된 작업
+
+- App Store Connect에 `Pilot Logbook` iOS 앱을 생성함.
+  - Bundle ID: `com.rufnek.pilotlogbook`
+  - App Store Connect 앱 ID: `6804390347`
+  - 최초 업로드 버전: `1.0 (1)`
+- Capacitor 웹 자산을 iOS 프로젝트에 다시 동기화하고 Release 아카이브를 생성함.
+- `npm test`의 오래된 기대값 3건을 현재 구현에 맞게 보정하고 전체 34개 테스트 통과를 확인함.
+- App Store Connect 업로드 및 자동 처리 완료 후 수출 규정 항목을 설정해 빌드를 `제출 준비 완료` 상태로 전환함.
+- 내부 TestFlight 그룹 `Pilot Logbook Internal`을 생성하고 계정 소유자 `rufnek@naver.com`을 내부 테스터로 초대함.
+- FAQ·개인정보처리방침·이용약관의 공식 문의 주소를 `info@rufnekcrew.com`으로 통일함.
+
+### 다음 단계
+
+- 내부 TestFlight에서 로그인, CrewConnex 가져오기, 업로드 파싱, 통계·인쇄·백업과 계정 삭제 흐름을 우선 확인.
+- 외부 테스트 전 베타 앱 설명·정책 URL·심사 연락처와 전용 심사용 계정을 입력하고 빌드별 테스트 안내를 작성.
+- 외부 TestFlight 베타 심사 제출 버튼은 사용자 최종 확인 후 진행.
+- 기존 미해결 항목인 `통계 → 경력 추가 모달 → 닫기 → 스크롤` 이후 iOS 상단바 겹침 재현 여부를 TestFlight에서 별도 확인.
+
+---
+
 ## 2026-08-21 (훈련시간 별도 집계 + 8~10년 반올림 오차 전수 검증)
 
 ### ✅ 완료된 작업

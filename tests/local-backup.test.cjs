@@ -86,7 +86,7 @@ test('native status bar height keeps the fixed header below the phone clock', ()
   const config = JSON.parse(fs.readFileSync(path.join(root, 'capacitor.config.json'), 'utf8'));
   const html = fs.readFileSync(path.join(root, 'www/index.html'), 'utf8');
   assert.equal(config.plugins.StatusBar.overlaysWebView, true);
-  assert.match(html, /StatusBar\?\.getInfo\(\)/);
+  assert.match(html, /height:env\(safe-area-inset-top\)/);
   assert.match(html, /--native-safe-top/);
   assert.match(html, /--app-safe-top: max\(env\(safe-area-inset-top\), var\(--native-safe-top\)\)/);
   assert.match(html, /body \{[\s\S]*?padding-top: var\(--app-safe-top\)/);

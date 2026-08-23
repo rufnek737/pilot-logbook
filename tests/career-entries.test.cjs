@@ -49,6 +49,6 @@ test('app stores career separately, syncs it to Firestore, and excludes it from 
   assert.match(html, /careerEntries: JSON\.parse\(JSON\.stringify\(careerEntries\)\)/);
   assert.match(html, /const prior = getCareerTotals\(\);[\s\S]*?let total=prior\.total/);
   assert.match(html, /chartYear === 'all' \? getCareerTotals\(\)/);
-  assert.match(html, /if \(diff <= 90\) last90 \+= dur/);
+  assert.match(html, /if \(diff <= 90\) last90 \+= credited/);
   assert.match(html, /최근 90일, 월별 통계, 자격 유지 및 LogTen CSV에는 포함되지 않습니다/);
 });

@@ -10,7 +10,7 @@ test('iOS modal scroll lock fixes the body and restores the saved page position'
   assert.match(html, /let _lockedBodyScrollY = 0/);
   assert.match(html, /_lockedBodyScrollY = window\.scrollY \|\| window\.pageYOffset \|\| 0/);
   assert.match(html, /document\.body\.style\.top = `-\$\{_lockedBodyScrollY\}px`/);
-  assert.match(html, /requestAnimationFrame\(\(\) => window\.scrollTo\(0, restoreY\)\)/);
+  assert.match(html, /requestAnimationFrame\(\(\) => \{[\s\S]*?window\.scrollTo\(0, restoreY\)/);
 });
 
 test('modal content keeps its own momentum scroll without propagating to the background', () => {
