@@ -13,11 +13,11 @@
   - 버전 `1.1`, 빌드 `6`
   - Bundle ID `com.rufnek.pilotlogbook`
   - 별도/비표준 암호화 미사용 설정 포함
-- 검증된 `1.1(6)` 아카이브를 App Store Connect에 업로드했으며 업로드 성공 응답을 확인함.
+- 검증된 `1.1(6)` 아카이브를 App Store Connect에 업로드하고 Apple 처리가 완료됨.
+- 빌드 `1.1(6)`은 수출 규정 추가 질문 없이 `제출 준비 완료`가 되었고 내부 그룹 `Pilot Logbook Internal`에 연결됨.
 
 ### 다음 단계
 
-- App Store Connect의 처리 완료 후 빌드 `1.1(6)`을 Pilot Logbook TestFlight 그룹에 연결.
 - 내부 TestFlight에서 자동 가져오기 카운팅, 구독 상품 조회·구매·복원, 로그인과 핵심 로그북 흐름을 최종 점검.
 - 외부 테스트 연결 및 베타 심사 제출은 별도 확인 후 진행.
 
