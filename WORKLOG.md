@@ -2,6 +2,27 @@
 
 ---
 
+## 2026-08-25 (개인정보 매니페스트 보완·TestFlight 재제출)
+
+### ✅ 완료된 작업
+
+- TestFlight 빌드 `1.1(6)` 업로드 후 Apple의 `ITMS-91061` 검증에서 `GTMAppAuth`, `GTMSessionFetcher`, `GoogleSignIn` 개인정보 매니페스트 누락을 확인함.
+- 구형 `@codetrix-studio/capacitor-google-auth`를 `@capgo/capacitor-social-login@8.4.5`로 교체하고 네이티브 Google 로그인 및 계정 삭제 재인증 흐름을 새 API에 맞게 변경함.
+- iOS 의존성을 GoogleSignIn 9.0.0, GTMAppAuth 5.0.0, GTMSessionFetcher 3.5.0 등으로 갱신하고 Capacitor iOS·Android 동기화 파일을 반영함.
+- Release 아카이브 내부에 Apple이 지적한 세 프레임워크의 `PrivacyInfo.xcprivacy`가 포함된 것을 직접 확인함.
+- 전체 자동 테스트 41개 통과 및 iOS Release 아카이브 성공을 확인함.
+- iOS 빌드 번호를 `1.1(7)`로 올려 App Store Connect에 업로드함.
+- 외부 그룹 `지인 테스트`(3명)에 빌드 7을 연결하고 테스트 안내를 입력한 뒤 TestFlight 베타 심사를 제출함.
+- 현재 상태: `심사 대기 중`.
+
+### 다음 단계
+
+- Apple 베타 심사 결과 확인.
+- 승인 후 외부 테스터 3명의 설치·Google 로그인·CrewConnex 자동 가져오기·100편 카운팅·구독 조회 및 복원 결과 수집.
+- 이번 제출은 TestFlight 외부 베타 심사이며 정식 App Store 출시 심사는 별도로 진행.
+
+---
+
 ## 2026-08-24 (Apple 심사용 전용 계정 준비)
 
 ### ✅ 완료된 작업

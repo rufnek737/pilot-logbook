@@ -28,8 +28,14 @@
     "Keyboard": {
       "resize": "none"
     },
-    "GoogleAuth": {
-      "serverClientId": "824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com"
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      },
+      "logLevel": 1
     }
   }
 }

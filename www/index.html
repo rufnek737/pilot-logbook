@@ -2440,21 +2440,25 @@ async function signInWithGoogle() {
   try {
     const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform());
     if (isNative) {
-      const GoogleAuth = window.Capacitor.Plugins.GoogleAuth;
-      if (!GoogleAuth) {
-        alert('GoogleAuth 플러그인 없음\nnpx cap sync android 후 APK 재빌드 필요');
+      const SocialLogin = window.Capacitor.Plugins.SocialLogin;
+      if (!SocialLogin) {
+        alert('Google 로그인 모듈을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트해 주세요.');
         return;
       }
-      const isIOS = window.Capacitor.getPlatform() === 'ios';
-      await GoogleAuth.initialize({
-        clientId: isIOS
-          ? '824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com'
-          : '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
-        scopes: ['profile', 'email'],
-        grantOfflineAccess: true,
+      await SocialLogin.initialize({
+        google: {
+          webClientId: '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
+          iOSClientId: '824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com',
+          iOSServerClientId: '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
+          mode: 'online',
+        },
       });
-      const googleUser = await GoogleAuth.signIn();
-      const idToken = googleUser.authentication.idToken;
+      const googleLogin = await SocialLogin.login({
+        provider: 'google',
+        options: { scopes: ['profile', 'email'] },
+      });
+      const idToken = googleLogin && googleLogin.result && googleLogin.result.idToken;
+      if (!idToken) throw new Error('Google 인증 토큰을 받지 못했습니다. 다시 시도해 주세요.');
       const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
       await auth.signInWithCredential(credential);
     } else {
@@ -2591,18 +2595,23 @@ async function reauthenticateForAccountDeletion(user) {
   if (providers.includes('google.com')) {
     const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform());
     if (isNative) {
-      const GoogleAuth = window.Capacitor.Plugins.GoogleAuth;
-      if (!GoogleAuth) throw new Error('Google 본인 확인 모듈을 사용할 수 없습니다.');
-      const isIOS = window.Capacitor.getPlatform() === 'ios';
-      await GoogleAuth.initialize({
-        clientId: isIOS
-          ? '824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com'
-          : '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
-        scopes: ['profile', 'email'],
-        grantOfflineAccess: true,
+      const SocialLogin = window.Capacitor.Plugins.SocialLogin;
+      if (!SocialLogin) throw new Error('Google 본인 확인 모듈을 사용할 수 없습니다.');
+      await SocialLogin.initialize({
+        google: {
+          webClientId: '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
+          iOSClientId: '824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com',
+          iOSServerClientId: '824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com',
+          mode: 'online',
+        },
       });
-      const googleUser = await GoogleAuth.signIn();
-      const credential = firebase.auth.GoogleAuthProvider.credential(googleUser.authentication.idToken);
+      const googleLogin = await SocialLogin.login({
+        provider: 'google',
+        options: { scopes: ['profile', 'email'] },
+      });
+      const idToken = googleLogin && googleLogin.result && googleLogin.result.idToken;
+      if (!idToken) throw new Error('Google 인증 토큰을 받지 못했습니다. 다시 시도해 주세요.');
+      const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
       await user.reauthenticateWithCredential(credential);
     } else {
       const provider = new firebase.auth.GoogleAuthProvider();
