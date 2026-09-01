@@ -1555,7 +1555,7 @@
     </button>
     <div style="position:relative;margin-bottom:12px">
       <input type="search" id="searchInput" placeholder="🔍  메모·편명·공항·날짜 검색..." autocomplete="off"
-        oninput="renderFlights()"
+        oninput="renderFlights()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
         style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 16px 10px 40px;color:var(--text1);font-size:13px;outline:none;-webkit-appearance:none;appearance:none"/>
       <svg style="position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <div id="searchCount" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text3);display:none"></div>
@@ -5670,8 +5670,12 @@ function _ccAcType(raw) {
   return 'B737-800';
 }
 
+// date+flight만으로는 같은 날 같은 편명·다른 구간(수동 입력 등)을 오인식해
+// 새 편을 "기존 편 업데이트"로 잘못 취급(무료 사용량 미차감 + 데이터 오염) →
+// 앱 내 다른 업로드(PDF/Excel/CSV)와 동일하게 dep/arr까지 매칭 키에 포함
 function _findCrewConnexFlightIndex(f) {
-  return flights.findIndex(x => x.date === f.date && x.flight === f.flight);
+  return flights.findIndex(x => x.date === f.date && x.flight === f.flight
+    && x.dep === f.from && x.arr === f.to);
 }
 
 // CrewConnex 재가져오기: 자동 파싱 항목만 최신값으로 바꾸고

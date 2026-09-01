@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-09-01 (CC 매칭 버그·검색 키보드 수정 + TestFlight 1.1(8) 업로드)
+
+### ✅ 완료된 작업
+
+#### CrewConnex 가져오기 — 무료 사용량 미차감 버그 수정
+- 사용자가 8/27 국내선 가져오기에서 무료 100편 사용량이 차감 안 되는 현상을 발견.
+- 원인: `_findCrewConnexFlightIndex()`가 날짜+편명만으로 기존 편 여부를 판단해, 같은 날짜·같은
+  편명이지만 실제로 다른 구간(수동 입력 등)인 편을 "기존 편 업데이트"로 오인식 → 신규 가져오기로
+  집계되지 않아 무료 사용량이 차감되지 않고, 기존 편 데이터가 잘못 덮어써질 위험도 있었음.
+- 앱 내 다른 업로드(PDF/Excel/CSV)와 동일하게 `dep`/`arr`까지 매칭 키에 포함하도록 수정
+  (리뷰 화면·상세 가져오기·일괄 가져오기 3곳 모두 동일 함수 사용, 한 번에 수정됨).
+
+#### 로그북 검색창 — 키보드 안 닫히는 버그 수정
+- 검색창에 Enter/검색 키 처리가 없어 iOS 키보드가 안 닫히고 화면을 가리던 현상 수정.
+- `onkeydown`에 Enter 시 `blur()` 처리 추가.
+
+#### App Store Connect 배포 자료 초안 작성
+- `app-store-metadata-ko.md`: 부제·프로모션 문구·앱 설명·키워드·URL·심사 참고사항·
+  스크린샷 목록·배포 체크리스트 초안 작성 (제출 전 최종 검토 필요).
+
+#### TestFlight 빌드 1.1(8) 업로드
+- 빌드 번호 `7` → `8`로 갱신, 웹 자산·네이티브 플러그인 재동기화.
+- `npm test` 41개 전체 통과 확인 후 Release Archive 생성.
+- Archive는 자동 서명(Apple Development)으로 생성되고, Export 단계에서 App Store 배포용
+  `Apple Distribution: kyungtae kay kang` 인증서로 재서명됨 (`-allowProvisioningUpdates`로
+  자동 처리, 별도 수동 인증서 발급 불필요 — 유료 개발자 계정 전환 후 최초 확인).
+- App Store Connect API 키(`AuthKey_PD2TJSVAU4.p8` + Issuer ID)로 `xcrun altool --upload-app`
+  업로드, `UPLOAD SUCCEEDED` 확인 (Delivery UUID `65d5f5c3-30cc-4489-846e-edef85dbc07c`).
+
+### 다음 단계
+- Apple 빌드 처리 완료 대기 (통상 10~30분).
+- App Store Connect 웹에서 처리 완료 확인 후 외부 테스트 그룹에 빌드 8 연결 및 필요 시
+  베타 심사 제출 — 이 단계는 로그인이 필요해 사용자가 직접 진행.
+- `app-store-metadata-ko.md` 초안 검토 후 정식 심사용 계정 정보 채워 넣기.
+
+---
+
 ## 2026-08-25 (개인정보 매니페스트 보완·TestFlight 재제출)
 
 ### ✅ 완료된 작업
