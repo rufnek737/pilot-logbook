@@ -472,28 +472,40 @@ function extractCrewFromRow(rowText) {
   }));
 }
 
+const MONTH_NAMES = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
 export function parseRosterHtml(html) {
   const flights = [];
   const today   = new Date();
   let trackYear  = today.getFullYear();
   let trackMonth = today.getMonth() + 1;
   let prevDayNum = 0;
-  let isFirstDay = true;
 
+  // 로스터의 날짜 칸은 "Tue 01 Sep"처럼 월 이름을 직접 담고 있으므로 그대로 사용한다.
+  // (월 이름이 없는 옛 형식만 일(日) 숫자 롤오버 추정으로 보조 처리)
   function dayToDate(dayStr) {
-    const d = parseInt((dayStr || '').replace(/\D/g, ''));
+    const text = String(dayStr || '');
+    const d = parseInt(text.replace(/\D/g, ''));
     if (!d) return null;
-    if (isFirstDay) {
-      // ±5일 조회 범위상 로스터가 이번 달 초(오늘이 1~5일)에 열람되면
-      // 표의 첫 행이 이미 전월 말(20일 초과)일 수 있음 — 이 경우를 놓치면
-      // 첫 행들이 이번 달로 잘못 계산되어(예: 9월 31일→10월 1일로 자동 보정)
-      // ±5일 필터 밖으로 밀려나 사라진다.
-      isFirstDay = false;
-      if (today.getDate() <= 5 && d > 20) {
-        trackMonth--;
-        if (trackMonth < 1) { trackMonth = 12; trackYear--; }
-      }
-    } else if (prevDayNum > 20 && d <= 5) {
+
+    const monthMatch = text.toLowerCase().match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/);
+    if (monthMatch) {
+      const month = MONTH_NAMES[monthMatch[1]];
+      // 연도는 표에 없으므로 오늘 기준으로 추정 — 6개월 이상 벌어지면 인접 연도로 본다.
+      let year = today.getFullYear();
+      const monthGap = month - (today.getMonth() + 1);
+      if (monthGap > 6) year -= 1;
+      else if (monthGap < -6) year += 1;
+      trackYear = year;
+      trackMonth = month;
+      prevDayNum = d;
+      return `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+
+    if (prevDayNum > 20 && d <= 5) {
       trackMonth++;
       if (trackMonth > 12) { trackMonth = 1; trackYear++; }
     }
@@ -611,6 +623,87 @@ export function parseRosterHtml(html) {
   return { flights: filtered, crew };
 }
 
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// CrewConnex 기간 입력 형식: "01Sep26 - 30Sep26"
+function formatRosterDate(date) {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mon = MONTH_ABBR[date.getMonth()];
+  const yy = String(date.getFullYear()).slice(-2);
+  return `${dd}${mon}${yy}`;
+}
+
+function extractHiddenFields(html) {
+  const fields = {};
+  const re = /<input[^>]+type=["']hidden["'][^>]*>/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const tag = m[0];
+    const name = (tag.match(/\bname=["']([^"']+)["']/i) || [])[1];
+    if (!name) continue;
+    const value = (tag.match(/\bvalue=["']([^"']*)["']/i) || [])[1] || '';
+    fields[name] = decodeEntities(value);
+  }
+  return fields;
+}
+
+function decodeEntities(text) {
+  return String(text)
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n));
+}
+
+// 오늘 ±7일 구간을 커스텀 기간으로 다시 조회 (월 경계에서 인접 달 비행 누락 방지)
+async function fetchRosterRange(rosterUrl, jar, html) {
+  try {
+    const fields = extractHiddenFields(html);
+    if (!fields.__VIEWSTATE) return null;
+
+    const today = new Date();
+    const from = new Date(today); from.setDate(from.getDate() - 7);
+    const to   = new Date(today); to.setDate(to.getDate() + 7);
+
+    const body = new URLSearchParams();
+    for (const [name, value] of Object.entries(fields)) body.set(name, value);
+    body.set('__EVENTTARGET', 'ctl00$Main$dataRangeButton');
+    body.set('__EVENTARGUMENT', '');
+    body.set('ctl00$Main$dateRangeHidden', `${formatRosterDate(from)} - ${formatRosterDate(to)}`);
+
+    const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    const r = await fetch(rosterUrl, {
+      method: 'POST',
+      headers: {
+        'User-Agent': UA,
+        'Accept': 'text/html,*/*',
+        'Accept-Language': 'ko-KR,ko',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie': jarStr(jar),
+        'Referer': rosterUrl,
+      },
+      body: body.toString(),
+      redirect: 'follow',
+    });
+    updateJar(jar, getSetCookies(r));
+    if (!r.ok) return null;
+    return parseRosterHtml(await r.text());
+  } catch (_) { return null; }
+}
+
+// 기본 조회 + 기간 조회 결과를 date+flight+from+to 기준으로 중복 없이 합침
+function mergeRosterResults(base, extra) {
+  const key = f => `${f.date}|${f.flight}|${f.from}|${f.to}`;
+  const byKey = new Map();
+  for (const f of [...(base.flights || []), ...(extra.flights || [])]) {
+    const k = key(f);
+    const prev = byKey.get(k);
+    // 편조 정보가 더 많은 쪽을 남긴다
+    if (!prev || (f.crew?.length || 0) > (prev.crew?.length || 0)) byKey.set(k, f);
+  }
+  const flights = [...byKey.values()].sort((a, b) => a.date.localeCompare(b.date));
+  return { flights, crew: base.crew?.length ? base.crew : (extra.crew || []) };
+}
+
 async function tryFetch(url, jar, referer) {
   try {
     const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -622,7 +715,13 @@ async function tryFetch(url, jar, referer) {
     if (!r.ok || r.url.includes('login')) return null;
     const html   = await r.text();
     const result = parseRosterHtml(html);
-    return result.flights.length > 0 ? result : null;
+    if (result.flights.length === 0) return null;
+    // 로스터 기본 화면은 "이번 달 전체"만 주므로, 월 경계(오늘이 월초/월말)에서
+    // 인접 달의 비행이 누락된다. ASP.NET 커스텀 기간 postback으로 today±7일을
+    // 다시 조회해 합친다.
+    const ranged = await fetchRosterRange(r.url, jar, html);
+    if (ranged && ranged.flights.length) return mergeRosterResults(result, ranged);
+    return result;
   } catch (_) { return null; }
 }
 

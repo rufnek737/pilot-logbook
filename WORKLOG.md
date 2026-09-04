@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-09-04 (8/31 비행 누락 원인 규명 — 커스텀 기간 조회 구현, 미해결)
+
+### 🔍 원인 규명 (Worker 실시간 로그로 확인)
+
+`wrangler tail`로 실제 응답을 찍어본 결과, **9/1 세션의 진단이 틀렸음**을 확인:
+
+- 크루커넥스 로스터(`roster.aspx`)는 **"이번 달 전체"만** 반환함 (`Tue 01 Sep` ~ `Wed 30 Sep`).
+  ±5일 범위 데이터가 아니므로 **8/31 행은 애초에 HTML에 없음** → 날짜 계산을 고쳐도 나올 수 없었음.
+  (9/1에 고친 "월초 첫 행 보정"은 실재하지 않는 문제를 대상으로 한 것이었음)
+- 원본 날짜 칸에 **월 이름이 이미 포함**되어 있음(`"Tue 01 Sep"`). 그동안 "일 숫자가 줄면 다음 달"로
+  추측하던 취약한 로직이 불필요했음.
+
+### ✅ 적용한 변경
+
+- **월 직접 파싱으로 교체**: `dayToDate`가 `Sep` 같은 월 이름을 직접 읽도록 변경(연말 경계 포함 검증).
+  월 이름이 없는 옛 형식만 기존 롤오버 추정으로 보조 처리.
+- **커스텀 기간 조회 구현**: 로스터가 ASP.NET WebForms(`aspnetForm` → POST `roster.aspx`)이고
+  `ctl00$Main$dateRangeHidden`(형식 `01Sep26 - 30Sep26`) + postback 대상 `ctl00$Main$dataRangeButton`으로
+  기간 조회가 가능함을 확인. 기본 조회 후 **오늘 ±7일 구간을 추가 POST**해서 결과를 병합
+  (`fetchRosterRange`, `mergeRosterResults`, `extractHiddenFields`, `formatRosterDate` 신규).
+- `npm test` 41개 통과, Worker 배포 완료 (Version `23bbf434-7009-43d7-83f7-eb6fe9a9ad55`).
+
+### ❌ 미해결 — 다음 세션 최우선
+
+커스텀 기간 POST를 넣었는데도 **사용자 확인 결과 8/31이 여전히 안 나옴**.
+요청 자체는 Worker에 도달함(POST 200 확인). 즉 `fetchRosterRange`가 조용히 실패하는 것으로 추정.
+
+**다음에 확인할 것:**
+1. `fetchRosterRange` 내부에 로그를 넣어 (a) `__VIEWSTATE` 추출 성공 여부, (b) POST 응답 status,
+   (c) 응답 HTML에서 파싱된 날짜 범위를 찍어볼 것 — 현재는 `catch (_) { return null; }`로 조용히 삼킴.
+2. ASP.NET이 `__EVENTVALIDATION` 없이 postback을 거부할 가능성 (수집된 hidden 목록엔 없었지만 재확인).
+3. `__EVENTTARGET`을 `ctl00$Main$dataRangeButton` 대신 `ctl00$Main$prev`(이전 기간 버튼, postback 목록에 존재)로
+   시도하는 대안. 또는 `ctl00$Main$periodSelect`(select) 값 조합 확인.
+4. 기간 문자열 형식이 정확히 `"28Aug26 - 11Sep26"`(공백 포함)로 맞는지 — 원본은 `"01Sep26 - 30Sep26"`.
+
+---
+
 ## 2026-09-01 (월 넘어가면 5일 안 나오는 버그 수정 + 크루커넥스 UX 정리)
 
 ### ✅ 완료된 작업
