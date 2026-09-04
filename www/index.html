@@ -1209,26 +1209,6 @@
     #infoFrame { width:100%; height:100%; border:0; background:#f8fafc; }
 
     /* ── CrewConnex Modal ── */
-    .cc-tab-btn {
-      flex: 1;
-      padding: 10px 8px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all .2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .cc-tab-btn.active {
-      background: var(--accent);
-      color: white;
-      border: 1px solid rgba(59,130,246,0.5);
-    }
-    .cc-tab-btn:not(.active) {
-      background: var(--surface2);
-      color: var(--text2);
-      border: 1px solid var(--border);
-    }
     .cc-flight-item {
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -1538,7 +1518,7 @@
     <div class="section-header">
       <span class="section-title">비행 기록</span>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="add-btn" style="background:rgba(16,58,100,0.6);border:1px solid rgba(59,130,246,0.35)" onclick="openCrewConnex()">🌐 CC</button>
+        <button class="add-btn" style="background:rgba(16,58,100,0.6);border:1px solid rgba(59,130,246,0.35)" onclick="openCrewConnex()">🌐 크루 커넥스</button>
         <button class="add-btn" style="background:rgba(30,80,30,0.6);border:1px solid rgba(34,197,94,0.35)" onclick="toggleRangePanel()">📊 합산</button>
         <button class="add-btn" style="background:rgba(80,40,10,0.6);border:1px solid rgba(251,146,60,0.35)" onclick="openPrintModal()">🖨 출력</button>
         <button class="add-btn" style="background:rgba(90,20,20,0.6);border:1px solid rgba(239,68,68,0.35)" onclick="toggleAuditPanel()">⚠️ 점검</button>
@@ -2158,12 +2138,6 @@
     </div>
     <div class="modal-body">
 
-      <!-- Tab buttons -->
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <button id="ccTabAuto" class="cc-tab-btn active" onclick="ccSwitchTab('auto')">자동 로그인</button>
-        <button id="ccTabText" class="cc-tab-btn"        onclick="ccSwitchTab('text')">텍스트 붙여넣기</button>
-      </div>
-
       <!-- Auto-login pane -->
       <div id="ccPaneAuto">
         <div style="padding:10px 12px;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:11px;color:var(--text2)">
@@ -2186,22 +2160,18 @@
         <div id="ccStatus" style="margin-top:10px;font-size:13px;color:var(--text2);min-height:18px;text-align:center"></div>
       </div>
 
-      <!-- Text-paste pane -->
-      <div id="ccPaneText" style="display:none">
-        <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.7">
-          crewconnex.jejuair.net → 체크인 화면에서 <strong style="color:var(--text2)">전체 텍스트 선택 → 복사</strong> 후 아래에 붙여넣기 하세요.
-        </div>
-        <textarea id="ccPastedText" class="form-input"
-          style="width:100%;min-height:110px;font-size:12px;resize:vertical;line-height:1.5"
-          placeholder="페이지 전체 텍스트를 여기에 붙여넣으세요..."></textarea>
-        <button class="submit-btn" onclick="parseCcText()" style="margin-top:10px">📋 파싱하기</button>
+      <!-- 스케줄 데이터를 가져오는 동안의 로딩 화면 -->
+      <div id="ccLoadingOverlay" style="display:none;padding:40px 20px;text-align:center">
+        <div style="width:44px;height:44px;margin:0 auto 18px;border:4px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:ptr-spin 0.9s linear infinite"></div>
+        <div style="font-size:15px;font-weight:700;color:var(--text1)">스케줄 데이터를 가져오는 중입니다</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px">잠시만 기다려주세요</div>
       </div>
 
       <!-- Results -->
       <div id="ccResultWrap" style="display:none;margin-top:18px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px">가져오기 검토</div>
-          <button onclick="ccSwitchTab('auto')" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;text-decoration:underline">↩ 다시 검색</button>
+          <button onclick="resetCcSearch()" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:2px 6px;text-decoration:underline">↩ 다시 검색</button>
         </div>
         <div id="ccFlightItems"></div>
 
@@ -2263,6 +2233,15 @@ function lockBodyScroll() {
 // 레이아웃(getBoundingClientRect)은 정상인데 화면에는 예전 위치가 그대로
 // 남아있는 iOS WKWebView paint 캐시 버그 대응 — display 토글로 렌더 트리에서
 // 완전히 뺐다 복원해 강제로 다시 그리게 한다 (transform 토글보다 훨씬 강함).
+// @capacitor/keyboard를 resize:"none"으로 꺼둔 이후 iOS가 포커스된 입력창을
+// 키보드 위로 자동 스크롤해주지 않아, 모달 하단부 입력창이 키보드에 가려지는
+// 문제가 생김 — 포커스 시 해당 입력창을 직접 화면 안으로 스크롤시켜 대체.
+document.addEventListener('focusin', e => {
+  const el = e.target;
+  if (!el.matches?.('input, select, textarea')) return;
+  setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
+});
+
 function forceFixedHeaderRepaint() {
   ['.header', '.status-bar-background'].forEach(sel => {
     const el = document.querySelector(sel);
@@ -5354,6 +5333,8 @@ let _ccReview = [];
 
 function openCrewConnex() {
   document.getElementById('ccResultWrap').style.display = 'none';
+  document.getElementById('ccLoadingOverlay').style.display = 'none';
+  document.getElementById('ccPaneAuto').style.display = '';
   document.getElementById('ccStatus').textContent = '';
   document.getElementById('ccModalOverlay').classList.add('show');
   syncBodyScrollLock();
@@ -5364,6 +5345,7 @@ function closeCrewConnex() {
   syncBodyScrollLock();
   // 닫을 때 로그인 폼 복원
   document.getElementById('ccPaneAuto').style.display = '';
+  document.getElementById('ccLoadingOverlay').style.display = 'none';
   document.getElementById('ccResultWrap').style.display = 'none';
 }
 
@@ -5371,12 +5353,10 @@ function closeCcOnOverlay(e) {
   if (e.target === document.getElementById('ccModalOverlay')) closeCrewConnex();
 }
 
-function ccSwitchTab(tab) {
-  const auto = tab === 'auto';
-  document.getElementById('ccPaneAuto').style.display = auto ? '' : 'none';
-  document.getElementById('ccPaneText').style.display = auto ? 'none' : '';
-  document.getElementById('ccTabAuto').className = 'cc-tab-btn' + (auto ? ' active' : '');
-  document.getElementById('ccTabText').className = 'cc-tab-btn' + (auto ? '' : ' active');
+// 결과 화면에서 "다시 검색" — 로그인 폼으로 복귀
+function resetCcSearch() {
+  document.getElementById('ccPaneAuto').style.display = '';
+  document.getElementById('ccLoadingOverlay').style.display = 'none';
   document.getElementById('ccResultWrap').style.display = 'none';
 }
 
@@ -5392,8 +5372,10 @@ async function loginCrewConnex() {
   }
 
   statusEl.style.color = 'var(--text2)';
-  statusEl.textContent = '⏳ 로그인 중...';
+  statusEl.textContent = '';
   document.getElementById('ccLoginBtn').disabled = true;
+  document.getElementById('ccPaneAuto').style.display = 'none';
+  document.getElementById('ccLoadingOverlay').style.display = '';
 
   try {
     const signedInUser = auth.currentUser;
@@ -5412,6 +5394,7 @@ async function loginCrewConnex() {
     const data = await resp.json();
 
     if (!resp.ok || data.error) {
+      document.getElementById('ccPaneAuto').style.display = '';
       if (data.code === 'FREE_LIMIT_REACHED') {
         statusEl.style.color = 'var(--warning)';
         statusEl.textContent = '무료 자동 가져오기 100편을 모두 사용했습니다';
@@ -5433,22 +5416,13 @@ async function loginCrewConnex() {
       renderCcResults(data);
     }
   } catch (err) {
+    document.getElementById('ccPaneAuto').style.display = '';
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = '❌ 연결 오류: ' + err.message;
   } finally {
     document.getElementById('ccLoginBtn').disabled = false;
+    document.getElementById('ccLoadingOverlay').style.display = 'none';
   }
-}
-
-function parseCcText() {
-  const text = (document.getElementById('ccPastedText').value || '').trim();
-  if (!text) { showToast('텍스트를 붙여넣어 주세요'); return; }
-  const data = parseCrewConnexText(text);
-  if (!data.flights.length) {
-    showToast('비행 데이터를 찾을 수 없습니다. 체크인 페이지 전체를 복사해 주세요.');
-    return;
-  }
-  renderCcResults(data);
 }
 
 function _buildCrewStr(crew) {
@@ -5528,7 +5502,7 @@ function renderCcResults(data) {
 
   // 결과가 나오면 로그인 폼 숨김 (혼동 방지)
   document.getElementById('ccPaneAuto').style.display = 'none';
-  document.getElementById('ccPaneText').style.display = 'none';
+  document.getElementById('ccLoadingOverlay').style.display = 'none';
 
   _ccReview = (data.flights || []).map((f, i) => _buildCcReview(f, i));
   const counts = _ccReview.reduce((acc, item) => {
@@ -5772,92 +5746,6 @@ function importCcFlight(idx) {
     document.getElementById('editId').value = previous.id;
     document.getElementById('modalTitle').textContent = '비행 기록 갱신';
   }
-}
-
-// ── Text parser (copy-paste fallback) ────────────────────────────
-function parseCrewConnexText(rawText) {
-  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const flights = [];
-  const crew    = [];
-
-  // 오늘 날짜 기준으로 월 추적 (HTML/텍스트에서 뽑은 날짜 대신 사용)
-  const _today     = new Date();
-  let _trackYear   = _today.getFullYear();
-  let _trackMonth  = _today.getMonth() + 1;
-  let _prevDayNum  = 0;
-
-  function resolveDay(dayStr) {
-    const d = parseInt((dayStr || '').replace(/\D/g, ''));
-    if (!d) return _today.toISOString().slice(0, 10);
-    // 월 넘어감 감지: 일수가 크게 줄어들면 (예: 30→1)
-    if (_prevDayNum > 20 && d <= 5) {
-      _trackMonth++;
-      if (_trackMonth > 12) { _trackMonth = 1; _trackYear++; }
-    }
-    _prevDayNum = d;
-    return `${_trackYear}-${String(_trackMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  }
-
-  const AC_MAP = {
-    '7M8': '-8 MAX', 'B38M': '-8 MAX',
-    '738': '-800', 'B738': '-800',
-    'A321': 'A321', 'A320': 'A320', 'Q400': 'Q400',
-  };
-
-  const FLIGHT_RE = /\b([A-Z]{3})\s+(\d{4})(?:\+\d)?\s+\d{4}(?:\+\d)?\s+([A-Z]{3})\s+(\d{4})(?:\+\d)?\s+\d{4}(?:\+\d)?\s+(7M8|B38M|738|B738|A321|A320|Q400)\s+(?:\d{1,2}:\d{2}\s+)?(\d{1,2}:\d{2})/;
-
-  let lastDay = '';
-  for (const line of lines) {
-    // 날짜 행 감지: "Mon 27 Apr" 또는 "Mon 27"
-    const dayM = line.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2})/i);
-    if (dayM) lastDay = dayM[1];
-
-    const m = FLIGHT_RE.exec(line);
-    if (!m) continue;
-
-    const fltM = line.match(/7[Cc]\s*(\d{3,4})/);
-    const flt  = fltM ? `7C${fltM[1]}` : '';
-    const regM = line.match(/\bHL(\d{4,5})\b/);
-
-    flights.push({
-      date:     resolveDay(lastDay),
-      flight:   flt,
-      from:     m[1],
-      to:       m[3],
-      stdLocal: `${m[2].slice(0,2)}:${m[2].slice(2)}`,
-      staLocal: `${m[4].slice(0,2)}:${m[4].slice(2)}`,
-      acType:   AC_MAP[m[5]] || 'B737-800',
-      acReg:    regM ? `HL${regM[1]}` : '',
-      blh:      m[6],
-    });
-  }
-
-  // ±5일 필터
-  const _todayMs  = _today.getTime();
-  const _windowMs = 5 * 24 * 60 * 60 * 1000;
-  const filteredFlights = flights.filter(f => {
-    const diff = new Date(f.date).getTime() - _todayMs;
-    return diff >= -_windowMs && diff <= _windowMs;
-  });
-
-  // ── 편조 파싱: 전체 텍스트에서 글로벌 정규식으로 한 번에 추출 ──
-  const flatText = rawText.replace(/\r?\n/g, ' ');
-  const POS = 'Capt\\s*\\(PIC\\)|SFO|Capt|FO|PUR|JC\\d|FA|OBSP|OBSR|OBS';
-  // 1차: empNo + 이름 + 직책
-  const CREW_RE = new RegExp(`(\\d{6,7})\\s+([가-힣][가-힣A-Za-z0-9]{0,9})\\s+(?:TL\\s+)?(${POS})`, 'g');
-  let cm;
-  while ((cm = CREW_RE.exec(flatText)) !== null) {
-    crew.push({ position: cm[3], empNo: cm[1], name: cm[2] });
-  }
-  // 2차 폴백: 이름 + 직책만
-  if (crew.length === 0) {
-    const CREW2 = new RegExp(`([가-힣]{2,5}[A-Za-z0-9]*)\\s+(?:TL\\s+)?(${POS})`, 'g');
-    while ((cm = CREW2.exec(flatText)) !== null) {
-      crew.push({ position: cm[2], empNo: '', name: cm[1] });
-    }
-  }
-
-  return { flights: filteredFlights, crew };
 }
 
 // ─── Init ────────────────────────────────────────────────────────

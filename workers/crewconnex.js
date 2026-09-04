@@ -478,11 +478,22 @@ export function parseRosterHtml(html) {
   let trackYear  = today.getFullYear();
   let trackMonth = today.getMonth() + 1;
   let prevDayNum = 0;
+  let isFirstDay = true;
 
   function dayToDate(dayStr) {
     const d = parseInt((dayStr || '').replace(/\D/g, ''));
     if (!d) return null;
-    if (prevDayNum > 20 && d <= 5) {
+    if (isFirstDay) {
+      // ±5일 조회 범위상 로스터가 이번 달 초(오늘이 1~5일)에 열람되면
+      // 표의 첫 행이 이미 전월 말(20일 초과)일 수 있음 — 이 경우를 놓치면
+      // 첫 행들이 이번 달로 잘못 계산되어(예: 9월 31일→10월 1일로 자동 보정)
+      // ±5일 필터 밖으로 밀려나 사라진다.
+      isFirstDay = false;
+      if (today.getDate() <= 5 && d > 20) {
+        trackMonth--;
+        if (trackMonth < 1) { trackMonth = 12; trackYear--; }
+      }
+    } else if (prevDayNum > 20 && d <= 5) {
       trackMonth++;
       if (trackMonth > 12) { trackMonth = 1; trackYear++; }
     }
