@@ -1226,6 +1226,30 @@
     .info-modal .modal-body { padding:0; flex:1; min-height:0; }
     #infoFrame { width:100%; height:100%; border:0; background:#f8fafc; }
 
+    /* ── 기간 합산 범위 달력 ── */
+    .rc-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .rc-week > div {
+      text-align: center; font-size: 10px; color: var(--text3);
+      padding: 4px 0; font-weight: 600;
+    }
+    .rc-nav {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text1); font-size: 15px; width: 30px; height: 28px; cursor: pointer;
+    }
+    .rc-day {
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; border: none; background: none; color: var(--text1);
+      cursor: pointer; border-radius: 8px; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rc-day:disabled { color: transparent; cursor: default; }
+    .rc-day.rc-in-range { background: rgba(59,130,246,0.15); border-radius: 0; }
+    .rc-day.rc-edge { background: var(--accent); color: #fff; font-weight: 700; }
+    .rc-day.rc-edge.rc-start { border-radius: 8px 0 0 8px; }
+    .rc-day.rc-edge.rc-end { border-radius: 0 8px 8px 0; }
+    .rc-day.rc-edge.rc-start.rc-end { border-radius: 8px; }
+    .rc-day.rc-today:not(.rc-edge) { box-shadow: inset 0 0 0 1px var(--accent); }
+
     /* ── CrewConnex Modal ── */
     .cc-flight-item {
       background: var(--surface2);
@@ -1565,10 +1589,24 @@
     <div id="rangePanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;display:none">
       <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📊 기간 비행시간 합산</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="date" id="rangeFrom" class="form-input" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px" />
-        <span style="color:var(--text3);font-size:13px">~</span>
-        <input type="date" id="rangeTo" class="form-input" style="flex:1;min-width:120px;font-size:13px;padding:8px 10px" />
+        <button type="button" id="rangeDisplay" onclick="toggleRangeCalendar()"
+          style="flex:1;min-width:180px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--text1);cursor:pointer;text-align:left">
+          기간을 선택하세요
+        </button>
         <button onclick="calcRangeSum()" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">합산</button>
+      </div>
+      <input type="hidden" id="rangeFrom" /><input type="hidden" id="rangeTo" />
+      <div id="rangeCalendar" style="display:none;margin-top:10px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <button type="button" onclick="shiftRangeMonth(-1)" class="rc-nav">‹</button>
+          <div id="rangeCalTitle" style="font-size:13px;font-weight:700"></div>
+          <button type="button" onclick="shiftRangeMonth(1)" class="rc-nav">›</button>
+        </div>
+        <div class="rc-grid rc-week">
+          <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+        </div>
+        <div class="rc-grid" id="rangeCalDays"></div>
+        <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px" id="rangeCalHint">시작일을 선택하세요</div>
       </div>
       <div id="rangeSumResult" style="margin-top:10px;display:none">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px">
@@ -3538,6 +3576,86 @@ function toggleRangePanel() {
     document.getElementById('rangeFrom').value = `${y}-${m}-01`;
     document.getElementById('rangeTo').value   = today.toISOString().slice(0,10);
   }
+  if (isHidden) { _rangeCalMonth = null; updateRangeDisplay(); }
+}
+
+// ── 기간 선택 달력 (시작·종료를 한 달력에서 연속 선택) ─────────────
+let _rangeCalMonth = null; // 표시 중인 달의 1일
+
+function _rcDateStr(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function toggleRangeCalendar() {
+  const cal = document.getElementById('rangeCalendar');
+  const show = cal.style.display === 'none';
+  cal.style.display = show ? '' : 'none';
+  if (show) renderRangeCalendar();
+}
+
+function shiftRangeMonth(delta) {
+  _rangeCalMonth.setMonth(_rangeCalMonth.getMonth() + delta);
+  renderRangeCalendar();
+}
+
+function renderRangeCalendar() {
+  const from = document.getElementById('rangeFrom').value;
+  if (!_rangeCalMonth) {
+    const base = from ? new Date(from) : new Date();
+    _rangeCalMonth = new Date(base.getFullYear(), base.getMonth(), 1);
+  }
+  const y = _rangeCalMonth.getFullYear();
+  const m = _rangeCalMonth.getMonth();
+  document.getElementById('rangeCalTitle').textContent = `${y}년 ${m + 1}월`;
+
+  const to = document.getElementById('rangeTo').value;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const firstWeekday = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+  let html = '';
+  for (let i = 0; i < firstWeekday; i++) html += '<button class="rc-day" disabled></button>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = _rcDateStr(y, m, d);
+    const isStart = ds === from;
+    const isEnd = ds === to;
+    const inRange = from && to && ds > from && ds < to;
+    const cls = ['rc-day'];
+    if (isStart || isEnd) cls.push('rc-edge');
+    if (isStart) cls.push('rc-start');
+    if (isEnd) cls.push('rc-end');
+    if (inRange) cls.push('rc-in-range');
+    if (ds === todayStr) cls.push('rc-today');
+    html += `<button class="${cls.join(' ')}" onclick="pickRangeDate('${ds}')">${d}</button>`;
+  }
+  document.getElementById('rangeCalDays').innerHTML = html;
+
+  const hint = document.getElementById('rangeCalHint');
+  hint.textContent = !from || to ? '시작일을 선택하세요' : '종료일을 선택하세요';
+}
+
+function pickRangeDate(ds) {
+  const fromEl = document.getElementById('rangeFrom');
+  const toEl = document.getElementById('rangeTo');
+  // 시작만 있고 종료가 비었으면 종료 선택, 그 외(둘 다 있거나 없음)엔 새 시작
+  if (fromEl.value && !toEl.value && ds >= fromEl.value) {
+    toEl.value = ds;
+  } else {
+    fromEl.value = ds;
+    toEl.value = '';
+  }
+  renderRangeCalendar();
+  updateRangeDisplay();
+}
+
+function updateRangeDisplay() {
+  const from = document.getElementById('rangeFrom').value;
+  const to = document.getElementById('rangeTo').value;
+  const el = document.getElementById('rangeDisplay');
+  if (!el) return;
+  if (from && to) el.textContent = `${from} ~ ${to}`;
+  else if (from) el.textContent = `${from} ~ 종료일 선택`;
+  else el.textContent = '기간을 선택하세요';
 }
 
 function calcRangeSum() {

@@ -479,8 +479,11 @@ const MONTH_NAMES = {
 
 // 가져오기 대상 기간(오늘 ±5일)을 'YYYY-MM-DD' 문자열로 반환.
 // 날짜 문자열끼리 비교하므로 시:분 차이로 경계일이 잘려나가지 않는다.
+// Workers 런타임은 UTC라 KST 00~09시에는 하루 전 날짜가 나온다.
+// 로스터 날짜는 한국 날짜 기준이므로 +9시간으로 맞춘 뒤 자른다.
 export function rosterWindow(now = new Date(), days = 5) {
-  const toStr = ms => new Date(ms).toISOString().slice(0, 10);
+  const KST_OFFSET = 9 * 60 * 60 * 1000;
+  const toStr = ms => new Date(ms + KST_OFFSET).toISOString().slice(0, 10);
   const dayMs = 24 * 60 * 60 * 1000;
   return { start: toStr(now.getTime() - days * dayMs), end: toStr(now.getTime() + days * dayMs) };
 }
