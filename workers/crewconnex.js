@@ -477,6 +477,14 @@ const MONTH_NAMES = {
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
 
+// 가져오기 대상 기간(오늘 ±5일)을 'YYYY-MM-DD' 문자열로 반환.
+// 날짜 문자열끼리 비교하므로 시:분 차이로 경계일이 잘려나가지 않는다.
+export function rosterWindow(now = new Date(), days = 5) {
+  const toStr = ms => new Date(ms).toISOString().slice(0, 10);
+  const dayMs = 24 * 60 * 60 * 1000;
+  return { start: toStr(now.getTime() - days * dayMs), end: toStr(now.getTime() + days * dayMs) };
+}
+
 export function parseRosterHtml(html) {
   const flights = [];
   const today   = new Date();
@@ -597,12 +605,10 @@ export function parseRosterHtml(html) {
     }
   }
 
-  const todayMs  = today.getTime();
-  const windowMs = 5 * 24 * 60 * 60 * 1000;
-  const filtered = flights.filter(f => {
-    const diff = new Date(f.date).getTime() - todayMs;
-    return diff >= -windowMs && diff <= windowMs;
-  });
+  // 날짜 단위 비교 — 시:분까지 비교하면 정확히 5일 전 비행(예: 오늘 9/5의 8/31)이
+  // 몇 시간 차이로 잘려나간다.
+  const { start: winStart, end: winEnd } = rosterWindow();
+  const filtered = flights.filter(f => f.date >= winStart && f.date <= winEnd);
 
   const dateCrewMap = {};
   filtered.forEach(f => {
@@ -621,16 +627,6 @@ export function parseRosterHtml(html) {
 
   const crew = filtered.find(f => f.crew && f.crew.length > 0)?.crew || [];
   return { flights: filtered, crew };
-}
-
-const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-// CrewConnex 기간 입력 형식: "01Sep26 - 30Sep26"
-function formatRosterDate(date) {
-  const dd = String(date.getDate()).padStart(2, '0');
-  const mon = MONTH_ABBR[date.getMonth()];
-  const yy = String(date.getFullYear()).slice(-2);
-  return `${dd}${mon}${yy}`;
 }
 
 function extractHiddenFields(html) {
@@ -654,21 +650,34 @@ function decodeEntities(text) {
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n));
 }
 
-// 오늘 ±7일 구간을 커스텀 기간으로 다시 조회 (월 경계에서 인접 달 비행 누락 방지)
-async function fetchRosterRange(rosterUrl, jar, html) {
+// 로스터 상단의 기간 선택 <select> 옵션 파싱
+// 옵션 형식: value="2026-08-01|2026-08-31" → AUG26 (01Aug26..31Aug26)
+function extractPeriodOptions(html) {
+  const sel = html.match(/<select[^>]+name=["']ctl00\$Main\$periodSelect["'][^>]*>([\s\S]*?)<\/select>/i);
+  if (!sel) return [];
+  return [...sel[1].matchAll(/<option([^>]*)>([^<]*)</gi)].map(m => {
+    const attrs = m[1];
+    const value = (attrs.match(/value=["']([^"']*)["']/i) || [])[1] || '';
+    const [start, end] = value.split('|');
+    return { value, start, end, selected: /\bselected\b/i.test(attrs), label: m[2].trim() };
+  }).filter(o => o.start && o.end);
+}
+
+// 기간 선택 후 "Period" 버튼(submit)으로 해당 월 로스터를 조회.
+// 주의: 이 버튼들은 type=submit 이므로 __EVENTTARGET이 아니라
+// 버튼의 name=value 쌍을 본문에 넣어야 서버가 조회를 실행한다.
+async function fetchRosterPeriod(rosterUrl, jar, html, option) {
   try {
     const fields = extractHiddenFields(html);
     if (!fields.__VIEWSTATE) return null;
 
-    const today = new Date();
-    const from = new Date(today); from.setDate(from.getDate() - 7);
-    const to   = new Date(today); to.setDate(to.getDate() + 7);
-
     const body = new URLSearchParams();
     for (const [name, value] of Object.entries(fields)) body.set(name, value);
-    body.set('__EVENTTARGET', 'ctl00$Main$dataRangeButton');
+    body.set('__EVENTTARGET', '');
     body.set('__EVENTARGUMENT', '');
-    body.set('ctl00$Main$dateRangeHidden', `${formatRosterDate(from)} - ${formatRosterDate(to)}`);
+    body.set('ctl00$Main$periodSelect', option.value);
+    body.set('ctl00$Main$activitySelectDropdown', 'period');
+    body.set('ctl00$Main$period', 'Period'); // submit 버튼
 
     const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
     const r = await fetch(rosterUrl, {
@@ -686,8 +695,33 @@ async function fetchRosterRange(rosterUrl, jar, html) {
     });
     updateJar(jar, getSetCookies(r));
     if (!r.ok) return null;
-    return parseRosterHtml(await r.text());
-  } catch (_) { return null; }
+    const respHtml = await r.text();
+    return parseRosterHtml(respHtml);
+  } catch (_) {
+    return null;
+  }
+}
+
+// 기본(이번 달) 조회 결과에, ±5일 창과 겹치는 인접 월을 추가 조회해 합친다.
+async function fetchAdjacentPeriods(rosterUrl, jar, html, base) {
+  const options = extractPeriodOptions(html);
+  if (!options.length) return base;
+
+  // 날짜 단위로 비교한다. 시:분까지 비교하면 "8/31까지"인 달 옵션이
+  // 현재 시각 기준 창 시작(8/31 01:40)보다 앞서 탈락하는 문제가 생긴다.
+  const { start: winStart, end: winEnd } = rosterWindow();
+
+  // 현재 선택된 달을 제외하고, 조회 창과 날짜 범위가 겹치는 달만 추가 조회
+  const targets = options.filter(o => !o.selected
+    && o.start <= winEnd && o.end >= winStart).slice(0, 2);
+  if (!targets.length) return base;
+
+  let merged = base;
+  for (const option of targets) {
+    const parsed = await fetchRosterPeriod(rosterUrl, jar, html, option);
+    if (parsed && parsed.flights.length) merged = mergeRosterResults(merged, parsed);
+  }
+  return merged;
 }
 
 // 기본 조회 + 기간 조회 결과를 date+flight+from+to 기준으로 중복 없이 합침
@@ -716,13 +750,12 @@ async function tryFetch(url, jar, referer) {
     const html   = await r.text();
     const result = parseRosterHtml(html);
     if (result.flights.length === 0) return null;
-    // 로스터 기본 화면은 "이번 달 전체"만 주므로, 월 경계(오늘이 월초/월말)에서
-    // 인접 달의 비행이 누락된다. ASP.NET 커스텀 기간 postback으로 today±7일을
-    // 다시 조회해 합친다.
-    const ranged = await fetchRosterRange(r.url, jar, html);
-    if (ranged && ranged.flights.length) return mergeRosterResults(result, ranged);
-    return result;
-  } catch (_) { return null; }
+    // 로스터 기본 화면은 "선택된 달 전체"만 준다. 월 경계(오늘이 월초/월말)에서는
+    // 조회 창에 걸치는 인접 달을 기간 선택으로 추가 조회해 합쳐야 누락되지 않는다.
+    return await fetchAdjacentPeriods(r.url, jar, html, result);
+  } catch (_) {
+    return null;
+  }
 }
 
 // ─── Cloudflare Workers 핸들러 (Netlify와 다른 부분) ───────────────────────

@@ -649,6 +649,24 @@
       touch-action: pan-y;
       animation: slideUp 0.3s ease;
     }
+    /* 키보드가 떠 있는 동안 가려진 높이만큼 스크롤 여유를 확보한다.
+       (resize:"none"이라 웹뷰가 줄지 않으므로 직접 확보해야 함) */
+    :root { --keyboard-inset: 0px; }
+    body.keyboard-open .modal,
+    body.keyboard-open #printView {
+      padding-bottom: calc(env(safe-area-inset-bottom) + var(--keyboard-inset));
+    }
+    /* 모달이 아닌 본문(검색창·카드 개인 메모 등)도 동일하게 여유 확보 */
+    body.keyboard-open .content {
+      padding-bottom: calc(100px + var(--keyboard-inset));
+    }
+    /* 로그인 화면은 overflow:hidden + 세로 중앙 정렬이라 스크롤 자체가 안 된다.
+       키보드가 뜨면 위 정렬로 바꾸고 스크롤을 허용해 입력창이 가리지 않게 한다. */
+    body.keyboard-open #authOverlay {
+      align-items: flex-start;
+      overflow-y: auto;
+      padding-bottom: var(--keyboard-inset);
+    }
     @keyframes slideUp {
       from { transform: translateY(100%); }
       to { transform: translateY(0); }
@@ -2230,18 +2248,70 @@ function lockBodyScroll() {
   _isBodyScrollLocked = true;
 }
 
+// ── 키보드 회피 ──────────────────────────────────────────────────
+// @capacitor/keyboard를 resize:"none"으로 쓰고 있어 키보드가 떠도 웹뷰 높이가
+// 그대로다. 이 경우 visualViewport도 줄지 않으므로(웹뷰가 키보드 존재 자체를
+// 모름) 키보드 높이는 플러그인 이벤트로만 알 수 있다. 웹에서는 visualViewport로 대체.
+(function initKeyboardAvoidance() {
+  let keyboardPx = 0;
+
+  // 키보드 높이만큼 스크롤 여유를 만들어 두지 않으면, 마지막 입력창은
+  // 더 스크롤할 내용이 없어 위로 올라오지 못한다.
+  function applyKeyboardInset(px) {
+    keyboardPx = Math.max(0, Math.round(px));
+    document.documentElement.style.setProperty('--keyboard-inset', `${keyboardPx}px`);
+    document.body.classList.toggle('keyboard-open', keyboardPx > 0);
+  }
+
+  function ensureFocusedVisible() {
+    const el = document.activeElement;
+    if (keyboardPx <= 0 || !el || !el.matches?.('input, select, textarea')) return;
+    const margin = 16;
+    const visibleBottom = window.innerHeight - keyboardPx - margin;
+    const rect = el.getBoundingClientRect();
+    if (rect.bottom <= visibleBottom) return;
+    const scroller = el.closest('.modal, #printView, #authOverlay') || document.scrollingElement;
+    scroller.scrollBy({ top: rect.bottom - visibleBottom, behavior: 'smooth' });
+  }
+
+  let bound = false;
+  function bindKeyboardPlugin() {
+    if (bound) return true;
+    const keyboard = window.Capacitor?.Plugins?.Keyboard;
+    if (!keyboard) return false;
+    bound = true;
+    keyboard.addListener('keyboardWillShow', info => {
+      applyKeyboardInset(info?.keyboardHeight || 0);
+      setTimeout(ensureFocusedVisible, 60);
+    });
+    keyboard.addListener('keyboardDidShow', () => ensureFocusedVisible());
+    keyboard.addListener('keyboardWillHide', () => applyKeyboardInset(0));
+    return true;
+  }
+
+  // 브릿지 주입 타이밍에 따라 최초 실행 시 플러그인이 아직 없을 수 있어 재시도
+  if (!bindKeyboardPlugin()) {
+    window.addEventListener('load', bindKeyboardPlugin, { once: true });
+    document.addEventListener('deviceready', bindKeyboardPlugin, { once: true });
+  }
+
+  // 웹(브라우저)에서는 visualViewport가 키보드 높이를 알려준다
+  if (window.visualViewport) {
+    const vv = window.visualViewport;
+    vv.addEventListener('resize', () => {
+      if (bound) return; // 네이티브는 플러그인 값이 정확하므로 덮어쓰지 않음
+      applyKeyboardInset(window.innerHeight - vv.height - vv.offsetTop);
+      setTimeout(ensureFocusedVisible, 60);
+    });
+  }
+
+  // 키보드가 떠 있는 상태에서 다른 입력창으로 옮겨가는 경우
+  document.addEventListener('focusin', () => setTimeout(ensureFocusedVisible, 250));
+})();
+
 // 레이아웃(getBoundingClientRect)은 정상인데 화면에는 예전 위치가 그대로
 // 남아있는 iOS WKWebView paint 캐시 버그 대응 — display 토글로 렌더 트리에서
 // 완전히 뺐다 복원해 강제로 다시 그리게 한다 (transform 토글보다 훨씬 강함).
-// @capacitor/keyboard를 resize:"none"으로 꺼둔 이후 iOS가 포커스된 입력창을
-// 키보드 위로 자동 스크롤해주지 않아, 모달 하단부 입력창이 키보드에 가려지는
-// 문제가 생김 — 포커스 시 해당 입력창을 직접 화면 안으로 스크롤시켜 대체.
-document.addEventListener('focusin', e => {
-  const el = e.target;
-  if (!el.matches?.('input, select, textarea')) return;
-  setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
-});
-
 function forceFixedHeaderRepaint() {
   ['.header', '.status-bar-background'].forEach(sel => {
     const el = document.querySelector(sel);
