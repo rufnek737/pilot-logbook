@@ -744,6 +744,20 @@
     }
     select.form-input { cursor: pointer; }
 
+    /* ePaper(E-FLIGHT LOG) 양식의 T/O · L/D 체크 방식 */
+    .epaper-check-row { display: flex; gap: 8px; }
+    .epaper-check {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 11px 8px; border: 1px solid var(--border); border-radius: 10px;
+      background: var(--surface2); cursor: pointer; user-select: none;
+      font-size: 14px; font-weight: 600; color: var(--text2);
+      transition: border-color .15s, color .15s, background .15s;
+    }
+    .epaper-check input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+    .epaper-check:has(input:checked) {
+      border-color: var(--accent); color: var(--accent); background: var(--accent-glow);
+    }
+
     .form-section-title {
       font-size: 11px;
       font-weight: 700;
@@ -1892,17 +1906,6 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">이륙 (T/O)</label>
-          <select class="form-input" id="fToPf">
-            <option value="PF">PF — 본인 이륙</option>
-            <option value="PM">PM — 상대방 이륙</option>
-            <option value="">— 해당없음</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-row flight-only">
-        <div class="form-group">
           <label class="form-label">Duty Code</label>
           <select class="form-input" id="fDutyCode">
             <option value="C">C — PIC 기장 (전체 PIC)</option>
@@ -1930,22 +1933,25 @@
             <option value="S">S — Student (Local FLT)</option>
           </select>
         </div>
-        <div class="form-group">
-          <label class="form-label">오토랜딩 (ALD)</label>
-          <select class="form-input" id="fAld">
-            <option value="N">N — 일반 착륙</option>
-            <option value="Y">Y — 오토랜딩</option>
-          </select>
-        </div>
       </div>
 
-      <div class="form-row single flight-only">
+      <div class="form-row flight-only">
         <div class="form-group">
-          <label class="form-label">착륙 (LDG)</label>
-          <select class="form-input" id="fLdgPf">
-            <option value="PF">PF — 본인 착륙</option>
-            <option value="PM">PM — 상대방 착륙</option>
+          <label class="form-label">본인 수행 (T/O · L/D)</label>
+          <div class="epaper-check-row">
+            <label class="epaper-check"><input type="checkbox" id="fToChk" /><span>T/O</span></label>
+            <label class="epaper-check"><input type="checkbox" id="fLdChk" /><span>L/D</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">착륙 유형 (LDT)</label>
+          <select class="form-input" id="fLdt">
             <option value="">— 해당없음</option>
+            <option value="M">M — 메뉴얼</option>
+            <option value="A">A — 오토</option>
+            <option value="2">2 — CAT II</option>
+            <option value="3">3 — CAT III</option>
+            <option value="O">O — 비정밀 접근</option>
           </select>
         </div>
       </div>
@@ -3845,7 +3851,7 @@ function normalizeBackupFlight(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('백업에 올바르지 않은 비행기록이 있습니다.');
   const flight = JSON.parse(JSON.stringify(raw));
   flight.id = String(flight.id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) || uid();
-  const shortFields = ['date','flight','dep','arr','acType','reg','dutyCode','role','recordType','depTime','arrTime','total','night','ifr','toPf','ldgPf','ald','simDevice','simTraining'];
+  const shortFields = ['date','flight','dep','arr','acType','reg','dutyCode','role','recordType','depTime','arrTime','total','night','ifr','toPf','ldgPf','ald','ldt','simDevice','simTraining'];
   shortFields.forEach(key => {
     if (flight[key] != null) flight[key] = String(flight[key]).replace(/[<>&"'`]/g, '').slice(0, 80);
   });
@@ -4066,6 +4072,20 @@ function calcCreditedTime(f) {
 function isTrainingDuty(f) {
   const dc = (f.dutyCode || '').toUpperCase();
   return dc === 'R' || dc === 'S';
+}
+
+// ePaper(E-FLIGHT LOG) LDT — 착륙 유형. '' 해당없음 / M 메뉴얼 / A 오토 / 2 CAT II / 3 CAT III / O 비정밀 접근
+// 구형 기록은 ald('Y'/'N')만 있으므로 Y→A, N→M 으로 읽어준다.
+function ldtOf(f) {
+  if (f.ldt !== undefined && f.ldt !== null) return f.ldt;
+  if (f.ald === 'Y') return 'A';
+  if (f.ald === 'N') return 'M';
+  return '';
+}
+// 오토랜딩 통계 집계 대상 — CAT II/III 접근은 오토랜딩으로 본다
+function isAutoland(f) {
+  const v = ldtOf(f);
+  return v === 'A' || v === '2' || v === '3';
 }
 
 function showToast(msg, duration = 2500) {
@@ -4308,7 +4328,8 @@ function flightCard(f) {
   const dcClass = isSim ? 'badge-sim' : (dc ? dutyCodeBadgeClass(dc) : (f.role === 'PIC' || f.role === 'INST' ? 'badge-pic' : 'badge-sic'));
   const dcBadge = `<span class="badge ${dcClass}">${dcLabel}</span>`;
   const nightBadge = isNight ? `<span class="badge badge-night">야간</span>` : '';
-  const aldBadge   = f.ald === 'Y' ? `<span class="badge badge-ald">ALD</span>` : '';
+  const _ldt = ldtOf(f);
+  const aldBadge   = _ldt && _ldt !== 'M' ? `<span class="badge badge-ald">${_ldt === 'A' ? 'ALD' : _ldt === 'O' ? 'NPA' : 'CAT ' + _ldt}</span>` : '';
 
   const duration = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
   const cr = isSim ? { pic:0, sic:0 } : calcCreditedTime(f);
@@ -4413,7 +4434,7 @@ function updateStats() {
     night   += parseHHMM(f.night) || 0;
     ifr     += parseHHMM(f.ifr)   || 0;
     actualLandings += window.PilotLogbookSim.actualLandingCount(f);
-    if (f.ald === 'Y') ald++;
+    if (isAutoland(f)) ald++;
 
     const fDate = new Date(f.date);
     const diff = (now - fDate) / (1000*60*60*24);
@@ -4705,7 +4726,7 @@ function renderCurrency() {
       } else if (window.PilotLogbookSim.actualLandingCount(f) > 0) {
         ldg90Day += 1;
       }
-      if (f.ald === 'Y') ald90++;
+      if (isAutoland(f)) ald90++;
       ifr90 += parseHHMM(f.ifr) || 0;
       const cr = calcCreditedTime(f); // 듀티코드 가중치 반영된 인정시간
       hrs90 += cr.pic + cr.sic;
@@ -4770,9 +4791,9 @@ function openModal(prefill) {
   document.getElementById('fAcType').value    = 'B737-800';
   document.getElementById('fRole').value      = 'PIC';
   document.getElementById('fDutyCode').value  = 'C';
-  document.getElementById('fAld').value       = 'N';
-  document.getElementById('fToPf').value   = 'PF';
-  document.getElementById('fLdgPf').value   = 'PF';
+  document.getElementById('fLdt').value       = 'M';
+  document.getElementById('fToChk').checked = true;
+  document.getElementById('fLdChk').checked = true;
   document.getElementById('fRecordType').value = 'FLIGHT';
   document.getElementById('fSimDevice').value = 'FFS';
   document.getElementById('fSimTraining').value = 'LPC';
@@ -4784,7 +4805,9 @@ function openModal(prefill) {
   if (prefill) {
     Object.entries(prefill).forEach(([k,v]) => {
       const el = document.getElementById(k);
-      if (el && v !== undefined) el.value = v;
+      if (!el || v === undefined) return;
+      if (el.type === 'checkbox') el.checked = !!v;
+      else el.value = v;
     });
   }
 
@@ -4817,12 +4840,12 @@ function editEntry(id) {
   document.getElementById('fIfr').value = f.ifr || '';
   document.getElementById('fRole').value      = f.role      || 'SIC';
   document.getElementById('fDutyCode').value  = f.dutyCode  || 'C';
-  document.getElementById('fAld').value       = f.ald       || 'N';
+  document.getElementById('fLdt').value       = ldtOf(f);
   // T/O PF/PM: 신규 필드 우선, 구형(takeoffs/landings)에서 폴백
   const _toPf  = f.toPf  !== undefined ? f.toPf  : (parseInt(f.takeoffs||f.toCnt||1)>0 ? 'PF' : 'PM');
   const _ldgPf = f.ldgPf !== undefined ? f.ldgPf : (parseInt(f.landings||f.ldCnt||1)>0 ? 'PF' : 'PM');
-  document.getElementById('fToPf').value   = _toPf;
-  document.getElementById('fLdgPf').value  = _ldgPf;
+  document.getElementById('fToChk').checked = _toPf === 'PF';
+  document.getElementById('fLdChk').checked = _ldgPf === 'PF';
   document.getElementById('fCrewInfo').value = getCrewInfo(f);
   document.getElementById('fPersonalMemo').value = getPersonalMemo(f);
   document.getElementById('fSimDevice').value = f.simDevice || 'FFS';
@@ -4920,9 +4943,10 @@ function saveEntry() {
     role:      document.getElementById('fRole').value,
     dutyCode:  document.getElementById('fDutyCode').value,
     dutyCodeManual: true,  // 수동 저장 → PDF 재업로드 시 덮어쓰기 방지
-    ald:       document.getElementById('fAld').value,
-    toPf:     document.getElementById('fToPf').value,
-    ldgPf:    document.getElementById('fLdgPf').value,
+    ldt:       document.getElementById('fLdt').value,
+    ald:       document.getElementById('fLdt').value === 'A' ? 'Y' : 'N', // 구버전 호환
+    toPf:     document.getElementById('fToChk').checked ? 'PF' : 'PM',
+    ldgPf:    document.getElementById('fLdChk').checked ? 'PF' : 'PM',
     crewInfo,
     personalMemo: document.getElementById('fPersonalMemo').value,
     remarks: crewInfo, // 구버전 호환용 편조 사본
@@ -4932,7 +4956,7 @@ function saveEntry() {
     entry.flight = `SIM ${document.getElementById('fSimTraining').value}`;
     entry.dep = ''; entry.arr = ''; entry.depTime = ''; entry.arrTime = ''; entry.reg = '';
     entry.night = ''; entry.ifr = ''; entry.role = 'SIM'; entry.dutyCode = ''; entry.dutyCodeManual = false;
-    entry.ald = 'N'; entry.toPf = ''; entry.ldgPf = ''; entry.crewInfo = ''; entry.remarks = '';
+    entry.ldt = ''; entry.ald = 'N'; entry.toPf = ''; entry.ldgPf = ''; entry.crewInfo = ''; entry.remarks = '';
     entry.simDevice = document.getElementById('fSimDevice').value;
     entry.simTraining = document.getElementById('fSimTraining').value;
     entry.simTakeoffs = window.PilotLogbookSim.count(document.getElementById('fSimTakeoffs').value);
@@ -5489,6 +5513,7 @@ function parseJejuAirEpaper(text, filename, lines) {
       role,
       dutyCode,
       ald: aldVal,
+      ldt: aldVal === 'Y' ? 'A' : 'M',
       ldgPf: hasLanding ? 'PF' : 'PM',
       dayLdg:   (hasLanding && !isNight) ? '1' : '0',
       nightLdg: (hasLanding &&  isNight) ? '1' : '0',
@@ -5864,6 +5889,7 @@ function _mergeCrewConnexFlight(f, previous) {
     night: previous?.night || '',
     ifr: previous?.ifr || '',
     ald: previous?.ald || '',
+    ldt: previous?.ldt ?? (previous ? ldtOf(previous) : ''),
     toPf: previous?.toPf ?? 'PF',
     ldgPf: previous?.ldgPf ?? 'PF',
     personalMemo: getPersonalMemo(previous),
@@ -5926,7 +5952,7 @@ function importCcFlight(idx) {
     fAcType: merged.acType, fReg: merged.reg,
     fNight: merged.night, fIfr: merged.ifr,
     fRole: merged.role, fDutyCode: merged.dutyCode,
-    fAld: merged.ald || 'N', fToPf: merged.toPf, fLdgPf: merged.ldgPf,
+    fLdt: ldtOf(merged), fToChk: merged.toPf === 'PF', fLdChk: merged.ldgPf === 'PF',
     fCrewInfo: merged.crewInfo, fPersonalMemo: merged.personalMemo,
   });
   if (previous) {
