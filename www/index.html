@@ -1496,6 +1496,7 @@
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
+      <button id="themeToggle" onclick="toggleTheme()" title="테마 전환">🌙</button>
       <div class="user-chip" id="userChip" style="display:none" onclick="openAccountMenu()" role="button" aria-label="계정 및 도움말">
         <img id="userPhoto" src="" alt="" style="display:none" />
         <span id="userInitial" style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0"></span>
@@ -1591,15 +1592,14 @@
 
     <div class="drawer-group-title">도구</div>
     <button class="drawer-item" onclick="drawerRun(openCrewConnex)"><span class="drawer-ico">🌐</span><span>크루 커넥스</span></button>
-    <button class="drawer-item" onclick="drawerRun(openRangePanel)"><span class="drawer-ico">📊</span><span>기간 합산</span></button>
+    <button class="drawer-item" data-tab="range" onclick="drawerGo('range')"><span class="drawer-ico">📊</span><span>기간 합산</span></button>
     <button class="drawer-item" onclick="drawerRun(openPrintModal)"><span class="drawer-ico">🖨</span><span>출력</span></button>
-    <button class="drawer-item" onclick="drawerRun(openAuditPanel)"><span class="drawer-ico">⚠️</span><span>기록 점검</span></button>
+    <button class="drawer-item" data-tab="audit" onclick="drawerGo('audit')"><span class="drawer-ico">⚠️</span><span>기록 점검</span></button>
     <button class="drawer-item" onclick="drawerRun(() => openModal())"><span class="drawer-ico">➕</span><span>비행 입력</span></button>
 
     <div class="drawer-group-title">계정</div>
     <button class="drawer-item" onclick="drawerRun(() => PilotLogbookBilling.open())"><span class="drawer-ico">✈️</span><span>구독 현황</span></button>
     <button class="drawer-item" onclick="drawerRun(openAccountMenu)"><span class="drawer-ico">👤</span><span>계정 및 도움말</span></button>
-    <button class="drawer-item" onclick="toggleTheme()"><span class="drawer-ico" id="themeToggle">🌙</span><span>테마 전환</span></button>
   </nav>
 </div>
 
@@ -1639,8 +1639,21 @@
     <div id="monthNav" style="display:none;overflow-x:auto;white-space:nowrap;padding:0 0 10px 0;margin-bottom:4px;scrollbar-width:none">
       <div id="monthNavInner" style="display:inline-flex;gap:6px"></div>
     </div>
-    <!-- 기간 합산 패널 -->
-    <div id="rangePanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;display:none">
+
+
+    <div id="flightList">
+      <div class="empty-state">
+        <span class="empty-icon">🛫</span>
+        <div class="empty-title">비행 기록이 없습니다</div>
+        <div class="empty-sub">상단 업로드 탭에서 제주항공<br>PDF·Excel·CSV를 업로드하거나<br>직접 입력해 주세요.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload Tab -->
+  <!-- 기간 합산 Tab -->
+  <div id="tab-range" class="tab-pane">
+    <div id="rangePanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📊 기간 비행시간 합산</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button type="button" id="rangeDisplay" onclick="toggleRangeCalendar()"
@@ -1691,9 +1704,11 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- 이상 기록 점검 패널 -->
-    <div id="auditPanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;display:none">
+  <!-- 기록 점검 Tab -->
+  <div id="tab-audit" class="tab-pane">
+    <div id="auditPanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">⚠️ 이상 기록 점검</div>
       <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:10px">
         저장된 총 비행시간이 출발·도착시간으로 계산한 값과 크게 다르거나, 값이 없거나 비정상적으로 큰 기록을 찾아줍니다.
@@ -1702,17 +1717,8 @@
       <button onclick="runFlightAudit()" style="background:var(--danger);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">검사하기</button>
       <div id="auditResult" style="margin-top:12px"></div>
     </div>
-
-    <div id="flightList">
-      <div class="empty-state">
-        <span class="empty-icon">🛫</span>
-        <div class="empty-title">비행 기록이 없습니다</div>
-        <div class="empty-sub">상단 업로드 탭에서 제주항공<br>PDF·Excel·CSV를 업로드하거나<br>직접 입력해 주세요.</div>
-      </div>
-    </div>
   </div>
 
-  <!-- Upload Tab -->
   <div id="tab-upload" class="tab-pane">
     <div class="upload-section">
       <div class="upload-zone" id="uploadZone">
@@ -3552,12 +3558,6 @@ async function deleteCareerEntry(entryId) {
 }
 
 // ── 이상 기록 점검 (PDF 파싱 오류 후보 탐지) ──────────────────────
-function toggleAuditPanel() {
-  const p = document.getElementById('auditPanel');
-  const isHidden = p.style.display === 'none' || p.style.display === '';
-  p.style.display = isHidden ? 'block' : 'none';
-}
-
 // 같은 시간대(국내선)에서만 출발·도착 로컬시간 기반 계산이 총 비행시간과 일치해야 함
 // 국제선은 시차 때문에 로컬시간 차이가 실제 블록타임과 원래 다르므로 비교 대상에서 제외
 const KOREA_DOMESTIC_APTS = new Set(['GMP','ICN','CJU','PUS','TAE','KWJ','RSU','USN','HIN','KUV','WJU','YNY','CJJ','MWX','KPO']);
@@ -3612,18 +3612,16 @@ function runFlightAudit() {
 }
 
 // ── 기간 합산 ─────────────────────────────────────────────────────
-function toggleRangePanel() {
-  const p = document.getElementById('rangePanel');
-  const isHidden = p.style.display === 'none' || p.style.display === '';
-  p.style.display = isHidden ? 'block' : 'none';
-  if (isHidden && !document.getElementById('rangeFrom').value) {
-    // 기본값: 이번달 1일 ~ 오늘
+// 기간 합산 화면 진입 — 기간이 비어 있으면 이번달 1일~오늘로 채운다
+function initRangePane() {
+  if (!document.getElementById('rangeFrom').value) {
     const today = new Date();
     const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0');
     document.getElementById('rangeFrom').value = `${y}-${m}-01`;
     document.getElementById('rangeTo').value   = today.toISOString().slice(0,10);
   }
-  if (isHidden) { _rangeCalMonth = null; updateRangeDisplay(); }
+  _rangeCalMonth = null;
+  updateRangeDisplay();
 }
 
 // ── 기간 선택 달력 (시작·종료를 한 달력에서 연속 선택) ─────────────
@@ -4148,7 +4146,10 @@ function scrollToMonth(mo) {
 }
 
 function switchTab(name) {
-  const titles = { logbook: '비행 기록', upload: '업로드', charts: '통계', currency: '자격 유지' };
+  const titles = {
+    logbook: '비행 기록', upload: '업로드', charts: '통계',
+    currency: '자격 유지', range: '기간 합산', audit: '기록 점검',
+  };
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   // 탭바가 없으므로 현재 위치는 헤더 부제 + 드로어 강조로 알린다
@@ -4159,6 +4160,11 @@ function switchTab(name) {
   });
   if (name === 'charts') renderCharts();
   if (name === 'currency') renderCurrency();
+  if (name === 'range') initRangePane();
+  // 비행 추가 FAB은 비행 기록 화면에서만 — 다른 화면은 그 화면 일만 보이게
+  const fab = document.querySelector('.fab');
+  if (fab) fab.style.display = name === 'logbook' ? '' : 'none';
+  window.scrollTo(0, 0);
   requestAnimationFrame(() => window.forceFixedHeaderRepaint?.());
 }
 
@@ -4185,18 +4191,7 @@ function drawerRun(fn) {
   setTimeout(fn, 200);
 }
 
-// 합산·점검 패널은 로그북 탭 안에 있으므로 탭을 먼저 맞추고 항상 펼친다
-function openRangePanel() {
-  switchTab('logbook');
-  if (document.getElementById('rangePanel').style.display !== 'block') toggleRangePanel();
-  document.getElementById('rangePanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
 
-function openAuditPanel() {
-  switchTab('logbook');
-  if (document.getElementById('auditPanel').style.display !== 'block') toggleAuditPanel();
-  document.getElementById('auditPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
 
 // ─── Render Flights ─────────────────────────────────────────────
 // 현재 페이지 (월 기준, 0 = 가장 최근 월)
