@@ -4121,6 +4121,10 @@ function ldtOf(f) {
   if (f.ald === 'N') return 'M';
   return '';
 }
+// 로그북 카드에 보여줄 짧은 라벨 ('2'만 적으면 뜻이 안 보이므로 풀어 쓴다)
+const LDT_LABELS = { M: 'MAN', A: 'AUTO', '2': 'CAT2', '3': 'CAT3', O: 'NPA' };
+function ldtLabel(f) { return LDT_LABELS[ldtOf(f)] || '—'; }
+
 // 오토랜딩 통계 집계 대상 — CAT II/III 접근은 오토랜딩으로 본다
 function isAutoland(f) {
   const v = ldtOf(f);
@@ -4404,8 +4408,6 @@ function flightCard(f) {
   const dcClass = isSim ? 'badge-sim' : (dc ? dutyCodeBadgeClass(dc) : (f.role === 'PIC' || f.role === 'INST' ? 'badge-pic' : 'badge-sic'));
   const dcBadge = `<span class="badge ${dcClass}">${dcLabel}</span>`;
   const nightBadge = isNight ? `<span class="badge badge-night">야간</span>` : '';
-  const _ldt = ldtOf(f);
-  const aldBadge   = _ldt && _ldt !== 'M' ? `<span class="badge badge-ald">${_ldt === 'A' ? 'ALD' : _ldt === 'O' ? 'NPA' : 'CAT ' + _ldt}</span>` : '';
 
   const duration = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
   const cr = isSim ? { pic:0, sic:0 } : calcCreditedTime(f);
@@ -4442,7 +4444,7 @@ function flightCard(f) {
         <div class="card-flt">${isSim ? escHtml(f.simTraining || 'SIM 훈련') : (f.flight || '—')}</div>
         <div class="card-ac">${f.acType || ''} ${f.reg ? '· '+f.reg : ''}</div>
       </div>
-      <div class="card-badges">${dcBadge}${nightBadge}${aldBadge}</div>
+      <div class="card-badges">${dcBadge}${nightBadge}</div>
     </div>
     ${routeMarkup}
     <div class="card-footer">
@@ -4470,6 +4472,10 @@ function flightCard(f) {
         <div class="card-stat-val" style="font-size:11px">${isSim ? simLandings : actualLandings}</div>
         <div class="card-stat-lbl">LDG</div>
       </div>
+      ${isSim ? '' : `<div class="card-stat">
+        <div class="card-stat-val" style="font-size:11px;color:${isAutoland(f) ? 'var(--accent)' : ldtOf(f) === 'O' ? 'var(--warning)' : 'var(--text2)'}">${ldtLabel(f)}</div>
+        <div class="card-stat-lbl">LDT</div>
+      </div>`}
     </div>
     ${isSim ? '' : `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
       <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:5px">편조</div>
@@ -5965,7 +5971,7 @@ function _mergeCrewConnexFlight(f, previous) {
     night: previous?.night || '',
     ifr: previous?.ifr || '',
     ald: previous?.ald || '',
-    ldt: previous?.ldt ?? (previous ? ldtOf(previous) : ''),
+    ldt: previous?.ldt ?? (previous ? ldtOf(previous) : 'M'), // 신규 가져오기 기본값은 메뉴얼
     toPf: previous?.toPf ?? 'PF',
     ldgPf: previous?.ldgPf ?? 'PF',
     personalMemo: getPersonalMemo(previous),
