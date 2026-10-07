@@ -4122,8 +4122,9 @@ function ldtOf(f) {
   return '';
 }
 // 로그북 카드에 보여줄 짧은 라벨 ('2'만 적으면 뜻이 안 보이므로 풀어 쓴다)
-const LDT_LABELS = { M: 'MAN', A: 'AUTO', '2': 'CAT2', '3': 'CAT3', O: 'NPA' };
-function ldtLabel(f) { return LDT_LABELS[ldtOf(f)] || '—'; }
+// 오토랜딩·CAT II·CAT III가 아니면(O=기타, 미입력 포함) 전부 메뉴얼 착륙이다
+const LDT_LABELS = { A: 'AUTO', '2': 'CAT2', '3': 'CAT3' };
+function ldtLabel(f) { return LDT_LABELS[ldtOf(f)] || 'MAN'; }
 
 // 오토랜딩 통계 집계 대상 — CAT II/III 접근은 오토랜딩으로 본다
 function isAutoland(f) {
@@ -4473,7 +4474,7 @@ function flightCard(f) {
         <div class="card-stat-lbl">LDG</div>
       </div>
       ${isSim ? '' : `<div class="card-stat">
-        <div class="card-stat-val" style="font-size:11px;color:${isAutoland(f) ? 'var(--accent)' : ldtOf(f) === 'O' ? 'var(--warning)' : 'var(--text2)'}">${ldtLabel(f)}</div>
+        <div class="card-stat-val" style="font-size:11px;color:${isAutoland(f) ? 'var(--accent)' : 'var(--text2)'}">${ldtLabel(f)}</div>
         <div class="card-stat-lbl">LDT</div>
       </div>`}
     </div>
