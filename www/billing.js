@@ -2,6 +2,9 @@
   'use strict';
 
   const API_BASE = 'https://crewconnex.tae26001.workers.dev';
+  // 서버(Worker)의 AUTO_IMPORT_FREE_LIMIT과 맞춘 폴백값 — 실제 값은 서버 응답을 따른다
+  const DEFAULT_FREE_LIMIT = 50;
+
   const PRODUCTS = {
     monthly: 'com.rufnekcrew.flylog.autoimport.monthly',
     annual: 'com.rufnekcrew.flylog.autoimport.annual',
@@ -54,7 +57,7 @@
   function renderStatus(nextStatus) {
     if (nextStatus) status = nextStatus;
     const usedCount = Math.max(0, Number(status?.usedCount) || 0);
-    const freeLimit = Math.max(1, Number(status?.freeLimit) || 100);
+    const freeLimit = Math.max(1, Number(status?.freeLimit) || DEFAULT_FREE_LIMIT);
     const remaining = Math.max(0, Number.isFinite(Number(status?.remaining)) ? Number(status.remaining) : freeLimit - usedCount);
     const text = status?.active
       ? `구독 이용 중 · ${formatDate(status.expiresAt)}까지`
@@ -63,7 +66,7 @@
     document.querySelectorAll('[data-billing-used]').forEach(el => {
       el.textContent = status?.active
         ? 'CrewConnex 자동 가져오기 무제한'
-        : `${status?.usedCount ?? 0} / ${status?.freeLimit ?? 100}편 사용`;
+        : `${status?.usedCount ?? 0} / ${status?.freeLimit ?? DEFAULT_FREE_LIMIT}편 사용`;
     });
     const activePanel = document.getElementById('billingActivePanel');
     const purchasePanel = document.getElementById('billingPurchasePanel');
@@ -114,7 +117,10 @@
   function nextNoticeKind() {
     if (!window.auth?.currentUser || status?.active) return '';
     const used = Math.max(0, Number(status?.usedCount) || 0);
-    const threshold = used >= 100 ? 100 : used >= 90 ? 90 : used >= 80 ? 80 : 0;
+    // 한도 대비 비율로 판단 — 절대 편수로 두면 무료 한도가 바뀔 때 알림이 안 뜬다
+    const limit = Math.max(1, Number(status?.freeLimit) || DEFAULT_FREE_LIMIT);
+    const pct = Math.floor((used / limit) * 100);
+    const threshold = pct >= 100 ? 100 : pct >= 90 ? 90 : pct >= 80 ? 80 : 0;
     const milestone = threshold ? `milestone-${threshold}` : '';
     if (milestone && localStorage.getItem(noticeStorageKey(milestone)) !== 'seen') return milestone;
     return localStorage.getItem(noticeStorageKey('intro')) === 'seen' ? '' : 'intro';
@@ -123,18 +129,19 @@
   function showNotice(kind) {
     const overlay = document.getElementById('billingNoticeOverlay');
     if (!overlay || !kind) return;
-    const used = Math.min(Math.max(0, Number(status?.usedCount) || 0), Number(status?.freeLimit) || 100);
-    const remaining = Math.max(0, Number(status?.remaining ?? 100));
+    const limit = Number(status?.freeLimit) || DEFAULT_FREE_LIMIT;
+    const used = Math.min(Math.max(0, Number(status?.usedCount) || 0), limit);
+    const remaining = Math.max(0, Number(status?.remaining ?? limit));
     const title = document.getElementById('billingNoticeTitle');
     const lead = document.getElementById('billingNoticeLead');
     if (kind === 'intro') {
       title.textContent = '✈️ 자동 가져오기 이용 안내';
-      lead.textContent = '처음 100편까지 결제 없이 자동으로 가져올 수 있습니다.';
+      lead.textContent = `처음 ${limit}편까지 결제 없이 자동으로 가져올 수 있습니다.`;
     } else {
       title.textContent = `✈️ 자동 가져오기 ${used}편 사용`;
       lead.textContent = remaining > 0
         ? `무료 자동 가져오기가 ${remaining}편 남았습니다. 필요할 때 구독을 확인해 주세요.`
-        : '무료 자동 가져오기 100편을 모두 사용했습니다. 구독하면 계속 무제한으로 가져올 수 있습니다.';
+        : `무료 자동 가져오기 ${limit}편을 모두 사용했습니다. 구독하면 계속 무제한으로 가져올 수 있습니다.`;
     }
     activeNoticeKind = kind;
     overlay.classList.add('show');
@@ -317,7 +324,7 @@
       activeNoticeKind = '';
       document.getElementById('billingNoticeOverlay')?.classList.remove('show');
       status = null;
-      renderStatus({ active: false, usedCount: 0, freeLimit: 100, remaining: 100 });
+      renderStatus({ active: false, usedCount: 0, freeLimit: DEFAULT_FREE_LIMIT, remaining: DEFAULT_FREE_LIMIT });
     }
   }
 

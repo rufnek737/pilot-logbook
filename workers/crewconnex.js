@@ -17,7 +17,7 @@ const ALLOWED_ORIGINS = new Set([
   'https://localhost',
 ]);
 const MAX_REQUEST_BYTES = 4096;
-const AUTO_IMPORT_FREE_LIMIT = 100;
+const AUTO_IMPORT_FREE_LIMIT = 50;
 const APP_BUNDLE_ID = 'com.rufnekcrew.flylog';
 const SUBSCRIPTION_PRODUCTS = new Set([
   'com.rufnekcrew.flylog.autoimport.monthly',
@@ -848,7 +848,7 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       if (billingEnforced(env)) return fail(503, '구독 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
     }
     if (billingEnforced(env) && !currentBilling?.active && currentBilling?.remaining <= 0) {
-      return fail(402, '무료 자동 가져오기 100편을 모두 사용했습니다. 구독 후 무제한으로 이용할 수 있습니다.', 'FREE_LIMIT_REACHED');
+      return fail(402, `무료 자동 가져오기 ${AUTO_IMPORT_FREE_LIMIT}편을 모두 사용했습니다. 구독 후 무제한으로 이용할 수 있습니다.`, 'FREE_LIMIT_REACHED');
     }
 
     if (!env.CREWCONNEX_RATE_LIMITER || typeof env.CREWCONNEX_RATE_LIMITER.limit !== 'function') {

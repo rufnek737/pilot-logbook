@@ -22,19 +22,18 @@ test('billing UI uses StoreKit localized product data and supports restore', () 
   assert.match(html, /App Store 구독 관리/);
 });
 
-test('free import and subscription policy is consistent at 100 flights', () => {
-  for (const source of [html, terms, faq]) assert.match(source, /100편/);
-  assert.doesNotMatch(terms, /최초 50편/);
-  assert.doesNotMatch(faq, /50편 이후/);
+test('free import and subscription policy is consistent at 50 flights', () => {
+  for (const source of [html, terms, faq]) assert.match(source, /50편/);
+  for (const source of [html, terms, faq]) assert.doesNotMatch(source, /100편/);
   assert.match(terms, /월간 또는 연간 자동 갱신 구독/);
 });
 
 test('main screen shows automatic import usage and milestone guidance', () => {
   assert.match(html, /billingOverviewCard/);
-  assert.match(html, /0 \/ 100편 사용/);
-  assert.match(html, /100편 남음/);
+  assert.match(html, /0 \/ 50편 사용/);
+  assert.match(html, /50편 남음/);
   assert.match(html, /billingProgressFill/);
-  assert.match(billing, /used >= 100 \? 100 : used >= 90 \? 90 : used >= 80 \? 80/);
+  assert.match(billing, /pct >= 100 \? 100 : pct >= 90 \? 90 : pct >= 80 \? 80/);
   assert.match(billing, /milestone-\$\{threshold\}/);
 });
 
