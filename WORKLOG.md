@@ -23,6 +23,32 @@ API 키도 기존 `claude-asc`(`QS53NUHWUF`)를 재사용.
 
 남은 것: 구독 심사용 스크린샷 업로드(현재 `MISSING_METADATA`), `BILLING_ENFORCED` 활성화.
 
+### 후속 — 유료화 마무리 작업 (같은 날)
+
+**운영자 무제한** — `BILLING_UNLIMITED_EMAILS` 시크릿의 이메일은 한도 없이 사용.
+저장소가 공개라 이메일을 코드에 두지 않았다. 이후 사용자 요청으로 연 구독 자격으로 교체하며
+시크릿은 삭제(무제한과 구독 표시가 겹치면 "무제한 이용 중"이 구독 표시를 덮어쓴다).
+
+**수동 구독 자격 부여** — 운영자 계정(`p7lQ…`, 사용량 48편)에 D1 직접 INSERT.
+`original_transaction_id='manual-grant-owner-annual'`, `environment='Manual'`로 표시해
+애플 영수증 기반 자격과 구분된다. 만료 2027-10-17. 되돌리려면 그 행을 DELETE.
+
+**🐛 구독자는 요금제를 영영 볼 수 없던 문제**
+`loadProducts()`에 `if (loadingProducts || status?.active) return;` 가 있어
+**구독 중이면 상품 조회 자체를 건너뛰었다.** 구매 패널도 active면 숨겼으므로
+월↔연 전환 경로가 아예 없었다. → 조회 조건 제거, 패널 상시 노출,
+현재 요금제는 '이용 중'(비활성·강조), 나머지는 '…으로 전환'으로 표시.
+
+**🐛 cap sync 누락 2건** — iOS만 동기화하고 Android를 빠뜨려 `android/assets/public`이
+50편 변경 전 상태로 남아 있었다. 반대로 무제한 표시 수정 때는 Android만 돌려
+iOS에 반영이 안 돼 "구독 이용 중 · (빈 날짜)까지"가 표시됐다.
+**www/ 를 고치면 양쪽 다 sync 할 것.**
+
+**미해결** — StoreKit이 아직 상품 가격을 못 불러온다("App Store 정보 준비 중").
+상품은 App Store Connect UI에서 `제출 준비 중`이고 빠진 메타데이터는 없다
+(API는 `MISSING_METADATA`로 보고하는데 UI와 불일치). 애플 전파 지연으로 보고 대기 중.
+첫 자동 갱신 구독은 **앱 첫 버전 심사와 함께 제출**해야 최종 승인된다.
+
 ---
 
 ## 2026-10-17 (유료화 — 무료 한도 100편 → 50편)
