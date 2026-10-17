@@ -1,5 +1,28 @@
 # 날고적다 (FlyLog) — Work Log
 
+### ✅ 아내 계정 이전 — App Store Connect 구성 완료 (2026-10-17)
+
+계약·은행·세금은 **듀티스왑 때 이미 활성화**되어 있어 그대로 승계 (계정 단위).
+API 키도 기존 `claude-asc`(`QS53NUHWUF`)를 재사용.
+
+| 항목 | 값 |
+|---|---|
+| 앱 레코드 | `날고적다` / `com.rufnekcrew.flylog` / id `6823952877` |
+| 팀 | Ryeojin Jung `XV2TFVJUG3` |
+| 구독 그룹 | 자동 가져오기 (id `22487869`) |
+| 월 구독 | `...autoimport.monthly` ₩1,900 (id `6823954307`) |
+| 연 구독 | `...autoimport.annual` ₩14,000 (id `6823953995`) |
+
+구독 상품은 **App Store Connect API로 직접 생성**. 과정에서 두 번 막혔다:
+- 구독 설명은 **45자 제한** (`ENTITY_ERROR.ATTRIBUTE.INVALID.TOO_LONG`)
+- 신규 구독은 **판매 지역이 비어 있어** 가격 설정이 `UNSUPPORTED_TERRITORY`로 거부된다.
+  `subscriptionAvailabilities`를 먼저 만들어 175개 지역을 열고 나서야 가격이 들어갔다.
+
+버전은 새 앱 레코드이므로 **1.0 (빌드 1)** 로 리셋. Worker 시크릿 3개를 아내 계정 키로 교체.
+`ExportOptions.plist`의 teamID도 변경. **TestFlight 1.0(1) 업로드 완료.**
+
+남은 것: 구독 심사용 스크린샷 업로드(현재 `MISSING_METADATA`), `BILLING_ENFORCED` 활성화.
+
 ---
 
 ## 2026-10-17 (유료화 — 무료 한도 100편 → 50편)
