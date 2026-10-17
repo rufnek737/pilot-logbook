@@ -176,27 +176,27 @@ test('Automatic import usage key is stable and identifies a unique flight', () =
   );
 });
 
-test('Apple subscription selection only accepts active Pilot Logbook products', () => {
+test('Apple subscription selection only accepts active 날고적다 products', () => {
   const now = Date.now();
   const jws = payload => `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`;
   const active = selectActiveAppleSubscription({
     data: [{
       status: 1,
       lastTransactions: [{ signedTransactionInfo: jws({
-        bundleId: 'com.rufnek.pilotlogbook',
-        productId: 'com.rufnek.pilotlogbook.autoimport.annual',
+        bundleId: 'com.rufnekcrew.flylog',
+        productId: 'com.rufnekcrew.flylog.autoimport.annual',
         transactionId: '200000000000001',
         originalTransactionId: '200000000000000',
         expiresDate: now + 86_400_000,
       }) }],
     }],
   }, now);
-  assert.equal(active.productId, 'com.rufnek.pilotlogbook.autoimport.annual');
+  assert.equal(active.productId, 'com.rufnekcrew.flylog.autoimport.annual');
 
   const expired = selectActiveAppleSubscription({
     data: [{ status: 1, lastTransactions: [{ signedTransactionInfo: jws({
-      bundleId: 'com.rufnek.pilotlogbook',
-      productId: 'com.rufnek.pilotlogbook.autoimport.monthly',
+      bundleId: 'com.rufnekcrew.flylog',
+      productId: 'com.rufnekcrew.flylog.autoimport.monthly',
       expiresDate: now - 1,
     }) }] }],
   }, now);
@@ -205,7 +205,7 @@ test('Apple subscription selection only accepts active Pilot Logbook products', 
   const otherApp = selectActiveAppleSubscription({
     data: [{ status: 1, lastTransactions: [{ signedTransactionInfo: jws({
       bundleId: 'com.example.other',
-      productId: 'com.rufnek.pilotlogbook.autoimport.monthly',
+      productId: 'com.rufnekcrew.flylog.autoimport.monthly',
       expiresDate: now + 86_400_000,
     }) }] }],
   }, now);

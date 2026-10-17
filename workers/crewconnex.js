@@ -19,14 +19,9 @@ const ALLOWED_ORIGINS = new Set([
 const MAX_REQUEST_BYTES = 4096;
 const AUTO_IMPORT_FREE_LIMIT = 100;
 const APP_BUNDLE_ID = 'com.rufnekcrew.flylog';
-// 계정 이전 과도기: 구 번들 ID로 설치된 앱도 계속 동작해야 한다.
-// 전원 새 빌드로 넘어가면 아래 레거시 항목을 지울 것.
-const ACCEPTED_BUNDLE_IDS = new Set([APP_BUNDLE_ID, 'com.rufnek.pilotlogbook']);
 const SUBSCRIPTION_PRODUCTS = new Set([
   'com.rufnekcrew.flylog.autoimport.monthly',
   'com.rufnekcrew.flylog.autoimport.annual',
-  'com.rufnek.pilotlogbook.autoimport.monthly', // 레거시
-  'com.rufnek.pilotlogbook.autoimport.annual',  // 레거시
 ]);
 
 let firebaseCertCache = { certificates: null, expiresAt: 0 };
@@ -299,7 +294,7 @@ export function selectActiveAppleSubscription(body, nowMs = Date.now()) {
     for (const item of group?.lastTransactions || []) {
       try {
         const info = decodeJwsPayload(item?.signedTransactionInfo);
-        if (!ACCEPTED_BUNDLE_IDS.has(info.bundleId)) continue;
+        if (info.bundleId !== APP_BUNDLE_ID) continue;
         if (!SUBSCRIPTION_PRODUCTS.has(info.productId)) continue;
         if (Number(info.expiresDate || 0) <= nowMs || info.revocationDate) continue;
         candidates.push(info);
