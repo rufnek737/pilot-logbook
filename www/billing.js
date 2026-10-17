@@ -73,7 +73,9 @@
     const activePanel = document.getElementById('billingActivePanel');
     const purchasePanel = document.getElementById('billingPurchasePanel');
     if (activePanel) activePanel.style.display = status?.active ? '' : 'none';
-    if (purchasePanel) purchasePanel.style.display = status?.active ? 'none' : '';
+    // 구독 중에도 요금제를 보여준다 — 월↔연 전환을 하려면 가격이 보여야 한다
+    if (purchasePanel) purchasePanel.style.display = '';
+    renderProducts();
     const expiry = document.getElementById('billingExpiry');
     if (expiry && status?.active) expiry.textContent = status.unlimited
       ? '운영자 계정으로 자동 가져오기를 무제한 이용 중입니다.'
@@ -180,26 +182,32 @@
   }
 
   function renderProducts() {
-    const monthly = productById(PRODUCTS.monthly);
-    const annual = productById(PRODUCTS.annual);
-    const monthlyButton = document.getElementById('billingMonthlyButton');
-    const annualButton = document.getElementById('billingAnnualButton');
-    if (monthlyButton) {
-      monthlyButton.disabled = !monthly;
-      monthlyButton.innerHTML = monthly
-        ? `<strong>${monthly.title}</strong><span>${monthly.priceString} / 월</span>`
-        : '<strong>월간 구독</strong><span>App Store 정보 준비 중</span>';
-    }
-    if (annualButton) {
-      annualButton.disabled = !annual;
-      annualButton.innerHTML = annual
-        ? `<strong>${annual.title}</strong><span>${annual.priceString} / 년</span>`
-        : '<strong>연간 구독</strong><span>App Store 정보 준비 중</span>';
+    const current = status?.active ? (status.productId || '') : '';
+    const plans = [
+      ['billingMonthlyButton', PRODUCTS.monthly, '월간 구독', '월'],
+      ['billingAnnualButton',  PRODUCTS.annual,  '연간 구독', '년'],
+    ];
+    for (const [elId, productId, fallbackTitle, unit] of plans) {
+      const button = document.getElementById(elId);
+      if (!button) continue;
+      const product = productById(productId);
+      const isCurrent = Boolean(current) && current === productId;
+      button.classList.toggle('current', isCurrent);
+      // 이용 중인 요금제는 다시 살 수 없고, 다른 요금제는 전환용으로 열어둔다
+      button.disabled = !product || isCurrent;
+      if (isCurrent) {
+        button.innerHTML = `<strong>${product ? product.title : fallbackTitle}</strong><span>이용 중</span>`;
+      } else if (product) {
+        const label = current ? '으로 전환' : '';
+        button.innerHTML = `<strong>${product.title}</strong><span>${product.priceString} / ${unit}${label}</span>`;
+      } else {
+        button.innerHTML = `<strong>${fallbackTitle}</strong><span>App Store 정보 준비 중</span>`;
+      }
     }
   }
 
   async function loadProducts() {
-    if (loadingProducts || status?.active) return;
+    if (loadingProducts) return;
     loadingProducts = true;
     try {
       if (!isNativeIOS() || !plugin()) {
