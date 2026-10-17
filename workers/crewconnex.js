@@ -158,6 +158,15 @@ function responseHeaders(origin) {
   return headers;
 }
 
+// 개발자/운영자 계정은 한도 없이 사용한다.
+// 저장소가 공개라 이메일은 코드가 아니라 시크릿(BILLING_UNLIMITED_EMAILS, 쉼표 구분)에 둔다.
+function isUnlimitedAccount(env, email) {
+  if (!email) return false;
+  const allow = String(env.BILLING_UNLIMITED_EMAILS || '')
+    .split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+  return allow.includes(String(email).toLowerCase());
+}
+
 function billingEnforced(env) {
   return String(env.BILLING_ENFORCED || '').toLowerCase() === 'true';
 }
@@ -168,7 +177,8 @@ export function autoImportFlightKey(flight) {
     .join('|');
 }
 
-async function readBillingStatus(env, uid) {
+async function readBillingStatus(env, uid, email) {
+  const unlimited = isUnlimitedAccount(env, email);
   if (!env.BILLING_DB) {
     return {
       active: false,
@@ -178,6 +188,7 @@ async function readBillingStatus(env, uid) {
       freeLimit: AUTO_IMPORT_FREE_LIMIT,
       remaining: AUTO_IMPORT_FREE_LIMIT,
       enforced: billingEnforced(env),
+      unlimited,
     };
   }
   const now = Date.now();
@@ -194,13 +205,14 @@ async function readBillingStatus(env, uid) {
   ]);
   const usedCount = Number(usage?.usedCount || 0);
   return {
-    active: Boolean(entitlement),
+    active: unlimited || Boolean(entitlement),
     productId: entitlement?.productId || null,
     expiresAt: entitlement?.expiresAt || null,
     usedCount,
     freeLimit: AUTO_IMPORT_FREE_LIMIT,
-    remaining: Math.max(0, AUTO_IMPORT_FREE_LIMIT - usedCount),
+    remaining: unlimited ? AUTO_IMPORT_FREE_LIMIT : Math.max(0, AUTO_IMPORT_FREE_LIMIT - usedCount),
     enforced: billingEnforced(env),
+    unlimited,
   };
 }
 
@@ -769,7 +781,7 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
     let username;
     const ok = async body => {
       const mapped = applyDutyCode(body, username);
-      const billing = verifiedUser ? await readBillingStatus(env, verifiedUser.uid) : null;
+      const billing = verifiedUser ? await readBillingStatus(env, verifiedUser.uid, verifiedUser.email) : null;
       return new Response(JSON.stringify({ ...mapped, billing }), {
       status: 200,
       headers: cors,
@@ -809,7 +821,7 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
 
     if (isBillingStatus) {
       try {
-        return new Response(JSON.stringify(await readBillingStatus(env, verifiedUser.uid)), { status: 200, headers: cors });
+        return new Response(JSON.stringify(await readBillingStatus(env, verifiedUser.uid, verifiedUser.email)), { status: 200, headers: cors });
       } catch (_) {
         return fail(503, '구독 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
       }
@@ -835,7 +847,7 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       if (!flights.length) return fail(400, '저장된 비행 정보가 없습니다.', 'INVALID_REQUEST');
       try {
         await recordAutoImportFlights(env, verifiedUser.uid, flights);
-        return new Response(JSON.stringify(await readBillingStatus(env, verifiedUser.uid)), { status: 200, headers: cors });
+        return new Response(JSON.stringify(await readBillingStatus(env, verifiedUser.uid, verifiedUser.email)), { status: 200, headers: cors });
       } catch (_) {
         return fail(503, '자동 가져오기 사용량을 저장하지 못했습니다.', 'BILLING_UNAVAILABLE');
       }
@@ -843,7 +855,7 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
 
     let currentBilling;
     try {
-      currentBilling = await readBillingStatus(env, verifiedUser.uid);
+      currentBilling = await readBillingStatus(env, verifiedUser.uid, verifiedUser.email);
     } catch (_) {
       if (billingEnforced(env)) return fail(503, '구독 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
     }

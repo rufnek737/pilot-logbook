@@ -59,13 +59,15 @@
     const usedCount = Math.max(0, Number(status?.usedCount) || 0);
     const freeLimit = Math.max(1, Number(status?.freeLimit) || DEFAULT_FREE_LIMIT);
     const remaining = Math.max(0, Number.isFinite(Number(status?.remaining)) ? Number(status.remaining) : freeLimit - usedCount);
-    const text = status?.active
-      ? `구독 이용 중 · ${formatDate(status.expiresAt)}까지`
-      : `자동 가져오기 무료 ${status?.remaining ?? 100}편 남음`;
+    const text = status?.unlimited
+      ? '무제한 이용 중'
+      : status?.active
+        ? `구독 이용 중 · ${formatDate(status.expiresAt)}까지`
+        : `자동 가져오기 무료 ${remaining}편 남음`;
     document.querySelectorAll('[data-billing-status]').forEach(el => { el.textContent = text; });
     document.querySelectorAll('[data-billing-used]').forEach(el => {
       el.textContent = status?.active
-        ? 'CrewConnex 자동 가져오기 무제한'
+        ? '크루 커넥스 자동 가져오기 무제한'
         : `${status?.usedCount ?? 0} / ${status?.freeLimit ?? DEFAULT_FREE_LIMIT}편 사용`;
     });
     const activePanel = document.getElementById('billingActivePanel');
@@ -73,7 +75,9 @@
     if (activePanel) activePanel.style.display = status?.active ? '' : 'none';
     if (purchasePanel) purchasePanel.style.display = status?.active ? 'none' : '';
     const expiry = document.getElementById('billingExpiry');
-    if (expiry && status?.active) expiry.textContent = `${formatDate(status.expiresAt)}까지 자동 가져오기를 무제한 이용할 수 있습니다.`;
+    if (expiry && status?.active) expiry.textContent = status.unlimited
+      ? '운영자 계정으로 자동 가져오기를 무제한 이용 중입니다.'
+      : `${formatDate(status.expiresAt)}까지 자동 가져오기를 무제한 이용할 수 있습니다.`;
     const overviewTitle = document.getElementById('billingOverviewTitle');
     const overviewUsed = document.getElementById('billingOverviewUsed');
     const overviewRemaining = document.getElementById('billingOverviewRemaining');
