@@ -3,8 +3,8 @@
 
   const API_BASE = 'https://crewconnex.tae26001.workers.dev';
   const PRODUCTS = {
-    monthly: 'com.rufnek.pilotlogbook.autoimport.monthly',
-    annual: 'com.rufnek.pilotlogbook.autoimport.annual',
+    monthly: 'com.rufnekcrew.flylog.autoimport.monthly',
+    annual: 'com.rufnekcrew.flylog.autoimport.annual',
   };
   let status = null;
   let products = [];

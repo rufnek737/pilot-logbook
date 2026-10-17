@@ -143,7 +143,7 @@ CrewConnex는 제주항공의 사내 시스템이라 외부에서 접근할 수 
 - [ ] 수출 규정 준수 (암호화 사용 여부 — HTTPS만 사용 시 표준 예외 해당 여부 확인)
 - [ ] 판매 지역 **대한민국만** 선택 (다른 국가 전부 해제)
 - [ ] App Store Connect에 구독 상품 등록 완료 확인
-      (`com.rufnek.pilotlogbook.autoimport.monthly`, `com.rufnek.pilotlogbook.autoimport.annual`)
+      (`com.rufnekcrew.flylog.autoimport.monthly`, `com.rufnekcrew.flylog.autoimport.annual`)
 - [ ] 구독 심사용 스크린샷 업로드 (구독 화면, 위 스크린샷 7번과 동일 활용 가능)
 
 ---

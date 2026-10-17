@@ -1,4 +1,51 @@
-# Pilot Logbook — Work Log
+# 날고적다 (FlyLog) — Work Log
+
+---
+
+## 2026-10-17 (앱 이름 변경 + 아내 계정으로 이전 준비)
+
+### 배경 — 공식 앱 이전이 불가능한 이유
+App Store Connect 조회 결과 버전 1.0이 `PREPARE_FOR_SUBMISSION`, **출시 이력 없음**.
+애플 앱 이전(App Transfer)은 "App Store에 출시된 버전이 하나 이상" 이 조건이라
+사업자번호와 무관하게 이전이 불가능하다. 대신 출시 전이라 잃을 것도 없으므로
+**새 계정에서 새 번들 ID로 재생성**하는 쪽이 맞다.
+
+| 항목 | 이전 | 이후 |
+|---|---|---|
+| 앱 이름 | Pilot Logbook / 파일럿 로그북 | **날고적다** (영문 FlyLog) |
+| 번들 ID (iOS) | `com.rufnek.pilotlogbook` | **`com.rufnekcrew.flylog`** |
+| 팀 | kyungtae kay kang `V6TT3SA8H9` | **Ryeojin Jung `XV2TFVJUG3`** |
+| 구독 상품 | `com.rufnek.pilotlogbook.autoimport.*` | `com.rufnekcrew.flylog.autoimport.*` |
+
+번들 ID는 한 번 앱 레코드에 쓰이면 다른 계정에서 재사용이 불가능해 새로 정했다.
+
+### 변경한 파일
+- iOS: `project.pbxproj`(번들 ID·팀 ID 각 2곳), `capacitor.config.json`, `Info.plist`(표시 이름)
+- PWA/Android 표시 이름: `manifest.json`, `strings.xml`
+  (**Android `applicationId`는 그대로** — Play 등록 후에는 변경 불가)
+- 구독 상품 ID: `www/billing.js` (ios/android의 public/ 사본은 `cap sync` 산출물)
+- 앱 내 문구: `www/index.html` 9곳 (타이틀·로고·로그인·드로어·백업·오류 메시지 등)
+- 문서: `CLAUDE.md`, `app-store-metadata-ko.md`
+
+### Worker — 과도기 호환
+`workers/crewconnex.js`에 `ACCEPTED_BUNDLE_IDS`를 두어 **구·신 번들 ID를 모두 수락**.
+`SUBSCRIPTION_PRODUCTS`에도 레거시 상품 ID를 남겼다. 기존 설치본(테스터 포함)이
+새 빌드로 넘어가기 전까지 깨지지 않게 하기 위함이며, 전원 이전 후 레거시 항목은 삭제할 것.
+
+### ⚠️ 남은 수동 작업
+1. **Google 로그인 iOS 클라이언트** — OAuth 클라이언트는 번들 ID에 묶인다.
+   Cloud Console에서 `com.rufnekcrew.flylog`용 iOS 클라이언트를 새로 만들고
+   `Info.plist`의 URL Scheme(현 `com.googleusercontent.apps.824870554939-uagl5pfvr8a4...`)과
+   `www/index.html`의 `iOSClientId`를 교체해야 한다. **그 전까지 iOS 구글 로그인은 동작하지 않는다.**
+   (Firebase 프로젝트 `pilot-logbook-22bb8`는 유지 → 기존 사용자 계정·비행기록 보존)
+2. 아내 계정 App Store Connect에 앱 레코드 + 구독 상품 생성
+3. App Store Server API 키를 아내 계정 것으로 교체 (Worker 시크릿)
+4. rufnekcrew.com (`~/projects/rufnekcrew-site`) 의 `/pilot-logbook` 페이지 문구·경로
+5. 아이콘/스플래시에 구 이름이 들어 있으면 교체
+
+### 검증
+`npm test` 41개 통과. 새 팀(Ryeojin Jung) 서명으로 빌드 성공, 실기기 설치 확인
+(`bundleID: com.rufnekcrew.flylog`). **구 번들 ID 앱과 별개 앱으로 설치된다.**
 
 ---
 

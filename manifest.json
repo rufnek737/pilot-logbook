@@ -1,6 +1,6 @@
 {
-  "name": "Pilot Logbook",
-  "short_name": "LogBook",
+  "name": "날고적다",
+  "short_name": "날고적다",
   "description": "항공일지 — Log It. Review It. Fly Better.",
   "start_url": "/",
   "display": "standalone",

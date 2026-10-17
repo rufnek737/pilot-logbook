@@ -1,4 +1,4 @@
-# Pilot Logbook — Claude Code 컨텍스트
+# 날고적다 (FlyLog) — Claude Code 컨텍스트
 
 ## 프로젝트 개요
 - 제주항공 기장용 파일럿 로그북 PWA + Android/iOS 앱
@@ -43,7 +43,7 @@ npx cap open ios
    (안 되면 iOS용 PrintBridge 구현 필요 — Android는 `MainActivity.java`의
    `PrintBridge` JS Interface로 해결, iOS는 `WKWebView` printing 또는
    `UIPrintInteractionController` 네이티브 브릿지 필요)
-5. **Bundle ID** — `com.rufnek.pilotlogbook` 확인
+5. **Bundle ID** — `com.rufnekcrew.flylog` 확인
 6. **스플래시/로그인 영상** — `www/splash-intro.mp4`, `www/auth-bg.mp4`가
    WKWebView `<video autoplay muted playsinline>`에서 자동재생되는지 확인
    (iOS는 보통 무음+playsinline 조건이면 자동재생 허용됨)
@@ -81,7 +81,7 @@ pilot-logbook/
 | 항목 | 값 |
 |------|-----|
 | Firebase Project | pilot-logbook-22bb8 |
-| Bundle ID | com.rufnek.pilotlogbook |
+| Bundle ID | com.rufnekcrew.flylog (iOS) / com.rufnek.pilotlogbook (Android, Play 고정) |
 | Capacitor | v8 |
 | Google Auth | @codetrix-studio/capacitor-google-auth@3.4.0-rc.4 |
 | Android SHA-1 (debug) | 5E:24:89:C7:DF:B2:50:B5:73:2B:7E:12:E2:E4:38:D4:E0:75:B0:E9 |
