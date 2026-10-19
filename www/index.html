@@ -3667,6 +3667,9 @@ function findSuspiciousFlights(range) {
 
 function clearAuditRange() { _auditRange = null; runFlightAudit(); }
 
+// 합산에서 넘어온 경우 되돌아가기 — 보던 기간과 결과가 그대로 남아 있다
+function backToRangeSum() { switchTab('range'); }
+
 // 기간 합산 → 기록 점검: 보고 있던 기간을 그대로 들고 간다
 function auditRangeFromSum() {
   const from = document.getElementById('rangeFrom').value;
@@ -3680,7 +3683,8 @@ function runFlightAudit() {
   const host = document.getElementById('auditResult');
   const found = findSuspiciousFlights(_auditRange);
   const scope = _auditRange
-    ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--accent)">
+    ? `<button onclick="backToRangeSum()" style="display:flex;align-items:center;gap:6px;width:100%;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;text-align:left">‹ 기간 합산으로 돌아가기</button>
+       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--accent)">
          <span>📅 ${_auditRange.from} ~ ${_auditRange.to} 범위만 검사</span>
          <button onclick="clearAuditRange()" style="background:none;border:none;padding:0;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline">전체 보기</button>
        </div>`
@@ -3696,7 +3700,7 @@ function runFlightAudit() {
           <span style="font-size:13px;font-weight:700">${f.date} · ${f.flight || '—'}</span>
           <button onclick="editEntry('${f.id}')" style="background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">수정</button>
         </div>
-        <div style="font-size:11px;color:var(--text3)">${f.dep || '???'} → ${f.arr || '???'} · 저장된 총 비행 ${f.total || '—'} · 출발 ${f.depTime || '—'} · 출처 ${f.source || '(없음)'}</div>
+        <div style="font-size:11px;color:var(--text3)">${f.dep || '???'} → ${f.arr || '???'} · 저장된 총 비행 ${f.total || '—'} · 출발 ${f.depTime || '—'}</div>
         <div style="font-size:11px;color:${warnOnly ? 'var(--warning)' : 'var(--danger)'};margin-top:4px">${reasons.join(' / ')}</div>
       </div>`).join('');
 }
