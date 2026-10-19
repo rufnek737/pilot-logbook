@@ -1722,8 +1722,24 @@
     <div id="auditPanel" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">⚠️ 이상 기록 점검</div>
       <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:10px">
-        저장된 총 비행시간이 출발·도착시간으로 계산한 값과 크게 다르거나, 값이 없거나 비정상적으로 큰 기록을 찾아줍니다.
-        PDF 파싱 오류로 의심되는 기록만 골라서 보여주므로, 종이 로그와 이 목록만 대조하면 됩니다.
+        총 비행시간이 출발·도착시간과 맞지 않거나, 계기·야간시간이 빠졌거나 비정상적으로 큰 기록을 찾아줍니다.
+        <span style="color:var(--danger)">빨강</span>은 확실한 오류, <span style="color:var(--warning)">주황</span>은 확인이 필요한 의심 기록입니다.
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <button type="button" id="auditDisplay" onclick="toggleRangeCalendar('audit')"
+          style="flex:1;min-width:150px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--text1);cursor:pointer;text-align:left">전체 기간</button>
+        <button onclick="clearAuditRange()" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap">전체</button>
+      </div>
+      <input type="hidden" id="auditFrom" /><input type="hidden" id="auditTo" />
+      <div id="auditCalendar" style="display:none;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <button type="button" onclick="shiftRangeMonth(-1,'audit')" class="rc-nav">‹</button>
+          <div id="auditCalTitle" style="font-size:13px;font-weight:700"></div>
+          <button type="button" onclick="shiftRangeMonth(1,'audit')" class="rc-nav">›</button>
+        </div>
+        <div class="rc-grid rc-week"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+        <div class="rc-grid" id="auditCalDays"></div>
+        <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px" id="auditCalHint">시작일을 선택하세요</div>
       </div>
       <button onclick="runFlightAudit()" style="background:var(--danger);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">검사하기</button>
       <div id="auditResult" style="margin-top:12px"></div>
@@ -3626,8 +3642,6 @@ function timeDataIssues(f) {
   return issues;
 }
 
-let _auditRange = null;   // {from, to} — 기간 합산에서 넘어왔을 때만 설정
-
 function findSuspiciousFlights(range) {
   const TOLERANCE_MIN = 10; // 저장값과 계산값의 허용 오차(분)
   const MAX_REASONABLE_MIN = 20 * 60; // 20시간 — 국제선 포함 전체 기준 (이보다 크면 명백한 오류)
@@ -3665,30 +3679,27 @@ function findSuspiciousFlights(range) {
   return results.sort((a, b) => compareFlightsDesc(a.f, b.f));
 }
 
-function clearAuditRange() { _auditRange = null; runFlightAudit(); }
+// 기록 점검은 자기 기간을 갖는다 (기간 합산과 독립)
+function auditRange() {
+  const from = document.getElementById('auditFrom')?.value;
+  const to = document.getElementById('auditTo')?.value;
+  return (from && to) ? { from, to } : null;
+}
 
-// 합산에서 넘어온 경우 되돌아가기 — 보던 기간과 결과가 그대로 남아 있다
-function backToRangeSum() { switchTab('range'); }
-
-// 기간 합산 → 기록 점검: 보고 있던 기간을 그대로 들고 간다
-function auditRangeFromSum() {
-  const from = document.getElementById('rangeFrom').value;
-  const to = document.getElementById('rangeTo').value;
-  _auditRange = (from && to) ? { from, to } : null;
-  switchTab('audit');
+function clearAuditRange() {
+  document.getElementById('auditFrom').value = '';
+  document.getElementById('auditTo').value = '';
+  document.getElementById('auditCalendar').style.display = 'none';
+  updateRangeDisplay('audit');
   runFlightAudit();
 }
 
 function runFlightAudit() {
   const host = document.getElementById('auditResult');
-  const found = findSuspiciousFlights(_auditRange);
-  const scope = _auditRange
-    ? `<button onclick="backToRangeSum()" style="display:flex;align-items:center;gap:6px;width:100%;margin-bottom:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;text-align:left">‹ 기간 합산으로 돌아가기</button>
-       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--accent)">
-         <span>📅 ${_auditRange.from} ~ ${_auditRange.to} 범위만 검사</span>
-         <button onclick="clearAuditRange()" style="background:none;border:none;padding:0;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline">전체 보기</button>
-       </div>`
-    : '';
+  const range = auditRange();
+  const found = findSuspiciousFlights(range);
+  const scope = `<div style="margin-bottom:8px;font-size:12px;color:${range ? 'var(--accent)' : 'var(--text3)'}">${
+    range ? `📅 ${range.from} ~ ${range.to} 검사` : '전체 기간 검사'}</div>`;
   if (!found.length) {
     host.innerHTML = scope + `<div style="text-align:center;padding:12px;color:var(--success);font-size:13px">✓ 이상 기록이 발견되지 않았습니다</div>`;
     return;
@@ -3719,35 +3730,37 @@ function initRangePane() {
 }
 
 // ── 기간 선택 달력 (시작·종료를 한 달력에서 연속 선택) ─────────────
-let _rangeCalMonth = null; // 표시 중인 달의 1일
+// 범위 달력 — 접두사(pfx)로 여러 화면에서 독립적으로 쓴다.
+// 'range' = 기간 합산, 'audit' = 기록 점검. 각자 자기 기간을 갖는다.
+const _rcMonth = {};   // pfx → 표시 중인 달의 1일
 
 function _rcDateStr(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-function toggleRangeCalendar() {
-  const cal = document.getElementById('rangeCalendar');
+function toggleRangeCalendar(pfx = 'range') {
+  const cal = document.getElementById(`${pfx}Calendar`);
   const show = cal.style.display === 'none';
   cal.style.display = show ? '' : 'none';
-  if (show) renderRangeCalendar();
+  if (show) renderRangeCalendar(pfx);
 }
 
-function shiftRangeMonth(delta) {
-  _rangeCalMonth.setMonth(_rangeCalMonth.getMonth() + delta);
-  renderRangeCalendar();
+function shiftRangeMonth(delta, pfx = 'range') {
+  _rcMonth[pfx].setMonth(_rcMonth[pfx].getMonth() + delta);
+  renderRangeCalendar(pfx);
 }
 
-function renderRangeCalendar() {
-  const from = document.getElementById('rangeFrom').value;
-  if (!_rangeCalMonth) {
+function renderRangeCalendar(pfx = 'range') {
+  const from = document.getElementById(`${pfx}From`).value;
+  if (!_rcMonth[pfx]) {
     const base = from ? new Date(from) : new Date();
-    _rangeCalMonth = new Date(base.getFullYear(), base.getMonth(), 1);
+    _rcMonth[pfx] = new Date(base.getFullYear(), base.getMonth(), 1);
   }
-  const y = _rangeCalMonth.getFullYear();
-  const m = _rangeCalMonth.getMonth();
-  document.getElementById('rangeCalTitle').textContent = `${y}년 ${m + 1}월`;
+  const y = _rcMonth[pfx].getFullYear();
+  const m = _rcMonth[pfx].getMonth();
+  document.getElementById(`${pfx}CalTitle`).textContent = `${y}년 ${m + 1}월`;
 
-  const to = document.getElementById('rangeTo').value;
+  const to = document.getElementById(`${pfx}To`).value;
   const todayStr = new Date().toISOString().slice(0, 10);
   const firstWeekday = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m + 1, 0).getDate();
@@ -3765,17 +3778,16 @@ function renderRangeCalendar() {
     if (isEnd) cls.push('rc-end');
     if (inRange) cls.push('rc-in-range');
     if (ds === todayStr) cls.push('rc-today');
-    html += `<button class="${cls.join(' ')}" onclick="pickRangeDate('${ds}')">${d}</button>`;
+    html += `<button class="${cls.join(' ')}" onclick="pickRangeDate('${ds}','${pfx}')">${d}</button>`;
   }
-  document.getElementById('rangeCalDays').innerHTML = html;
-
-  const hint = document.getElementById('rangeCalHint');
-  hint.textContent = !from || to ? '시작일을 선택하세요' : '종료일을 선택하세요';
+  document.getElementById(`${pfx}CalDays`).innerHTML = html;
+  document.getElementById(`${pfx}CalHint`).textContent =
+    !from || to ? '시작일을 선택하세요' : '종료일을 선택하세요';
 }
 
-function pickRangeDate(ds) {
-  const fromEl = document.getElementById('rangeFrom');
-  const toEl = document.getElementById('rangeTo');
+function pickRangeDate(ds, pfx = 'range') {
+  const fromEl = document.getElementById(`${pfx}From`);
+  const toEl = document.getElementById(`${pfx}To`);
   // 시작만 있고 종료가 비었으면 종료 선택, 그 외(둘 다 있거나 없음)엔 새 시작
   if (fromEl.value && !toEl.value && ds >= fromEl.value) {
     toEl.value = ds;
@@ -3783,18 +3795,22 @@ function pickRangeDate(ds) {
     fromEl.value = ds;
     toEl.value = '';
   }
-  renderRangeCalendar();
-  updateRangeDisplay();
+  renderRangeCalendar(pfx);
+  updateRangeDisplay(pfx);
+  if (pfx === 'audit' && fromEl.value && toEl.value) {
+    document.getElementById('auditCalendar').style.display = 'none';
+    runFlightAudit();
+  }
 }
 
-function updateRangeDisplay() {
-  const from = document.getElementById('rangeFrom').value;
-  const to = document.getElementById('rangeTo').value;
-  const el = document.getElementById('rangeDisplay');
+function updateRangeDisplay(pfx = 'range') {
+  const from = document.getElementById(`${pfx}From`).value;
+  const to = document.getElementById(`${pfx}To`).value;
+  const el = document.getElementById(`${pfx}Display`);
   if (!el) return;
   if (from && to) el.textContent = `${from} ~ ${to}`;
   else if (from) el.textContent = `${from} ~ 종료일 선택`;
-  else el.textContent = '기간을 선택하세요';
+  else el.textContent = pfx === 'audit' ? '전체 기간' : '기간을 선택하세요';
 }
 
 function calcRangeSum() {
@@ -3832,8 +3848,7 @@ function calcRangeSum() {
   const warn = document.getElementById('rangeSumWarn');
   if (warn) {
     if (missing.length) {
-      warn.innerHTML = `⚠️ 이 기간 ${missing.length}편에 계기·야간시간 문제가 있어 합계가 실제보다 적을 수 있습니다.`
-        + ` <button onclick="auditRangeFromSum()" style="background:none;border:none;padding:0;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline">기록 점검에서 보기</button>`;
+      warn.textContent = `⚠️ 이 기간 ${missing.length}편에 계기·야간시간이 빠져 있어 합계가 실제보다 적을 수 있습니다.`;
       warn.style.display = 'block';
     } else {
       warn.style.display = 'none';
