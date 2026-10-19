@@ -1681,7 +1681,11 @@
       <div id="rangeSumResult" style="margin-top:10px;display:none">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px">
           <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
-            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">총 비행</div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">실비행</div>
+            <div id="rsBlock" style="font-size:16px;font-weight:700;color:var(--text)">-</div>
+          </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">인정시간</div>
             <div id="rsTotal" style="font-size:16px;font-weight:700;color:var(--accent)">-</div>
           </div>
           <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
@@ -3795,8 +3799,11 @@ function calcRangeSum() {
   if (!from || !to) { showToast('날짜를 선택해주세요'); return; }
   const sel = flights.filter(f => f.date >= from && f.date <= to && !window.PilotLogbookSim.isSim(f));
   if (!sel.length) { showToast('해당 기간에 비행이 없습니다'); return; }
-  let total = 0, night = 0, ifr = 0, pic = 0, sic = 0, training = 0;
+  let total = 0, night = 0, ifr = 0, pic = 0, sic = 0, training = 0, block = 0;
   sel.forEach(f => {
+    // 실제로 난 시간(블록)과 회사가 세는 인정시간은 다르다.
+    // 훈련(R/S)은 인정시간 0이지만 실비행에는 들어간다.
+    block += parseHHMM(f.total) || calcDuration(f.depTime, f.arrTime);
     night += parseHHMM(f.night);
     ifr   += parseHHMM(f.ifr);
     // R/S(승격훈련·학생)는 SP.5.1상 PIC/SIC 산정 대상이 아니라 인정시간이 0이다.
@@ -3806,6 +3813,7 @@ function calcRangeSum() {
     total += cr.pic + cr.sic;
     pic += cr.pic; sic += cr.sic;
   });
+  document.getElementById('rsBlock').textContent = toHHMM(block);
   document.getElementById('rsTotal').textContent = toHHMM(total);
   document.getElementById('rsPic').textContent   = toHHMM(pic);
   document.getElementById('rsSic').textContent   = toHHMM(sic);
