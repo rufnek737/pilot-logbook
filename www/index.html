@@ -3579,6 +3579,9 @@ const KOREA_DOMESTIC_APTS = new Set(['GMP','ICN','CJU','PUS','TAE','KWJ','RSU','
 // 그래서 야간은 "확실히 어두운 시간대와 겹쳤는데도 0"인 경우만 의심으로 잡는다.
 // 한국 일몰·일출이 계절에 따라 17:15~19:55 / 05:10~07:45로 움직이므로
 // 오탐을 피하려고 가장 보수적인 20:00~05:00 구간만 쓴다.
+// 출발시각이 UTC로 저장되는 가져오기 경로 — 야간 판정 대상에서 제외한다
+const UTC_TIME_SOURCES = new Set(['excel', 'epaper']);
+
 const NIGHT_WINDOWS = [[0, 5 * 60], [20 * 60, 29 * 60]];
 
 // 출발 현지시각 + 블록타임으로 구간을 잡는다.
@@ -3605,7 +3608,10 @@ function timeDataIssues(f) {
   else if (total && ifr > total) issues.push({ level: 'error', msg: `계기시간(${toHHMM(ifr)})이 총 비행시간보다 큼` });
 
   if (total && night > total) issues.push({ level: 'error', msg: `야간시간(${toHHMM(night)})이 총 비행시간보다 큼` });
-  else if (!night) {
+  else if (!night && !UTC_TIME_SOURCES.has(f.source)) {
+    // flightHistory 엑셀(fltTime)과 ePaper PDF는 출발시각이 UTC로 들어온다.
+    // 현지시각으로 변환하지 않는 한 야간 여부를 판단할 수 없으므로 건너뛴다.
+    // 크루 커넥스(stdLocal)와 수동 입력은 현지시각이라 그대로 본다.
     const overlap = nightWindowOverlap(f.depTime, f.total);
     if (overlap >= 15) issues.push({ level: 'warn', msg: `야간시간 0인데 야간시간대를 ${overlap}분 지남` });
   }
@@ -5698,6 +5704,7 @@ function parseJejuAirEpaper(text, filename, lines) {
       dutyCode,
       ald: aldVal,
       ldt: aldVal === 'Y' ? 'A' : 'M',
+      source: 'epaper',
       ldgPf: hasLanding ? 'PF' : 'PM',
       dayLdg:   (hasLanding && !isNight) ? '1' : '0',
       nightLdg: (hasLanding &&  isNight) ? '1' : '0',
