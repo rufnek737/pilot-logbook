@@ -3581,11 +3581,14 @@ const KOREA_DOMESTIC_APTS = new Set(['GMP','ICN','CJU','PUS','TAE','KWJ','RSU','
 // 오탐을 피하려고 가장 보수적인 20:00~05:00 구간만 쓴다.
 const NIGHT_WINDOWS = [[0, 5 * 60], [20 * 60, 29 * 60]];
 
-function nightWindowOverlap(depTime, arrTime) {
-  if (!depTime || !arrTime) return 0;
+// 출발 현지시각 + 블록타임으로 구간을 잡는다.
+// 도착시각은 '도착지' 현지시각이라 시차가 있는 노선(베트남 등)에서 구간이 어긋난다.
+// 출발지 기준으로 재면 노선에 관계없이 일관된다.
+function nightWindowOverlap(depTime, totalHHMM) {
+  const dur = parseHHMM(totalHHMM);
+  if (!depTime || !dur) return 0;
   const d = parseHHMM(depTime);
-  const a0 = parseHHMM(arrTime);
-  const a = a0 <= d ? a0 + 24 * 60 : a0;      // 자정을 넘긴 도착
+  const a = d + dur;
   return NIGHT_WINDOWS.reduce((sum, [s, e]) =>
     sum + Math.max(0, Math.min(a, e) - Math.max(d, s)), 0);
 }
@@ -3603,15 +3606,8 @@ function timeDataIssues(f) {
 
   if (total && night > total) issues.push({ level: 'error', msg: `야간시간(${toHHMM(night)})이 총 비행시간보다 큼` });
   else if (!night) {
-    // 국제선은 출발이 출발지 현지시각, 도착이 도착지 현지시각이라
-    // 두 값으로 만든 구간이 실제 비행 구간이 아니다. 시차만큼 어긋나므로
-    // 한국 기준 야간대와 비교하는 것 자체가 성립하지 않는다 → 국내선만 본다.
-    const dep = (f.dep || '').trim().toUpperCase();
-    const arr = (f.arr || '').trim().toUpperCase();
-    if (KOREA_DOMESTIC_APTS.has(dep) && KOREA_DOMESTIC_APTS.has(arr)) {
-      const overlap = nightWindowOverlap(f.depTime, f.arrTime);
-      if (overlap >= 15) issues.push({ level: 'warn', msg: `야간시간 0인데 야간시간대를 ${overlap}분 지남` });
-    }
+    const overlap = nightWindowOverlap(f.depTime, f.total);
+    if (overlap >= 15) issues.push({ level: 'warn', msg: `야간시간 0인데 야간시간대를 ${overlap}분 지남` });
   }
   return issues;
 }
