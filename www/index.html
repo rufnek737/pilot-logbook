@@ -1704,6 +1704,10 @@
             <div style="font-size:10px;color:var(--text3);margin-bottom:4px">편수</div>
             <div id="rsCount" style="font-size:16px;font-weight:700;color:var(--text2)">-</div>
           </div>
+          <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">훈련</div>
+            <div id="rsTraining" style="font-size:16px;font-weight:700;color:var(--warning)">-</div>
+          </div>
         </div>
       </div>
     </div>
@@ -3579,8 +3583,11 @@ const KOREA_DOMESTIC_APTS = new Set(['GMP','ICN','CJU','PUS','TAE','KWJ','RSU','
 // 그래서 야간은 "확실히 어두운 시간대와 겹쳤는데도 0"인 경우만 의심으로 잡는다.
 // 한국 일몰·일출이 계절에 따라 17:15~19:55 / 05:10~07:45로 움직이므로
 // 오탐을 피하려고 가장 보수적인 20:00~05:00 구간만 쓴다.
-// 출발시각이 UTC로 저장되는 가져오기 경로 — 야간 판정 대상에서 제외한다
-const UTC_TIME_SOURCES = new Set(['excel', 'epaper']);
+// 출발시각이 '현지시각'임이 확실한 출처만 야간 판정에 쓴다.
+// flightHistory 엑셀(fltTime)과 ePaper PDF는 UTC로 들어오고,
+// 출처 표시가 붙기 전에 저장된 과거 기록은 기준을 알 수 없다.
+// 모르는 건 경고하지 않는 쪽이 맞다 — 틀린 경고가 더 해롭다.
+const LOCAL_TIME_SOURCES = new Set(['crewconnex', 'manual']);
 
 const NIGHT_WINDOWS = [[0, 5 * 60], [20 * 60, 29 * 60]];
 
@@ -3608,10 +3615,7 @@ function timeDataIssues(f) {
   else if (total && ifr > total) issues.push({ level: 'error', msg: `계기시간(${toHHMM(ifr)})이 총 비행시간보다 큼` });
 
   if (total && night > total) issues.push({ level: 'error', msg: `야간시간(${toHHMM(night)})이 총 비행시간보다 큼` });
-  else if (!night && !UTC_TIME_SOURCES.has(f.source)) {
-    // flightHistory 엑셀(fltTime)과 ePaper PDF는 출발시각이 UTC로 들어온다.
-    // 현지시각으로 변환하지 않는 한 야간 여부를 판단할 수 없으므로 건너뛴다.
-    // 크루 커넥스(stdLocal)와 수동 입력은 현지시각이라 그대로 본다.
+  else if (!night && LOCAL_TIME_SOURCES.has(f.source)) {
     const overlap = nightWindowOverlap(f.depTime, f.total);
     if (overlap >= 15) issues.push({ level: 'warn', msg: `야간시간 0인데 야간시간대를 ${overlap}분 지남` });
   }
@@ -3688,7 +3692,7 @@ function runFlightAudit() {
           <span style="font-size:13px;font-weight:700">${f.date} · ${f.flight || '—'}</span>
           <button onclick="editEntry('${f.id}')" style="background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">수정</button>
         </div>
-        <div style="font-size:11px;color:var(--text3)">${f.dep || '???'} → ${f.arr || '???'} · 저장된 총 비행 ${f.total || '—'}</div>
+        <div style="font-size:11px;color:var(--text3)">${f.dep || '???'} → ${f.arr || '???'} · 저장된 총 비행 ${f.total || '—'} · 출발 ${f.depTime || '—'} · 출처 ${f.source || '(없음)'}</div>
         <div style="font-size:11px;color:${warnOnly ? 'var(--warning)' : 'var(--danger)'};margin-top:4px">${reasons.join(' / ')}</div>
       </div>`).join('');
 }
@@ -3791,10 +3795,13 @@ function calcRangeSum() {
   if (!from || !to) { showToast('날짜를 선택해주세요'); return; }
   const sel = flights.filter(f => f.date >= from && f.date <= to && !window.PilotLogbookSim.isSim(f));
   if (!sel.length) { showToast('해당 기간에 비행이 없습니다'); return; }
-  let total = 0, night = 0, ifr = 0, pic = 0, sic = 0;
+  let total = 0, night = 0, ifr = 0, pic = 0, sic = 0, training = 0;
   sel.forEach(f => {
     night += parseHHMM(f.night);
     ifr   += parseHHMM(f.ifr);
+    // R/S(승격훈련·학생)는 SP.5.1상 PIC/SIC 산정 대상이 아니라 인정시간이 0이다.
+    // 훈련시간을 따로 보여주지 않으면 그 기간 비행이 통째로 사라진 것처럼 보인다.
+    if (isTrainingDuty(f)) training += parseHHMM(f.total) || calcDuration(f.depTime, f.arrTime);
     const cr = calcCreditedTime(f); // 듀티코드 가중치 반영된 인정시간
     total += cr.pic + cr.sic;
     pic += cr.pic; sic += cr.sic;
@@ -3805,6 +3812,7 @@ function calcRangeSum() {
   document.getElementById('rsNight').textContent = toHHMM(night);
   document.getElementById('rsIfr').textContent   = toHHMM(ifr);
   document.getElementById('rsCount').textContent = sel.length + '편';
+  document.getElementById('rsTraining').textContent = toHHMM(training);
 
   // 계기·야간이 비어 있으면 조용히 0으로 더해져 합계가 실제와 달라진다.
   // 합산을 보는 자리에서 바로 알려준다.
@@ -5159,8 +5167,15 @@ function saveEntry() {
   }
 
   if (editingId) {
-    if (existingIdx >= 0) flights[existingIdx] = entry;
+    if (existingIdx >= 0) {
+      // entry는 폼 값으로만 만든 객체라, 폼에 없는 필드(source 등 출처 정보)를
+      // 그대로 대입하면 사라진다. 가져오기 출처는 시간 기준 판단에 쓰이므로 보존한다.
+      const prevSource = flights[existingIdx].source;
+      if (prevSource) entry.source = prevSource;
+      flights[existingIdx] = entry;
+    }
   } else {
+    entry.source = 'manual';
     flights.push(entry);
   }
 
