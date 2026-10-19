@@ -1677,6 +1677,7 @@
         <div class="rc-grid" id="rangeCalDays"></div>
         <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px" id="rangeCalHint">시작일을 선택하세요</div>
       </div>
+      <div id="rangeSumWarn" style="display:none;margin-top:10px;padding:9px 11px;border-radius:9px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:var(--warning);font-size:11px;line-height:1.6"></div>
       <div id="rangeSumResult" style="margin-top:10px;display:none">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px">
           <div style="background:var(--bg);border-radius:10px;padding:10px;text-align:center">
@@ -3564,6 +3565,42 @@ async function deleteCareerEntry(entryId) {
 // 국제선은 시차 때문에 로컬시간 차이가 실제 블록타임과 원래 다르므로 비교 대상에서 제외
 const KOREA_DOMESTIC_APTS = new Set(['GMP','ICN','CJU','PUS','TAE','KWJ','RSU','USN','HIN','KUV','WJU','YNY','CJJ','MWX','KPO']);
 
+// ── 계기·야간시간 누락 점검 ────────────────────────────────────────
+// 상용 운항은 전 구간 IFR이므로 계기시간은 0일 수 없다. 반면 야간시간은
+// 0이 정상인 비행이 많아 단순히 0인지로는 누락을 가릴 수 없다.
+// 그래서 야간은 "확실히 어두운 시간대와 겹쳤는데도 0"인 경우만 의심으로 잡는다.
+// 한국 일몰·일출이 계절에 따라 17:15~19:55 / 05:10~07:45로 움직이므로
+// 오탐을 피하려고 가장 보수적인 20:00~05:00 구간만 쓴다.
+const NIGHT_WINDOWS = [[0, 5 * 60], [20 * 60, 29 * 60]];
+
+function nightWindowOverlap(depTime, arrTime) {
+  if (!depTime || !arrTime) return 0;
+  const d = parseHHMM(depTime);
+  const a0 = parseHHMM(arrTime);
+  const a = a0 <= d ? a0 + 24 * 60 : a0;      // 자정을 넘긴 도착
+  return NIGHT_WINDOWS.reduce((sum, [s, e]) =>
+    sum + Math.max(0, Math.min(a, e) - Math.max(d, s)), 0);
+}
+
+// 한 편의 계기·야간시간 문제를 찾는다. level: 'error'(확실) | 'warn'(의심)
+function timeDataIssues(f) {
+  if (window.PilotLogbookSim.isSim(f)) return [];
+  const issues = [];
+  const total = parseHHMM(f.total);
+  const ifr = parseHHMM(f.ifr);
+  const night = parseHHMM(f.night);
+
+  if (!ifr) issues.push({ level: 'error', msg: '계기시간 없음 (상용 운항은 0일 수 없음)' });
+  else if (total && ifr > total) issues.push({ level: 'error', msg: `계기시간(${toHHMM(ifr)})이 총 비행시간보다 큼` });
+
+  if (total && night > total) issues.push({ level: 'error', msg: `야간시간(${toHHMM(night)})이 총 비행시간보다 큼` });
+  else if (!night) {
+    const overlap = nightWindowOverlap(f.depTime, f.arrTime);
+    if (overlap >= 15) issues.push({ level: 'warn', msg: `야간시간 0인데 야간시간대를 ${overlap}분 지남` });
+  }
+  return issues;
+}
+
 function findSuspiciousFlights() {
   const TOLERANCE_MIN = 10; // 저장값과 계산값의 허용 오차(분)
   const MAX_REASONABLE_MIN = 20 * 60; // 20시간 — 국제선 포함 전체 기준 (이보다 크면 명백한 오류)
@@ -3589,7 +3626,13 @@ function findSuspiciousFlights() {
         }
       }
     }
-    if (reasons.length) results.push({ f, reasons });
+    const hardReasons = reasons.length;   // 계기·야간 점검 이전까지는 모두 확실한 오류
+    const timeIssues = timeDataIssues(f);
+    timeIssues.forEach(i => reasons.push(i.msg));
+    if (reasons.length) {
+      const warnOnly = hardReasons === 0 && timeIssues.every(i => i.level === 'warn');
+      results.push({ f, reasons, warnOnly });
+    }
   });
   return results.sort((a, b) => compareFlightsDesc(a.f, b.f));
 }
@@ -3602,14 +3645,14 @@ function runFlightAudit() {
     return;
   }
   host.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px">⚠️ ${found.length}건 발견</div>` +
-    found.map(({ f, reasons }) => `
+    found.map(({ f, reasons, warnOnly }) => `
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <span style="font-size:13px;font-weight:700">${f.date} · ${f.flight || '—'}</span>
           <button onclick="editEntry('${f.id}')" style="background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">수정</button>
         </div>
         <div style="font-size:11px;color:var(--text3)">${f.dep || '???'} → ${f.arr || '???'} · 저장된 총 비행 ${f.total || '—'}</div>
-        <div style="font-size:11px;color:var(--danger);margin-top:4px">${reasons.join(' / ')}</div>
+        <div style="font-size:11px;color:${warnOnly ? 'var(--warning)' : 'var(--danger)'};margin-top:4px">${reasons.join(' / ')}</div>
       </div>`).join('');
 }
 
@@ -3725,6 +3768,20 @@ function calcRangeSum() {
   document.getElementById('rsNight').textContent = toHHMM(night);
   document.getElementById('rsIfr').textContent   = toHHMM(ifr);
   document.getElementById('rsCount').textContent = sel.length + '편';
+
+  // 계기·야간이 비어 있으면 조용히 0으로 더해져 합계가 실제와 달라진다.
+  // 합산을 보는 자리에서 바로 알려준다.
+  const missing = sel.filter(f => timeDataIssues(f).length);
+  const warn = document.getElementById('rangeSumWarn');
+  if (warn) {
+    if (missing.length) {
+      warn.innerHTML = `⚠️ 이 기간 ${missing.length}편에 계기·야간시간 문제가 있어 합계가 실제보다 적을 수 있습니다.`
+        + ` <button onclick="switchTab('audit');runFlightAudit();" style="background:none;border:none;padding:0;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline">기록 점검에서 보기</button>`;
+      warn.style.display = 'block';
+    } else {
+      warn.style.display = 'none';
+    }
+  }
   document.getElementById('rangeSumResult').style.display = 'block';
 }
 

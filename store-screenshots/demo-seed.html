@@ -1,0 +1,55 @@
+<script>
+/* 스토어 스크린샷 전용 데모 데이터 — cap sync 산출물(ios/App/App/public)에만 주입한다.
+   실제 배포 빌드에 들어가지 않도록, 캡처가 끝나면 반드시 `npx cap sync ios`로 되돌릴 것. */
+(function demoSeed(){
+  var CREW='Capt: 최항공 / FO: 이운항 / PUR: 김애경 / JC1: 최크루 / FA: 이객실 / FA: 박승무';
+  var DOM=[['GMP','CJU',75],['CJU','GMP',80],['PUS','CJU',60],['CJU','PUS',62],['CJU','CJJ',70],['CJJ','CJU',70],['GMP','PUS',62],['PUS','GMP',60]];
+  var INT=[['ICN','NRT',140],['NRT','ICN',150],['ICN','KIX',110],['KIX','ICN',115],['ICN','CXR',310],['CXR','ICN',320],['ICN','DAD',290],['DAD','ICN',300],['ICN','FUK',95],['FUK','ICN',100]];
+  var REG8=['HL8014','HL8035','HL8087','HL8090','HL8234','HL8306'], REGM=['HL8740','HL8551','HL8553'];
+  function pad(n){return String(n).padStart(2,'0');}
+  function hhmm(m){return pad(Math.floor(m/60)%24)+':'+pad(m%60);}
+  var s=20261018; function rnd(){s=(s*1103515245+12345)&0x7fffffff;return s/0x7fffffff;}
+  function pick(a){return a[Math.floor(rnd()*a.length)];}
+  var out=[], fn=100;
+  for(var y=1997;y<=2026;y++){
+    for(var mo=1;mo<=(y===2026?10:12);mo++){
+      var legs=46+Math.floor(rnd()*10);
+      for(var i=0;i<legs;i++){
+        var day=1+Math.floor(rnd()*27), intl=rnd()<0.22;
+        var r=pick(intl?INT:DOM), dep=r[0], arr=r[1], dur=r[2];
+        var isMax=intl&&rnd()<0.5, st=5*60+Math.floor(rnd()*13*60);
+        var isNight=st+dur>22*60||st<6*60;
+        fn=(fn%2400)+7;
+        out.push({id:'s'+out.length,date:y+'-'+pad(mo)+'-'+pad(day),
+          flight:'7C'+String(fn).padStart(4,'0'),dep:dep,arr:arr,
+          depTime:hhmm(st),arrTime:hhmm(st+dur),
+          total:Math.floor(dur/60)+':'+pad(dur%60),
+          acType:isMax?'B737-8':'B737-800',reg:isMax?pick(REGM):pick(REG8),
+          dutyCode:rnd()<0.095?'C':'F',role:'SIC',
+          toPf:rnd()<0.5?'PF':'PM',ldgPf:rnd()<0.5?'PF':'PM',
+          ldt:rnd()<0.08?'A':'M',
+          night:isNight?(Math.floor(dur/120)+':'+pad(dur%60)):'0:00',
+          ifr:Math.floor(dur*0.6/60)+':'+pad(Math.floor(dur*0.6)%60),
+          crewInfo:CREW,remarks:CREW,personalMemo:''});
+      }
+    }
+  }
+  out=out.filter(function(f){return f.date<='2026-10-17';});  /* 미래 날짜 제거 */
+  out.sort(function(a,b){return b.date.localeCompare(a.date)||b.depTime.localeCompare(a.depTime);});
+  function apply(){
+    var ov=document.getElementById('authOverlay'); if(ov) ov.remove();
+    var sp=document.getElementById('nativeSplash'); if(sp) sp.remove();
+    try{
+      if(typeof flights==='undefined') return;
+      if(flights.length!==out.length){ flights.length=0; out.forEach(function(f){flights.push(f);});
+        if(typeof careerEntries!=='undefined') careerEntries.length=0;
+        renderFlights(); }
+      var chip=document.getElementById('userName'); if(chip) chip.textContent='김제주';
+      var ini=document.getElementById('userInitial'); if(ini) ini.textContent='김';
+      var uc=document.getElementById('userChip'); if(uc) uc.style.display='';
+    }catch(e){}
+  }
+  setInterval(apply,400); apply();
+})();
+</script>
+</body>
