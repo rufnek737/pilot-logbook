@@ -2323,6 +2323,7 @@ let currentUser = null;
 let _unsubSnapshot = null;
 let _saveTimer = null;
 let _lastSavedAt = 0;  // 마지막 Firestore 저장 시각 (ms)
+let _savingNow = false;   // Firestore 업로드 진행 중
 let _lockedBodyScrollY = 0;
 let _isBodyScrollLocked = false;
 
@@ -2853,6 +2854,7 @@ async function deleteAccountPermanently() {
 async function saveToFirestore(uid) {
   if (!uid) return;
   setSyncStatus('☁ 저장 중...');
+  _savingNow = true;
   try {
     await db.collection('users').doc(uid).collection('data').doc('flights')
       .set({ flights: JSON.parse(JSON.stringify(flights)),
@@ -2864,6 +2866,8 @@ async function saveToFirestore(uid) {
   } catch(e) {
     console.error('Firestore 저장 실패:', e);
     setSyncStatus('⚠ 저장 실패: ' + e.code);
+  } finally {
+    _savingNow = false;
   }
 }
 
@@ -2898,8 +2902,12 @@ function subscribeToFirestore(uid) {
   const ref = db.collection('users').doc(uid).collection('data').doc('flights');
 
   _unsubSnapshot = ref.onSnapshot({ includeMetadataChanges: false }, snap => {
-    // 내가 방금 저장한 직후 1초 이내면 echo — 무시
-    if (Date.now() - _lastSavedAt < 1000) return;
+    // 아직 서버에 올리지 않은 로컬 변경이 있으면 스냅샷을 적용하면 안 된다.
+    // 적용하면 flights 배열이 통째로 서버본으로 바뀌고, 뒤이어 debounce 타이머가
+    // 그 되돌려진 배열을 그대로 업로드해 방금 한 수정이 영구히 사라진다.
+    if (_saveTimer || _savingNow) return;
+    // 내가 방금 저장한 직후면 echo — 무시
+    if (Date.now() - _lastSavedAt < 3000) return;
 
     if (snap.exists) {
       const snapshotData = snap.data();
@@ -3595,19 +3603,29 @@ function timeDataIssues(f) {
 
   if (total && night > total) issues.push({ level: 'error', msg: `야간시간(${toHHMM(night)})이 총 비행시간보다 큼` });
   else if (!night) {
-    const overlap = nightWindowOverlap(f.depTime, f.arrTime);
-    if (overlap >= 15) issues.push({ level: 'warn', msg: `야간시간 0인데 야간시간대를 ${overlap}분 지남` });
+    // 국제선은 출발이 출발지 현지시각, 도착이 도착지 현지시각이라
+    // 두 값으로 만든 구간이 실제 비행 구간이 아니다. 시차만큼 어긋나므로
+    // 한국 기준 야간대와 비교하는 것 자체가 성립하지 않는다 → 국내선만 본다.
+    const dep = (f.dep || '').trim().toUpperCase();
+    const arr = (f.arr || '').trim().toUpperCase();
+    if (KOREA_DOMESTIC_APTS.has(dep) && KOREA_DOMESTIC_APTS.has(arr)) {
+      const overlap = nightWindowOverlap(f.depTime, f.arrTime);
+      if (overlap >= 15) issues.push({ level: 'warn', msg: `야간시간 0인데 야간시간대를 ${overlap}분 지남` });
+    }
   }
   return issues;
 }
 
-function findSuspiciousFlights() {
+let _auditRange = null;   // {from, to} — 기간 합산에서 넘어왔을 때만 설정
+
+function findSuspiciousFlights(range) {
   const TOLERANCE_MIN = 10; // 저장값과 계산값의 허용 오차(분)
   const MAX_REASONABLE_MIN = 20 * 60; // 20시간 — 국제선 포함 전체 기준 (이보다 크면 명백한 오류)
   const MAX_DOMESTIC_MIN = 4 * 60; // 4시간 — 국내선은 아무리 길어도 이 시간을 넘을 수 없음
   const results = [];
   flights.forEach(f => {
     if (window.PilotLogbookSim.isSim(f)) return;
+    if (range && (f.date < range.from || f.date > range.to)) return;
     const stored = parseHHMM(f.total);
     const reasons = [];
     const dep = (f.dep || '').trim().toUpperCase();
@@ -3637,14 +3655,31 @@ function findSuspiciousFlights() {
   return results.sort((a, b) => compareFlightsDesc(a.f, b.f));
 }
 
+function clearAuditRange() { _auditRange = null; runFlightAudit(); }
+
+// 기간 합산 → 기록 점검: 보고 있던 기간을 그대로 들고 간다
+function auditRangeFromSum() {
+  const from = document.getElementById('rangeFrom').value;
+  const to = document.getElementById('rangeTo').value;
+  _auditRange = (from && to) ? { from, to } : null;
+  switchTab('audit');
+  runFlightAudit();
+}
+
 function runFlightAudit() {
   const host = document.getElementById('auditResult');
-  const found = findSuspiciousFlights();
+  const found = findSuspiciousFlights(_auditRange);
+  const scope = _auditRange
+    ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--accent)">
+         <span>📅 ${_auditRange.from} ~ ${_auditRange.to} 범위만 검사</span>
+         <button onclick="clearAuditRange()" style="background:none;border:none;padding:0;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline">전체 보기</button>
+       </div>`
+    : '';
   if (!found.length) {
-    host.innerHTML = `<div style="text-align:center;padding:12px;color:var(--success);font-size:13px">✓ 이상 기록이 발견되지 않았습니다</div>`;
+    host.innerHTML = scope + `<div style="text-align:center;padding:12px;color:var(--success);font-size:13px">✓ 이상 기록이 발견되지 않았습니다</div>`;
     return;
   }
-  host.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px">⚠️ ${found.length}건 발견</div>` +
+  host.innerHTML = scope + `<div style="font-size:12px;color:var(--text2);margin-bottom:8px">⚠️ ${found.length}건 발견</div>` +
     found.map(({ f, reasons, warnOnly }) => `
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -3776,7 +3811,7 @@ function calcRangeSum() {
   if (warn) {
     if (missing.length) {
       warn.innerHTML = `⚠️ 이 기간 ${missing.length}편에 계기·야간시간 문제가 있어 합계가 실제보다 적을 수 있습니다.`
-        + ` <button onclick="switchTab('audit');runFlightAudit();" style="background:none;border:none;padding:0;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline">기록 점검에서 보기</button>`;
+        + ` <button onclick="auditRangeFromSum()" style="background:none;border:none;padding:0;color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;text-decoration:underline">기록 점검에서 보기</button>`;
       warn.style.display = 'block';
     } else {
       warn.style.display = 'none';
