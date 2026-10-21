@@ -3650,11 +3650,40 @@ function timeDataIssues(f) {
   return issues;
 }
 
+// 중복 점검 — 같은 날 같은 편명은 한 번만 있어야 한다.
+// 출도착까지 같으면 확실한 중복, 노선이 다르면 회항·교체편일 수 있어 의심으로 둔다.
+// 기간 필터와 무관하게 전체에서 찾는다(짝이 기간 밖에 있어도 중복은 중복이다).
+function findDuplicateFlights() {
+  const groups = new Map();
+  flights.forEach(f => {
+    if (window.PilotLogbookSim.isSim(f)) return;
+    const flight = (f.flight || '').trim().toUpperCase();
+    if (!f.date || !flight) return;
+    const key = `${f.date}|${flight}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(f);
+  });
+
+  const marks = new Map();   // flight.id → {level, msg}
+  groups.forEach(list => {
+    if (list.length < 2) return;
+    list.forEach(f => {
+      const sameRoute = list.some(o => o !== f
+        && (o.dep || '') === (f.dep || '') && (o.arr || '') === (f.arr || ''));
+      marks.set(f.id, sameRoute
+        ? { level: 'error', msg: `같은 날 같은 편이 ${list.length}건 — 중복 저장으로 보입니다` }
+        : { level: 'warn', msg: `같은 날 같은 편명이 ${list.length}건 (노선이 다름)` });
+    });
+  });
+  return marks;
+}
+
 function findSuspiciousFlights(range) {
   const TOLERANCE_MIN = 10; // 저장값과 계산값의 허용 오차(분)
   const MAX_REASONABLE_MIN = 20 * 60; // 20시간 — 국제선 포함 전체 기준 (이보다 크면 명백한 오류)
   const MAX_DOMESTIC_MIN = 4 * 60; // 4시간 — 국내선은 아무리 길어도 이 시간을 넘을 수 없음
   const results = [];
+  const dupMarks = findDuplicateFlights();
   flights.forEach(f => {
     if (window.PilotLogbookSim.isSim(f)) return;
     if (range && (f.date < range.from || f.date > range.to)) return;
@@ -3678,6 +3707,8 @@ function findSuspiciousFlights(range) {
     }
     const hardReasons = reasons.length;   // 계기·야간 점검 이전까지는 모두 확실한 오류
     const timeIssues = timeDataIssues(f);
+    const dup = dupMarks.get(f.id);
+    if (dup) timeIssues.push(dup);
     timeIssues.forEach(i => reasons.push(i.msg));
     if (reasons.length) {
       const warnOnly = hardReasons === 0 && timeIssues.every(i => i.level === 'warn');
