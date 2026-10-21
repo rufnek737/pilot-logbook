@@ -5339,7 +5339,9 @@ function deleteFromAudit(id) {
   if (!f) return;
   const label = `${f.date} ${f.flight || ''} ${f.dep || '?'}→${f.arr || '?'} ${f.depTime || ''} (${f.total || '—'})`;
   if (!confirm(`이 기록을 삭제할까요?\n\n${label}`)) return;
-  flights = flights.filter(x => x.id !== id);
+  // filter(id !== ...)는 id가 겹친 기록을 전부 지운다. 반드시 한 건만 제거한다.
+  const idx = flights.findIndex(x => x.id === id);
+  if (idx >= 0) flights.splice(idx, 1);
   saveData();
   renderFlights();
   runFlightAudit();
@@ -5348,7 +5350,10 @@ function deleteFromAudit(id) {
 
 function deleteEntry(id) {
   if (!confirm('이 비행 기록을 삭제할까요?')) return;
-  flights = flights.filter(x => x.id !== id);
+  // 같은 id를 가진 기록이 있어도 선택한 한 건만 지운다
+  const idx = flights.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  flights.splice(idx, 1);
   saveData();
   renderFlights();
   showToast('삭제되었습니다');
@@ -6311,12 +6316,15 @@ function importCcFlight(idx) {
 // dutyCode 없는 기존 데이터 마이그레이션
 (function migrateData() {
   let changed = false;
+  const _seenIds = new Set();
   flights.forEach(f => {
-    // ID 없는 flight에 ID 부여 → 메모 엉뚱한 카드 저장 버그 방지
-    if (!f.id) {
+    // ID 없거나 이미 쓰인 ID면 새로 부여.
+    // id가 겹치면 수정·삭제가 엉뚱한 기록에 걸린다(findIndex는 첫 건만 찾음).
+    if (!f.id || _seenIds.has(f.id)) {
       f.id = uid();
       changed = true;
     }
+    _seenIds.add(f.id);
     // dutyCode 없는 flight 보완
     if (!f.dutyCode) {
       f.dutyCode = (f.role === 'PIC' || f.role === 'INST') ? 'C' : 'F';
