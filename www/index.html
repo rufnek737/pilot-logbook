@@ -1832,6 +1832,14 @@
       </div>
     </div>
     <div class="chart-card">
+      <div class="chart-title">듀티코드별 시간</div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.6;margin:-4px 0 10px">
+        SP.5.1 기준으로 계산한 인정시간입니다. 회사 시스템의 <b>In Command</b>는 실제 지휘시간이라
+        3PC·3NC 등 분담 편에서 값이 다를 수 있습니다.
+      </div>
+      <div id="dutyCodeTable"></div>
+    </div>
+    <div class="chart-card">
       <div class="chart-title">공항별 착륙 횟수</div>
       <div id="airportChart">
         <div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">데이터 없음</div>
@@ -4717,6 +4725,7 @@ function renderCharts() {
   renderChartSummary();
   renderMonthlyChart();
   renderDonut();
+  renderDutyCodeTable();
   renderAirportChart();
 }
 
@@ -4889,6 +4898,56 @@ function renderDonut() {
       <span class="legend-text">야간</span>
       <span class="legend-val" style="color:#f59e0b">${toHHMM(night)}</span>
     </div>`;
+}
+
+function renderDutyCodeTable() {
+  const el = document.getElementById('dutyCodeTable');
+  if (!el) return;
+  const fs = getChartFlights().filter(f => !window.PilotLogbookSim.isSim(f));
+  if (!fs.length) { el.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px">데이터 없음</div>'; return; }
+
+  const map = {};
+  fs.forEach(f => {
+    const dc = (f.dutyCode || '(없음)').toUpperCase();
+    const block = f.total ? parseHHMM(f.total) : calcDuration(f.depTime, f.arrTime);
+    const cr = calcCreditedTime(f);
+    const m = map[dc] || (map[dc] = { n: 0, block: 0, pic: 0, sic: 0 });
+    m.n++; m.block += block; m.pic += cr.pic; m.sic += cr.sic;
+  });
+
+  const rows = Object.entries(map).sort((a, b) => b[1].block - a[1].block);
+  const sum = rows.reduce((t, [, v]) => ({
+    n: t.n + v.n, block: t.block + v.block, pic: t.pic + v.pic, sic: t.sic + v.sic,
+  }), { n: 0, block: 0, pic: 0, sic: 0 });
+
+  const cell = (v, extra = '') => `<td style="padding:7px 6px;text-align:right;font-variant-numeric:tabular-nums;${extra}">${v}</td>`;
+  el.innerHTML = `<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:var(--text3);font-size:11px">
+        <th style="padding:6px;text-align:left">듀티</th>
+        <th style="padding:6px;text-align:right">편수</th>
+        <th style="padding:6px;text-align:right">블록</th>
+        <th style="padding:6px;text-align:right">PIC</th>
+        <th style="padding:6px;text-align:right">SIC</th>
+      </tr></thead>
+      <tbody>${rows.map(([dc, v]) => `
+        <tr style="border-top:1px solid var(--border)">
+          <td style="padding:7px 6px;font-weight:700">${escHtml(dc)}</td>
+          ${cell(v.n)}
+          ${cell(toHHMM(v.block))}
+          ${cell(v.pic ? toHHMM(v.pic) : '—', v.pic ? 'color:var(--accent);font-weight:700' : 'color:var(--text3)')}
+          ${cell(v.sic ? toHHMM(v.sic) : '—', v.sic ? 'color:var(--success);font-weight:700' : 'color:var(--text3)')}
+        </tr>`).join('')}
+        <tr style="border-top:2px solid var(--border);font-weight:800">
+          <td style="padding:8px 6px">합계</td>
+          ${cell(sum.n)}
+          ${cell(toHHMM(sum.block))}
+          ${cell(toHHMM(sum.pic), 'color:var(--accent)')}
+          ${cell(toHHMM(sum.sic), 'color:var(--success)')}
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
 }
 
 function renderAirportChart() {
