@@ -3748,7 +3748,10 @@ function runFlightAudit() {
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <span style="font-size:13px;font-weight:700">${f.date} · ${f.flight || '—'}</span>
-          <button onclick="editEntry('${f.id}')" style="background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">수정</button>
+          <span style="display:flex;gap:6px">
+            <button onclick="editEntry('${f.id}')" style="background:rgba(59,130,246,0.15);color:var(--accent);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">수정</button>
+            <button onclick="deleteFromAudit('${f.id}')" style="background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">삭제</button>
+          </span>
         </div>
         <div style="font-size:11px;color:var(--text3)">${f.dep || '???'} → ${f.arr || '???'} · 저장된 총 비행 ${f.total || '—'} · 출발 ${f.depTime || '—'}</div>
         <div style="font-size:11px;color:${warnOnly ? 'var(--warning)' : 'var(--danger)'};margin-top:4px">${reasons.join(' / ')}</div>
@@ -5330,6 +5333,19 @@ function resetAllData() {
   showToast('전체 데이터가 삭제됐습니다. 파일을 다시 업로드해 주세요.');
 }
 
+// 점검 목록에서 삭제 — 어떤 기록인지 확인시킨 뒤 지우고 목록을 바로 갱신한다
+function deleteFromAudit(id) {
+  const f = flights.find(x => x.id === id);
+  if (!f) return;
+  const label = `${f.date} ${f.flight || ''} ${f.dep || '?'}→${f.arr || '?'} ${f.depTime || ''} (${f.total || '—'})`;
+  if (!confirm(`이 기록을 삭제할까요?\n\n${label}`)) return;
+  flights = flights.filter(x => x.id !== id);
+  saveData();
+  renderFlights();
+  runFlightAudit();
+  showToast('삭제되었습니다');
+}
+
 function deleteEntry(id) {
   if (!confirm('이 비행 기록을 삭제할까요?')) return;
   flights = flights.filter(x => x.id !== id);
@@ -5563,13 +5579,18 @@ async function processExcel(file) {
     // 기존 flights와 date+flight+dep+arr 기준 매칭 — 이미 있으면 건너뛰지 않고
     // dutyCode·시간 등을 최신 파일 값으로 업데이트 (사용자가 직접 수정한 값은 보존)
     const flightKey = f => `${f.date}_${f.flight}_${f.dep}${f.arr}`;
+    // 원본 엑셀에 같은 비행이 등록부호만 다르게 두 번 들어있는 경우가 있다
+    // (예: 2021-07-07 7C0211 HL8295/HL8297). 아래 분류는 '푸시 전' 인덱스로만
+    // 판단하므로, 먼저 걸러내지 않으면 같은 키가 둘 다 신규로 들어가 중복이 생긴다.
+    const deduped = window.PilotLogbookCsvImport.deduplicateFlights(parsed);
+    const droppedDupes = parsed.length - deduped.length;
     const existingIndex = new Map(flights.map((f, i) => [flightKey(f), i]));
-    const newFlights = parsed.filter(f => !existingIndex.has(flightKey(f)));
-    const updateFlights = parsed.filter(f => existingIndex.has(flightKey(f)));
+    const newFlights = deduped.filter(f => !existingIndex.has(flightKey(f)));
+    const updateFlights = deduped.filter(f => existingIndex.has(flightKey(f)));
 
     bar.style.width = '100%'; pct.textContent = '100%';
 
-    previewList.innerHTML = parsed.slice(0,10).map(f => {
+    previewList.innerHTML = deduped.slice(0,10).map(f => {
       const updating = existingIndex.has(flightKey(f));
       return `<div class="preview-item">
         <span class="preview-date">${f.date}</span>
@@ -5579,11 +5600,12 @@ async function processExcel(file) {
         <span class="badge ${dutyCodeBadgeClass(f.dutyCode)}">${f.dutyCode}</span>
         <span style="font-size:10px;color:${updating ? 'var(--warning)' : 'var(--success)'}">${updating ? '기존 갱신' : '신규'}</span>
       </div>`;
-    }).join('') + (parsed.length > 10 ? `<div style="text-align:center;color:var(--text3);font-size:12px;padding:8px">외 ${parsed.length-10}편...</div>` : '');
+    }).join('') + (deduped.length > 10 ? `<div style="text-align:center;color:var(--text3);font-size:12px;padding:8px">외 ${deduped.length-10}편...</div>` : '');
     preview.classList.add('show');
 
     const confirmed = confirm(
-      `신규 ${newFlights.length}편 · 기존 ${updateFlights.length}편 업데이트\n\n` +
+      `신규 ${newFlights.length}편 · 기존 ${updateFlights.length}편 업데이트\n` +
+      (droppedDupes ? `원본에 중복된 ${droppedDupes}편은 1건으로 합쳤습니다\n` : '') + `\n` +
       '기존 기록의 계기·야간시간, PF/PM, 오토랜딩과 개인 메모는 보존되고,\n' +
       '직접 수정한 Duty Code도 보존됩니다.\n진행하시겠습니까?'
     );
