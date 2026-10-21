@@ -1741,7 +1741,10 @@
         <div class="rc-grid" id="auditCalDays"></div>
         <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px" id="auditCalHint">시작일을 선택하세요</div>
       </div>
-      <button onclick="runFlightAudit()" style="background:var(--danger);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">검사하기</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="runFlightAudit()" style="background:var(--danger);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">검사하기</button>
+        <button onclick="cleanupDuplicateFlights()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap">중복 일괄 정리</button>
+      </div>
       <div id="auditResult" style="margin-top:12px"></div>
     </div>
   </div>
@@ -3676,6 +3679,50 @@ function findDuplicateFlights() {
     });
   });
   return marks;
+}
+
+// 중복 중 어느 것을 남길지 — 정보가 많은 쪽을 남긴다
+function _dupKeepScore(f) {
+  let score = 0;
+  if (f.source === 'crewconnex') score += 100;   // 회사 원본 기준이라 가장 정확
+  else if (f.source === 'manual') score += 50;
+  ['ifr', 'night', 'personalMemo', 'crewInfo', 'reg'].forEach(k => {
+    if (f[k] && String(f[k]).trim() && String(f[k]) !== '0:00') score += 1;
+  });
+  return score;
+}
+
+// 완전 중복(날짜·편명·노선이 모두 같음)만 정리한다.
+// 노선이 다른 같은 편명은 회항·교체편일 수 있어 사람이 판단해야 한다.
+function cleanupDuplicateFlights() {
+  const groups = new Map();
+  flights.forEach(f => {
+    if (window.PilotLogbookSim.isSim(f)) return;
+    const flight = (f.flight || '').trim().toUpperCase();
+    if (!f.date || !flight) return;
+    const key = `${f.date}|${flight}|${f.dep || ''}|${f.arr || ''}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(f);
+  });
+
+  const remove = new Set();
+  let groupCount = 0;
+  groups.forEach(list => {
+    if (list.length < 2) return;
+    groupCount++;
+    const keeper = list.reduce((a, b) => (_dupKeepScore(b) > _dupKeepScore(a) ? b : a));
+    list.forEach(f => { if (f !== keeper) remove.add(f); });
+  });
+
+  if (!remove.size) { showToast('정리할 중복이 없습니다'); return; }
+  if (!confirm(`완전히 같은 비행 ${groupCount}건에서 중복 ${remove.size}건을 지웁니다.\n`
+    + `각 비행은 정보가 가장 많은 1건만 남습니다.\n\n계속할까요?`)) return;
+
+  flights = flights.filter(f => !remove.has(f));
+  saveData();
+  renderFlights();
+  runFlightAudit();
+  showToast(`중복 ${remove.size}건을 정리했습니다`);
 }
 
 function findSuspiciousFlights(range) {
