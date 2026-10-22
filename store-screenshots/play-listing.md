@@ -77,3 +77,79 @@ CrewConnex 아이디·비밀번호는 사용자가 요청한 조회 한 번에�
 > 자동 가져오기(CrewConnex)는 해당 항공사 소속 조종사만 로그인할 수 있는 기능입니다.
 > 심사에는 제공된 데모 계정으로 로그인하신 뒤, 비행기록 추가(수동 입력)와 엑셀 가져오기로
 > 기록·통계·자격 관리 등 모든 기능을 확인하실 수 있습니다.
+
+---
+
+# 내일 할 일 — 순서대로 따라 하기
+
+모르는 게 나오면 멈추고 물어보면 된다. ①②는 맥북에서, ③④는 웹 콘솔에서 한다.
+
+## ① 업로드 키 만들기 (맥북, 5분)
+
+터미널에서:
+
+```bash
+keytool -genkeypair -v -keystore ~/flylog-upload.jks -alias flylog -keyalg RSA -keysize 2048 -validity 10000
+```
+
+물어보는 것들:
+- **키 저장소 비밀번호** — 직접 정해서 입력(두 번). **잊어버리면 앱 업데이트를 영원히 못 올린다.** 비밀번호 관리자에 저장할 것.
+- 이름/조직/도시/국가 — 아무거나. 국가는 `KR`.
+- 마지막 `[no]: ` 질문 → `yes` 입력.
+- 키 비밀번호를 따로 물으면 그냥 엔터(저장소 비밀번호와 동일).
+
+그다음 `android/keystore.properties` 파일을 만든다 (깃에 안 올라간다):
+
+```
+storeFile=/Users/kaymac/flylog-upload.jks
+storePassword=위에서 정한 비밀번호
+keyAlias=flylog
+keyPassword=위에서 정한 비밀번호
+```
+
+## ② SHA-1 지문을 Firebase에 등록 (안 하면 구글 로그인이 깨진다)
+
+```bash
+keytool -list -v -keystore ~/flylog-upload.jks -alias flylog | grep SHA1
+```
+
+나온 `AB:CD:...` 값을 복사 → Firebase Console → 프로젝트 `pilot-logbook-22bb8` →
+⚙️ 프로젝트 설정 → 내 앱에서 **com.rufnek.pilotlogbook** 선택 → **디지털 지문 추가** → 붙여넣기.
+
+그다음 같은 화면에서 **google-services.json 다운로드** → 받은 파일 알려주면 교체한다.
+
+> Play 콘솔에 앱을 올린 뒤에는 **앱 서명 키**의 SHA-1도 같은 방법으로 한 번 더 등록해야 한다.
+> (Play Console → 테스트 및 출시 → 설정 → 앱 무결성 → 앱 서명 키 인증서)
+
+## ③ Play Console — 앱 만들고 서비스 계정 키 받기
+
+1. [Play Console](https://play.google.com/console) → **앱 만들기**
+   - 앱 이름 `날고적다`, 언어 한국어, **앱**, **유료 또는 무료 → 무료**
+2. 좌측 **설정 → API 액세스** → **새 서비스 계정 만들기** → 구글 클라우드 콘솔로 이동
+   - 서비스 계정 만들기 → 이름 아무거나 → 완료
+   - 만든 계정 → **키 → 키 추가 → 새 키 만들기 → JSON** → 파일 다운로드
+3. Play Console로 돌아와 새로고침 → 그 계정에 **권한 부여**
+   - 재무 데이터 보기, 주문 및 구독 관리 ✔
+4. 받은 JSON 파일 경로를 알려주면 Workers 시크릿 두 개를 등록한다
+   (`GOOGLE_PLAY_SA_EMAIL`, `GOOGLE_PLAY_SA_PRIVATE_KEY`)
+
+## ④ Play Console — 구독 상품 2개
+
+**수익 창출 → 상품 → 구독** → 구독 만들기
+
+| 상품 ID | 이름 | 기본 요금제 |
+|---|---|---|
+| `com.rufnekcrew.flylog.autoimport.monthly` | 자동 가져오기 월간 | 1개월 자동 갱신 ₩1,900 |
+| `com.rufnekcrew.flylog.autoimport.annual` | 자동 가져오기 연간 | 1년 자동 갱신 ₩14,000 |
+
+상품 ID는 **애플과 똑같이** 입력해야 한다(앱 코드가 양쪽 같은 ID를 쓴다).
+만든 뒤 각 요금제를 **활성화**해야 앱에서 가격이 보인다.
+
+## ⑤ 그다음은 내가 한다
+
+- `google-services.json` 교체 → AAB 빌드
+- Workers 시크릿 등록 → `BILLING_ENFORCED=true`
+- 스토어 등록정보·스크린샷·데이터 보안 양식 (위 내용 그대로)
+- 애플은 아내분 계정으로 아카이브 업로드
+
+마지막 **제출 버튼**만 기장님이 누르면 된다.
