@@ -14,12 +14,21 @@ test('billing UI uses StoreKit localized product data and supports restore', () 
   assert.match(billing, /priceString/);
   assert.match(billing, /purchaseProduct\s*\(/);
   assert.match(billing, /restorePurchases\s*\(/);
-  assert.match(billing, /onlyCurrentEntitlements:\s*true/);
+  assert.match(billing, /options\.onlyCurrentEntitlements = true/);
   assert.match(billing, /async function syncStoreEntitlement/);
   assert.match(billing, /if \(!status\?\.active\) await syncStoreEntitlement\(\)/);
   assert.match(billing, /appAccountToken:\s*await accountToken\(\)/);
   assert.match(html, /이전 구매 복원/);
   assert.match(html, /App Store 구독 관리/);
+});
+
+test('billing works on both stores — Play sends the purchase token', () => {
+  // iOS 전용 분기가 남아 있으면 안드로이드에서 구매·복원이 막힌다
+  assert.doesNotMatch(billing, /isNativeIOS/);
+  assert.match(billing, /function storePlatform/);
+  assert.match(billing, /name === 'ios' \|\| name === 'android'/);
+  assert.match(billing, /purchaseToken: String\(transaction\?\.purchaseToken/);
+  assert.match(billing, /'Google Play' : 'App Store'/);
 });
 
 test('free import and subscription policy is consistent at 50 flights', () => {

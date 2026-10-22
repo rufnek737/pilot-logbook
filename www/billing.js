@@ -19,9 +19,15 @@
     return window.Capacitor?.Plugins?.NativePurchases || null;
   }
 
-  function isNativeIOS() {
-    return Boolean(window.Capacitor?.isNativePlatform?.())
-      && window.Capacitor?.getPlatform?.() === 'ios';
+  // 네이티브 앱이면 'ios' | 'android', 웹이면 '' — 스토어 분기의 기준점
+  function storePlatform() {
+    if (!window.Capacitor?.isNativePlatform?.()) return '';
+    const name = window.Capacitor?.getPlatform?.();
+    return name === 'ios' || name === 'android' ? name : '';
+  }
+
+  function storeLabel() {
+    return storePlatform() === 'android' ? 'Google Play' : 'App Store';
   }
 
   async function idToken() {
@@ -201,7 +207,7 @@
         const label = current ? '으로 전환' : '';
         button.innerHTML = `<strong>${product.title}</strong><span>${product.priceString} / ${unit}${label}</span>`;
       } else {
-        button.innerHTML = `<strong>${fallbackTitle}</strong><span>App Store 정보 준비 중</span>`;
+        button.innerHTML = `<strong>${fallbackTitle}</strong><span>${storeLabel()} 정보 준비 중</span>`;
       }
     }
   }
@@ -210,12 +216,14 @@
     if (loadingProducts) return;
     loadingProducts = true;
     try {
-      if (!isNativeIOS() || !plugin()) {
-        document.getElementById('billingPlatformNotice').textContent = '구독 구매는 iPhone 앱에서 가능합니다.';
+      if (!storePlatform() || !plugin()) {
+        document.getElementById('billingPlatformNotice').textContent = '구독 구매는 iPhone·Android 앱에서 가능합니다.';
         return;
       }
+      const manageButton = document.getElementById('billingManageButton');
+      if (manageButton) manageButton.textContent = `${storeLabel()} 구독 관리`;
       const support = await plugin().isBillingSupported();
-      if (!support.isBillingSupported) throw new Error('이 기기에서 App Store 결제를 사용할 수 없습니다.');
+      if (!support.isBillingSupported) throw new Error(`이 기기에서 ${storeLabel()} 결제를 사용할 수 없습니다.`);
       const result = await plugin().getProducts({
         productIdentifiers: Object.values(PRODUCTS),
         productType: 'subs',
@@ -223,10 +231,10 @@
       products = result.products || [];
       renderProducts();
       document.getElementById('billingPlatformNotice').textContent = products.length
-        ? '결제는 Apple ID로 처리되며 설정에서 언제든 해지할 수 있습니다.'
-        : 'App Store 상품 정보를 불러오지 못했습니다. 상품 등록 상태를 확인해 주세요.';
+        ? `결제는 ${storeLabel()} 계정으로 처리되며 설정에서 언제든 해지할 수 있습니다.`
+        : `${storeLabel()} 상품 정보를 불러오지 못했습니다. 상품 등록 상태를 확인해 주세요.`;
     } catch (error) {
-      document.getElementById('billingPlatformNotice').textContent = error.message || 'App Store 상품 정보를 불러오지 못했습니다.';
+      document.getElementById('billingPlatformNotice').textContent = error.message || `${storeLabel()} 상품 정보를 불러오지 못했습니다.`;
     } finally {
       loadingProducts = false;
     }
@@ -243,20 +251,23 @@
   }
 
   async function verifyTransaction(transaction) {
-    if (!transaction?.transactionId) throw new Error('Apple 거래번호를 확인하지 못했습니다.');
+    // iOS는 StoreKit 거래번호, Android는 Play 구매 토큰으로 서버가 검증한다.
+    const payload = storePlatform() === 'android'
+      ? { purchaseToken: String(transaction?.purchaseToken || '') }
+      : { transactionId: String(transaction?.transactionId || '') };
+    if (!Object.values(payload)[0]) throw new Error('구매 정보를 확인하지 못했습니다.');
     renderStatus(await api('/billing/verify', {
       method: 'POST',
-      body: JSON.stringify({ transactionId: String(transaction.transactionId) }),
+      body: JSON.stringify(payload),
     }));
   }
 
   async function currentStoreEntitlement() {
-    if (!plugin() || !isNativeIOS()) return null;
-    const result = await plugin().getPurchases({
-      productType: 'subs',
-      appAccountToken: await accountToken(),
-      onlyCurrentEntitlements: true,
-    });
+    if (!plugin() || !storePlatform()) return null;
+    const options = { productType: 'subs', appAccountToken: await accountToken() };
+    // onlyCurrentEntitlements는 iOS 전용 옵션이다.
+    if (storePlatform() === 'ios') options.onlyCurrentEntitlements = true;
+    const result = await plugin().getPurchases(options);
     return (result.purchases || [])
       .filter(item => Object.values(PRODUCTS).includes(item.productIdentifier) && item.isActive !== false)
       .sort((a, b) => new Date(b.expirationDate || 0) - new Date(a.expirationDate || 0))[0] || null;
@@ -295,8 +306,8 @@
   }
 
   async function restore() {
-    if (!plugin() || !isNativeIOS()) {
-      window.showToast?.('구매 복원은 iPhone 앱에서 가능합니다.', 3500);
+    if (!plugin() || !storePlatform()) {
+      window.showToast?.('구매 복원은 iPhone·Android 앱에서 가능합니다.', 3500);
       return;
     }
     try {

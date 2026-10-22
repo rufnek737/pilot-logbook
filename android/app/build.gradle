@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// 업로드 키는 저장소에 넣지 않는다. android/keystore.properties 에
+// storeFile / storePassword / keyAlias / keyPassword 를 적어두면 릴리스 서명에 쓰인다.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "com.rufnek.pilotlogbook"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +24,22 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            // 키 설정이 없으면 디버그 키로 떨어지지 않고 서명 없이 빌드된다(업로드 시 바로 드러남).
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

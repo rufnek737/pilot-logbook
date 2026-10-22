@@ -5,7 +5,9 @@ import {
   autoImportFlightKey,
   handleRequest,
   parseRosterHtml,
+  parsePurchaseRequest,
   selectActiveAppleSubscription,
+  selectActiveGoogleSubscription,
   verifyFirebaseIdToken,
 } from './crewconnex.js';
 
@@ -210,4 +212,50 @@ test('Apple subscription selection only accepts active 날고적다 products', (
     }) }] }],
   }, now);
   assert.equal(otherApp, null);
+});
+
+test('Google Play subscription selection accepts active and cancelled-but-unexpired purchases', () => {
+  const now = Date.now();
+  const future = new Date(now + 86_400_000).toISOString();
+
+  const active = selectActiveGoogleSubscription({
+    subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+    latestOrderId: 'GPA.1234-5678-9012-34567..3',
+    lineItems: [{ productId: 'com.rufnekcrew.flylog.autoimport.annual', expiryTime: future }],
+  }, now);
+  assert.equal(active.productId, 'com.rufnekcrew.flylog.autoimport.annual');
+  // 갱신 때마다 바뀌는 ..N 꼬리를 떼어 구독 식별자를 안정적으로 유지한다
+  assert.equal(active.originalTransactionId, 'GPA.1234-5678-9012-34567');
+
+  // 해지 예약 상태라도 만료 전까지는 이용할 수 있어야 한다
+  assert.ok(selectActiveGoogleSubscription({
+    subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
+    latestOrderId: 'GPA.1111-2222-3333-44444',
+    lineItems: [{ productId: 'com.rufnekcrew.flylog.autoimport.monthly', expiryTime: future }],
+  }, now));
+
+  assert.equal(selectActiveGoogleSubscription({
+    subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
+    lineItems: [{ productId: 'com.rufnekcrew.flylog.autoimport.monthly', expiryTime: future }],
+  }, now), null);
+
+  assert.equal(selectActiveGoogleSubscription({
+    subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+    lineItems: [{ productId: 'com.rufnekcrew.flylog.autoimport.monthly', expiryTime: new Date(now - 1).toISOString() }],
+  }, now), null);
+
+  assert.equal(selectActiveGoogleSubscription({
+    subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+    lineItems: [{ productId: 'com.example.other.monthly', expiryTime: future }],
+  }, now), null);
+});
+
+test('purchase requests are routed to the right store', () => {
+  assert.deepEqual(parsePurchaseRequest({ transactionId: '200000000000001' }),
+    { platform: 'ios', transactionId: '200000000000001' });
+  assert.deepEqual(parsePurchaseRequest({ purchaseToken: 'abcdefghijklmnopqrstuvwxyz.AO-J1Ox_token-value' }),
+    { platform: 'android', purchaseToken: 'abcdefghijklmnopqrstuvwxyz.AO-J1Ox_token-value' });
+  assert.equal(parsePurchaseRequest({ purchaseToken: 'too-short' }), null);
+  assert.equal(parsePurchaseRequest({ transactionId: 'not-a-number' }), null);
+  assert.equal(parsePurchaseRequest({}), null);
 });
