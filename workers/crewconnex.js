@@ -764,10 +764,11 @@ async function tryFetch(url, jar, referer) {
     if (!r.ok || r.url.includes('login')) return null;
     const html   = await r.text();
     const result = parseRosterHtml(html);
-    if (result.flights.length === 0) return null;
-    // 로스터 기본 화면은 "선택된 달 전체"만 준다. 월 경계(오늘이 월초/월말)에서는
-    // 조회 창에 걸치는 인접 달을 기간 선택으로 추가 조회해 합쳐야 누락되지 않는다.
-    return await fetchAdjacentPeriods(r.url, jar, html, result);
+    // 로스터 기본 화면은 "선택된 달 전체"만 준다. 월 경계(오늘이 월초/월말)이거나
+    // 선택된 달이 조회 창과 어긋나면, 창에 걸치는 달을 기간 선택으로 추가 조회해 합친다.
+    // (기본 화면 결과가 0건이어도 다른 달은 조회해 봐야 하므로 여기서 먼저 끊지 않는다)
+    const merged = await fetchAdjacentPeriods(r.url, jar, html, result);
+    return merged.flights.length > 0 ? merged : null;
   } catch (_) {
     return null;
   }
@@ -1026,6 +1027,9 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       const mainParsed = parseRosterHtml(mainHtml);
       if (mainParsed.flights.length > 0) return ok(mainParsed);
 
+      // 다음 실패를 재현 없이 진단할 수 있도록 창/로스터 링크 유무만 남긴다(개인정보 제외).
+      console.log('[NO_RECENT_FLIGHTS] win=' + JSON.stringify(rosterWindow())
+        + ' rosterLink=' + !!rosterRel + ' mainLen=' + mainHtml.length);
       return fail(404, '로그인 성공, 최근 5일 이내 비행을 찾을 수 없습니다.', 'NO_RECENT_FLIGHTS');
 
     } catch (_) {

@@ -18,3 +18,6 @@ namespace_id = "73726001"
   [ratelimits.simple]
   limit = 5
   period = 60
+
+[observability]
+enabled = true
