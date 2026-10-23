@@ -80,76 +80,35 @@ CrewConnex 아이디·비밀번호는 사용자가 요청한 조회 한 번에�
 
 ---
 
-# 내일 할 일 — 순서대로 따라 하기
+# 다음 할 일 (2026-10-23 기준)
 
-모르는 게 나오면 멈추고 물어보면 된다. ①②는 맥북에서, ③④는 웹 콘솔에서 한다.
+①②는 끝났다. 업로드 키는 결국 **듀티스왑 키**(`/Users/kaymac/crewswap-upload.jks`)를 쓴다 —
+Play가 이 앱의 업로드 키를 그것으로 고정해 두었기 때문. `android/keystore.properties` 설정 완료.
 
-## ① 업로드 키 만들기 (맥북, 5분)
+## 끝난 것
 
-터미널에서:
+- 업로드 키 서명 설정 · Firebase 지문 4개 등록 · `google-services.json` 교체
+- Play 앱 생성(날고적고) · 기본 스토어 등록정보 저장 · **AAB 업로드(버전 1)**
+- App Store Connect 이름/부제 변경
 
-```bash
-keytool -genkeypair -v -keystore ~/flylog-upload.jks -alias flylog -keyalg RSA -keysize 2048 -validity 10000
-```
+## 남은 것
 
-물어보는 것들:
-- **키 저장소 비밀번호** — 직접 정해서 입력(두 번). **잊어버리면 앱 업데이트를 영원히 못 올린다.** 비밀번호 관리자에 저장할 것.
-- 이름/조직/도시/국가 — 아무거나. 국가는 `KR`.
-- 마지막 `[no]: ` 질문 → `yes` 입력.
-- 키 비밀번호를 따로 물으면 그냥 엔터(저장소 비밀번호와 동일).
+### Play Console
+1. **앱 콘텐츠** — 개인정보처리방침 URL(`https://rufnek737.github.io/pilot-logbook/privacy.html`),
+   데이터 보안(위 표 참조), 콘텐츠 등급, 타겟층 18세 이상, 광고 없음
+2. **구독 상품 2개** — 수익 창출 → 상품 → 구독
+   - `com.rufnekcrew.flylog.autoimport.monthly` ₩1,900 / 1개월
+   - `com.rufnekcrew.flylog.autoimport.annual` ₩14,000 / 1년
+   - 상품 ID는 애플과 **동일해야** 한다(앱 코드가 양쪽 같은 ID를 쓴다)
+3. **API 서비스 계정** — 구독 검증용. Google Cloud에서 JSON 키 발급 →
+   Play Console에서 재무 데이터 보기·주문 관리 권한 →
+   Workers 시크릿 `GOOGLE_PLAY_SA_EMAIL`, `GOOGLE_PLAY_SA_PRIVATE_KEY`
+4. 드래프트에 남은 실패 업로드 줄 정리, 태블릿 스크린샷(선택)
 
-그다음 `android/keystore.properties` 파일을 만든다 (깃에 안 올라간다):
+### iOS
+5. **새 빌드 아카이브·업로드** — 앱 이름이 빌드에 박히므로 필요
+6. 키워드에서 `제주항공` 정리 검토
 
-```
-storeFile=/Users/kaymac/flylog-upload.jks
-storePassword=위에서 정한 비밀번호
-keyAlias=flylog
-keyPassword=위에서 정한 비밀번호
-```
-
-## ② SHA-1 지문을 Firebase에 등록 (안 하면 구글 로그인이 깨진다)
-
-```bash
-keytool -list -v -keystore ~/flylog-upload.jks -alias flylog | grep SHA1
-```
-
-나온 `AB:CD:...` 값을 복사 → Firebase Console → 프로젝트 `pilot-logbook-22bb8` →
-⚙️ 프로젝트 설정 → 내 앱에서 **com.rufnek.pilotlogbook** 선택 → **디지털 지문 추가** → 붙여넣기.
-
-그다음 같은 화면에서 **google-services.json 다운로드** → 받은 파일 알려주면 교체한다.
-
-> Play 콘솔에 앱을 올린 뒤에는 **앱 서명 키**의 SHA-1도 같은 방법으로 한 번 더 등록해야 한다.
-> (Play Console → 테스트 및 출시 → 설정 → 앱 무결성 → 앱 서명 키 인증서)
-
-## ③ Play Console — 앱 만들고 서비스 계정 키 받기
-
-1. [Play Console](https://play.google.com/console) → **앱 만들기**
-   - 앱 이름 `날고적고`, 언어 한국어, **앱**, **유료 또는 무료 → 무료**
-2. 좌측 **설정 → API 액세스** → **새 서비스 계정 만들기** → 구글 클라우드 콘솔로 이동
-   - 서비스 계정 만들기 → 이름 아무거나 → 완료
-   - 만든 계정 → **키 → 키 추가 → 새 키 만들기 → JSON** → 파일 다운로드
-3. Play Console로 돌아와 새로고침 → 그 계정에 **권한 부여**
-   - 재무 데이터 보기, 주문 및 구독 관리 ✔
-4. 받은 JSON 파일 경로를 알려주면 Workers 시크릿 두 개를 등록한다
-   (`GOOGLE_PLAY_SA_EMAIL`, `GOOGLE_PLAY_SA_PRIVATE_KEY`)
-
-## ④ Play Console — 구독 상품 2개
-
-**수익 창출 → 상품 → 구독** → 구독 만들기
-
-| 상품 ID | 이름 | 기본 요금제 |
-|---|---|---|
-| `com.rufnekcrew.flylog.autoimport.monthly` | 자동 가져오기 월간 | 1개월 자동 갱신 ₩1,900 |
-| `com.rufnekcrew.flylog.autoimport.annual` | 자동 가져오기 연간 | 1년 자동 갱신 ₩14,000 |
-
-상품 ID는 **애플과 똑같이** 입력해야 한다(앱 코드가 양쪽 같은 ID를 쓴다).
-만든 뒤 각 요금제를 **활성화**해야 앱에서 가격이 보인다.
-
-## ⑤ 그다음은 내가 한다
-
-- `google-services.json` 교체 → AAB 빌드
-- Workers 시크릿 등록 → `BILLING_ENFORCED=true`
-- 스토어 등록정보·스크린샷·데이터 보안 양식 (위 내용 그대로)
-- 애플은 아내분 계정으로 아카이브 업로드
-
-마지막 **제출 버튼**만 기장님이 누르면 된다.
+### 공통
+7. `BILLING_ENFORCED=true` — 지금은 구독해도 제한이 걸리지 않아 애플 3.1.1 반려 위험
+8. 심사용 데모 계정(Firebase 이메일) + 샘플 비행 데이터
