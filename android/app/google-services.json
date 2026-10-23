@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "824870554939-ba0nhn0vb9mfejql76fi7ib07iqpd6kd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rufnek.pilotlogbook",
+            "certificate_hash": "ea0c42e4610b861ff3aff1c7e49a88f4e20fec86"
+          }
+        },
+        {
           "client_id": "824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -37,6 +45,13 @@
             {
               "client_id": "824870554939-vicqc3fpdmo2b4n14ot8hegjqn97uvb5.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "824870554939-uagl5pfvr8a4vugpa6qom0mbjs6l13ok.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.rufnekcrew.flylog"
+              }
             }
           ]
         }
