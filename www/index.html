@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="날고적기" />
+  <meta name="apple-mobile-web-app-title" content="날고적고" />
   <meta name="theme-color" content="#0a1440" />
   <link rel="manifest" href="manifest.json" />
   <!-- PWA Icons -->
@@ -17,7 +17,7 @@
         media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
   <link rel="apple-touch-startup-image" href="splash-390x844.png"
         media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
-  <title>날고적기</title>
+  <title>날고적고</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="logten-export.js"></script>
@@ -1417,7 +1417,7 @@
   <!-- 인앱 브라우저 경고 (카카오톡 등) -->
   <div id="inAppWarning" style="display:none;position:fixed;inset:0;background:#0a0e1a;z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center">
     <div style="font-size:48px;margin-bottom:16px">✈️</div>
-    <div style="font-size:20px;font-weight:700;color:#f9fafb;margin-bottom:8px">날고적기</div>
+    <div style="font-size:20px;font-weight:700;color:#f9fafb;margin-bottom:8px">날고적고</div>
     <div style="font-size:14px;color:#9ca3af;margin-bottom:24px;line-height:1.7">
       카카오톡 내장 브라우저에서는<br>Google 로그인이 지원되지 않습니다.
     </div>
@@ -1443,7 +1443,7 @@
 
   <div class="auth-card" id="authCard">
     <div class="auth-logo">✈</div>
-    <div class="auth-title">날고적기</div>
+    <div class="auth-title">날고적고</div>
     <div class="auth-sub" id="authSub">이메일로 로그인하거나<br>Google 계정으로 빠르게 시작하세요.</div>
 
     <!-- 로그인 폼 -->
@@ -1493,7 +1493,7 @@
       <button id="drawerBtn" onclick="openDrawer()" aria-label="메뉴 열기">☰</button>
       <div class="logo-icon">✈</div>
       <div>
-        <div class="logo-text">날고적기</div>
+        <div class="logo-text">날고적고</div>
         <div class="logo-sub" id="headerSection">비행 기록</div>
       </div>
     </div>
@@ -1581,7 +1581,7 @@
     <div class="drawer-head">
       <div class="logo-icon">✈</div>
       <div>
-        <div class="drawer-head-name">날고적기</div>
+        <div class="drawer-head-name">날고적고</div>
         <div class="drawer-head-sub">FLYLOG · 조종사 비행기록</div>
       </div>
     </div>
@@ -1761,7 +1761,7 @@
             📂 파일 선택
           </button>
         </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--text3)">ePaper PDF · flightHistory Excel/CSV · 날고적기 LogTen CSV</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3)">ePaper PDF · flightHistory Excel/CSV · 날고적고 LogTen CSV</div>
       </div>
     </div>
 
@@ -2269,7 +2269,7 @@
       <button class="modal-close" onclick="closeInfoPage()">✕</button>
     </div>
     <div class="modal-body">
-      <iframe id="infoFrame" title="날고적기 안내"></iframe>
+      <iframe id="infoFrame" title="날고적고 안내"></iframe>
     </div>
   </div>
 </div>
@@ -2671,7 +2671,7 @@ function toggleTheme() {
 
 function openAccountMenu() {
   if (!currentUser) return;
-  const name = currentUser.displayName || '날고적기 사용자';
+  const name = currentUser.displayName || '날고적고 사용자';
   const email = currentUser.email || '';
   const avatar = document.getElementById('accountAvatar');
   document.getElementById('accountDisplayName').textContent = name;
@@ -4084,7 +4084,7 @@ async function exportFullBackup() {
     const file = new File([JSON.stringify(payload)], fileName, { type: 'application/json' });
 
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: '날고적기 전체 백업' });
+      await navigator.share({ files: [file], title: '날고적고 전체 백업' });
     } else {
       const url = URL.createObjectURL(file);
       const link = document.createElement('a');
@@ -5990,7 +5990,7 @@ async function loginCrewConnex() {
   try {
     const signedInUser = auth.currentUser;
     if (!signedInUser) {
-      throw new Error('날고적기에 로그인한 뒤 다시 시도해 주세요');
+      throw new Error('날고적고에 로그인한 뒤 다시 시도해 주세요');
     }
     const firebaseIdToken = await signedInUser.getIdToken();
     const resp = await fetch('https://crewconnex.tae26001.workers.dev', {
