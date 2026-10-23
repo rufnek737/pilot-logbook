@@ -1,4 +1,4 @@
-# Google Play 등록 자료 (날고적기 / Fly^Record)
+# Google Play 등록 자료 (날고적기 / FlyRecord)
 
 패키지명 `com.rufnek.pilotlogbook` · 첫 출시 (versionCode 1)
 

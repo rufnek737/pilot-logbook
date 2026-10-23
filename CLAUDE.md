@@ -1,4 +1,4 @@
-# 날고적기 (Fly^Record) — Claude Code 컨텍스트
+# 날고적기 (FlyRecord) — Claude Code 컨텍스트
 
 ## 프로젝트 개요
 - 제주항공 기장용 파일럿 로그북 PWA + Android/iOS 앱

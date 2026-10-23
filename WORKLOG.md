@@ -1,4 +1,4 @@
-# 날고적기 (Fly^Record) — Work Log
+# 날고적기 (FlyRecord) — Work Log
 
 ---
 
@@ -382,7 +382,7 @@ App Store Connect 조회 결과 버전 1.0이 `PREPARE_FOR_SUBMISSION`, **출시
 
 | 항목 | 이전 | 이후 |
 |---|---|---|
-| 앱 이름 | Pilot Logbook / 파일럿 로그북 | **날고적기** (영문 Fly^Record) |
+| 앱 이름 | Pilot Logbook / 파일럿 로그북 | **날고적기** (영문 FlyRecord) |
 | 번들 ID (iOS) | `com.rufnek.pilotlogbook` | **`com.rufnekcrew.flylog`** |
 | 팀 | kyungtae kay kang `V6TT3SA8H9` | **Ryeojin Jung `XV2TFVJUG3`** |
 | 구독 상품 | `com.rufnek.pilotlogbook.autoimport.*` | `com.rufnekcrew.flylog.autoimport.*` |
