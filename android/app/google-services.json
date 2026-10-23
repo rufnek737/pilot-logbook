@@ -22,11 +22,27 @@
           }
         },
         {
+          "client_id": "824870554939-2oklac50d0nild07qkuf4jj61g07577j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rufnek.pilotlogbook",
+            "certificate_hash": "a8d625c50814a4efb1b35910bfe7ead6b071fac7"
+          }
+        },
+        {
           "client_id": "824870554939-ba0nhn0vb9mfejql76fi7ib07iqpd6kd.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.rufnek.pilotlogbook",
             "certificate_hash": "ea0c42e4610b861ff3aff1c7e49a88f4e20fec86"
+          }
+        },
+        {
+          "client_id": "824870554939-ijh0i7srvta07qv9p0lroehhg6i87ias.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rufnek.pilotlogbook",
+            "certificate_hash": "4c3ad338ac8ea0ec7f4bee62fde45f9441d8bf66"
           }
         },
         {
