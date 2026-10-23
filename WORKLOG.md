@@ -1,4 +1,4 @@
-# 날고적다 (FlyLog) — Work Log
+# 날고적기 (Fly^Record) — Work Log
 
 ---
 
@@ -47,7 +47,7 @@ win = 2026-10-17 ~ 2026-10-27
 
 ### 📝 법적 고지의 서비스명 교체
 개인정보처리방침·이용약관·FAQ·웹 버전이 아직 `Pilot Logbook`을 서비스명으로 쓰고 있었다.
-스토어가 링크하는 문서라 앱 이름과 다르면 양쪽 심사에서 지적된다 → 28곳을 `날고적다`로 교체
+스토어가 링크하는 문서라 앱 이름과 다르면 양쪽 심사에서 지적된다 → 28곳을 `날고적기`로 교체
 (조사 `은/는` 등도 함께 교정).
 
 ### 상태
@@ -287,7 +287,7 @@ API 키도 기존 `claude-asc`(`QS53NUHWUF`)를 재사용.
 
 | 항목 | 값 |
 |---|---|
-| 앱 레코드 | `날고적다` / `com.rufnekcrew.flylog` / id `6823952877` |
+| 앱 레코드 | `날고적기` / `com.rufnekcrew.flylog` / id `6823952877` |
 | 팀 | Ryeojin Jung `XV2TFVJUG3` |
 | 구독 그룹 | 자동 가져오기 (id `22487869`) |
 | 월 구독 | `...autoimport.monthly` ₩1,900 (id `6823954307`) |
@@ -365,7 +365,7 @@ iOS에 반영이 안 돼 "구독 이용 중 · (빈 날짜)까지"가 표시됐�
 
 ### 남은 것 — 아내 계정 App Store Connect
 `BILLING_ENFORCED`는 **아직 `false`**. 아래가 끝나야 켤 수 있다.
-1. 앱 레코드 생성 (`com.rufnekcrew.flylog`, 날고적다)
+1. 앱 레코드 생성 (`com.rufnekcrew.flylog`, 날고적기)
 2. 유료 앱 계약(세금·은행) 체결
 3. 구독 상품 2개 생성 + 가격 설정
 4. App Store Connect API 키 발급 → Worker 시크릿 3개 교체
@@ -382,7 +382,7 @@ App Store Connect 조회 결과 버전 1.0이 `PREPARE_FOR_SUBMISSION`, **출시
 
 | 항목 | 이전 | 이후 |
 |---|---|---|
-| 앱 이름 | Pilot Logbook / 파일럿 로그북 | **날고적다** (영문 FlyLog) |
+| 앱 이름 | Pilot Logbook / 파일럿 로그북 | **날고적기** (영문 Fly^Record) |
 | 번들 ID (iOS) | `com.rufnek.pilotlogbook` | **`com.rufnekcrew.flylog`** |
 | 팀 | kyungtae kay kang `V6TT3SA8H9` | **Ryeojin Jung `XV2TFVJUG3`** |
 | 구독 상품 | `com.rufnek.pilotlogbook.autoimport.*` | `com.rufnekcrew.flylog.autoimport.*` |

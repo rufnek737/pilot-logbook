@@ -178,7 +178,7 @@ test('Automatic import usage key is stable and identifies a unique flight', () =
   );
 });
 
-test('Apple subscription selection only accepts active 날고적다 products', () => {
+test('Apple subscription selection only accepts active 날고적기 products', () => {
   const now = Date.now();
   const jws = payload => `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`;
   const active = selectActiveAppleSubscription({

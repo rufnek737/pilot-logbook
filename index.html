@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="날고적다" />
+  <meta name="apple-mobile-web-app-title" content="날고적기" />
   <meta name="theme-color" content="#0a1440" />
   <link rel="manifest" href="/manifest.json" />
   <!-- PWA Icons -->
@@ -17,7 +17,7 @@
         media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
   <link rel="apple-touch-startup-image" href="/splash-390x844.png"
         media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
-  <title>날고적다</title>
+  <title>날고적기</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- Firebase v10 compat SDK -->
@@ -1948,7 +1948,7 @@ function printMonth(ym) {
 
   const printDate = new Date().toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-  <title>날고적다 - ${label}</title>
+  <title>날고적기 - ${label}</title>
   <style>
     body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #111; }
     h2 { font-size: 16px; margin-bottom: 4px; }
@@ -1961,7 +1961,7 @@ function printMonth(ym) {
     .summary b { font-size: 14px; color: #1e3a5f; }
     @media print { body { margin: 10mm; } }
   </style></head><body>
-  <h2>날고적다 — ${label}</h2>
+  <h2>날고적기 — ${label}</h2>
   <div class="subtitle">Kyungtae Kang · Printed: ${printDate}</div>
   <table>
     <thead><tr>
