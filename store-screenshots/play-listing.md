@@ -80,35 +80,34 @@ CrewConnex 아이디·비밀번호는 사용자가 요청한 조회 한 번에�
 
 ---
 
-# 다음 할 일 (2026-10-23 기준)
-
-①②는 끝났다. 업로드 키는 결국 **듀티스왑 키**(`/Users/kaymac/crewswap-upload.jks`)를 쓴다 —
-Play가 이 앱의 업로드 키를 그것으로 고정해 두었기 때문. `android/keystore.properties` 설정 완료.
+# 다음 할 일 (2026-10-25 기준)
 
 ## 끝난 것
 
 - 업로드 키 서명 설정 · Firebase 지문 4개 등록 · `google-services.json` 교체
-- Play 앱 생성(날고적고) · 기본 스토어 등록정보 저장 · **AAB 업로드(버전 1)**
-- App Store Connect 이름/부제 변경
+- Play 앱 생성(날고적고) · 기본 스토어 등록정보 저장
+- 앱 콘텐츠(개인정보처리방침·데이터 보안·콘텐츠 등급·타겟층)
+- **평생 이용권 전환** — Play 관리형 상품 `com.rufnekcrew.flylog.autoimport.lifetime` ₩9,900 활성,
+  기존 월 구독은 기본 요금제 비활성화
+- **프로덕션 버전 초안** — versionCode 2 AAB 업로드, 출시명 `1.0 (2) - 첫 출시`, 한국어 출시 노트
+- **Play Developer API 연동 완료**
+  - GCP 프로젝트 `flyrecord-billing` (정여진 계정)
+  - 서비스 계정 `flyrecord-purchase-verifier@flyrecord-billing.iam.gserviceaccount.com`
+  - Google Play Android Developer API 사용 설정
+  - Play Console 사용자 및 권한에 초대 — 날고적고 앱 한정, 재무 데이터 보기 + 주문/구독 관리
+  - Workers 시크릿 `GOOGLE_PLAY_SA_EMAIL`, `GOOGLE_PLAY_SA_PRIVATE_KEY` 등록
+  - OAuth 토큰 발급 확인됨. `purchases.products` 호출은 아직 404
+    (`No application was found` — 앱 최초 게시 전이라 정상, 출시 후 해소)
+- `BILLING_ENFORCED=true` 배포 — 무료 50편 초과분이 실제로 막힘
+- iOS 1.0 (3) 아카이브·업로드, 버전 페이지 빌드를 (2)→(3)으로 교체
+- 애플 평생 이용권 상품(가격·한국어 현지화·심사 스크린샷·심사 참고사항) 완성,
+  제출 초안에서 구독 2개 + 구독 그룹 제외 후 평생 이용권 추가
 
 ## 남은 것
 
-### Play Console
-1. **앱 콘텐츠** — 개인정보처리방침 URL(`https://rufnek737.github.io/pilot-logbook/privacy.html`),
-   데이터 보안(위 표 참조), 콘텐츠 등급, 타겟층 18세 이상, 광고 없음
-2. **구독 상품 2개** — 수익 창출 → 상품 → 구독
-   - `com.rufnekcrew.flylog.autoimport.monthly` ₩1,900 / 1개월
-   - `com.rufnekcrew.flylog.autoimport.annual` ₩14,000 / 1년
-   - 상품 ID는 애플과 **동일해야** 한다(앱 코드가 양쪽 같은 ID를 쓴다)
-3. **API 서비스 계정** — 구독 검증용. Google Cloud에서 JSON 키 발급 →
-   Play Console에서 재무 데이터 보기·주문 관리 권한 →
-   Workers 시크릿 `GOOGLE_PLAY_SA_EMAIL`, `GOOGLE_PLAY_SA_PRIVATE_KEY`
-4. 드래프트에 남은 실패 업로드 줄 정리, 태블릿 스크린샷(선택)
-
-### iOS
-5. **새 빌드 아카이브·업로드** — 앱 이름이 빌드에 박히므로 필요
-6. 키워드에서 `제주항공` 정리 검토
-
-### 공통
-7. `BILLING_ENFORCED=true` — 지금은 구독해도 제한이 걸리지 않아 애플 3.1.1 반려 위험
-8. 심사용 데모 계정(Firebase 이메일) + 샘플 비행 데이터
+1. **Play 프로덕션 출시** — 검토 → 출시 시작 (사용자가 직접)
+2. **애플 심사 제출** — "심사를 위해 제출" (사용자가 직접)
+3. 출시 후 `purchases.products` 404가 풀렸는지 재확인
+4. 서비스 계정 JSON 키 파일 정리 — `~/Downloads/flyrecord-billing-448bdcdc24a2.json`
+   (시크릿 등록이 끝났으므로 안전한 곳으로 옮기거나 삭제. **저장소에 커밋 금지**)
+5. 디버그 alert 제거 (`[디버그]` 검색)
