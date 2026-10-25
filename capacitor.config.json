@@ -1,6 +1,6 @@
 {
   "appId": "com.rufnekcrew.flylog",
-  "appName": "Pilot Logbook",
+  "appName": "날고적고",
   "webDir": "www",
   "android": {
     "allowMixedContent": false,
