@@ -5,10 +5,8 @@
   // 서버(Worker)의 AUTO_IMPORT_FREE_LIMIT과 맞춘 폴백값 — 실제 값은 서버 응답을 따른다
   const DEFAULT_FREE_LIMIT = 50;
 
-  const PRODUCTS = {
-    monthly: 'com.rufnekcrew.flylog.autoimport.monthly',
-    annual: 'com.rufnekcrew.flylog.autoimport.annual',
-  };
+  // 구독이 아니라 한 번 사면 끝나는 평생 이용권이다(스토어 분류: 비소모성 / 관리형 제품).
+  const LIFETIME_PRODUCT = 'com.rufnekcrew.flylog.autoimport.lifetime';
   let status = null;
   let products = [];
   let loadingProducts = false;
@@ -46,7 +44,7 @@
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(body.error || '구독 정보를 확인하지 못했습니다.');
+      const error = new Error(body.error || '이용권 정보를 확인하지 못했습니다.');
       error.code = body.code;
       throw error;
     }
@@ -68,7 +66,7 @@
     const text = status?.unlimited
       ? '무제한 이용 중'
       : status?.active
-        ? `구독 이용 중 · ${formatDate(status.expiresAt)}까지`
+        ? '평생 이용권 사용 중'
         : `자동 가져오기 무료 ${remaining}편 남음`;
     document.querySelectorAll('[data-billing-status]').forEach(el => { el.textContent = text; });
     document.querySelectorAll('[data-billing-used]').forEach(el => {
@@ -79,13 +77,13 @@
     const activePanel = document.getElementById('billingActivePanel');
     const purchasePanel = document.getElementById('billingPurchasePanel');
     if (activePanel) activePanel.style.display = status?.active ? '' : 'none';
-    // 구독 중에도 요금제를 보여준다 — 월↔연 전환을 하려면 가격이 보여야 한다
-    if (purchasePanel) purchasePanel.style.display = '';
+    // 평생 이용권은 한 번 사면 더 살 게 없으므로 구매 영역을 감춘다
+    if (purchasePanel) purchasePanel.style.display = status?.active ? 'none' : '';
     renderProducts();
     const expiry = document.getElementById('billingExpiry');
     if (expiry && status?.active) expiry.textContent = status.unlimited
       ? '운영자 계정으로 자동 가져오기를 무제한 이용 중입니다.'
-      : `${formatDate(status.expiresAt)}까지 자동 가져오기를 무제한 이용할 수 있습니다.`;
+      : '평생 이용권으로 자동 가져오기를 무제한 이용할 수 있습니다.';
     const overviewTitle = document.getElementById('billingOverviewTitle');
     const overviewUsed = document.getElementById('billingOverviewUsed');
     const overviewRemaining = document.getElementById('billingOverviewRemaining');
@@ -93,8 +91,8 @@
     const progressFill = document.getElementById('billingProgressFill');
     const progress = status?.active ? 100 : Math.min(100, Math.round((usedCount / freeLimit) * 100));
     if (overviewTitle) overviewTitle.textContent = status?.active ? '✈️ 자동 가져오기 무제한' : '✈️ 자동 가져오기 무료 이용';
-    if (overviewUsed) overviewUsed.textContent = status?.active ? '구독 이용 중' : `${Math.min(usedCount, freeLimit)} / ${freeLimit}편 사용`;
-    if (overviewRemaining) overviewRemaining.textContent = status?.active ? '구독 활성화 · 구독 자세히' : `${remaining}편 남음 · 구독 자세히`;
+    if (overviewUsed) overviewUsed.textContent = status?.active ? '평생 이용권 사용 중' : `${Math.min(usedCount, freeLimit)} / ${freeLimit}편 사용`;
+    if (overviewRemaining) overviewRemaining.textContent = status?.active ? '이용권 자세히' : `${remaining}편 남음 · 이용권 자세히`;
     if (progressTrack) progressTrack.setAttribute('aria-valuenow', String(progress));
     if (progressFill) progressFill.style.width = `${progress}%`;
   }
@@ -152,8 +150,8 @@
     } else {
       title.textContent = `✈️ 자동 가져오기 ${used}편 사용`;
       lead.textContent = remaining > 0
-        ? `무료 자동 가져오기가 ${remaining}편 남았습니다. 필요할 때 구독을 확인해 주세요.`
-        : `무료 자동 가져오기 ${limit}편을 모두 사용했습니다. 구독하면 계속 무제한으로 가져올 수 있습니다.`;
+        ? `무료 자동 가져오기가 ${remaining}편 남았습니다. 필요할 때 이용권을 확인해 주세요.`
+        : `무료 자동 가져오기 ${limit}편을 모두 사용했습니다. 평생 이용권을 구매하면 계속 무제한으로 가져올 수 있습니다.`;
     }
     activeNoticeKind = kind;
     overlay.classList.add('show');
@@ -188,28 +186,18 @@
   }
 
   function renderProducts() {
-    const current = status?.active ? (status.productId || '') : '';
-    const plans = [
-      ['billingMonthlyButton', PRODUCTS.monthly, '월간 구독', '월'],
-      ['billingAnnualButton',  PRODUCTS.annual,  '연간 구독', '년'],
-    ];
-    for (const [elId, productId, fallbackTitle, unit] of plans) {
-      const button = document.getElementById(elId);
-      if (!button) continue;
-      const product = productById(productId);
-      const isCurrent = Boolean(current) && current === productId;
-      button.classList.toggle('current', isCurrent);
-      // 이용 중인 요금제는 다시 살 수 없고, 다른 요금제는 전환용으로 열어둔다
-      button.disabled = !product || isCurrent;
-      if (isCurrent) {
-        button.innerHTML = `<strong>${product ? product.title : fallbackTitle}</strong><span>이용 중</span>`;
-      } else if (product) {
-        const label = current ? '으로 전환' : '';
-        button.innerHTML = `<strong>${product.title}</strong><span>${product.priceString} / ${unit}${label}</span>`;
-      } else {
-        button.innerHTML = `<strong>${fallbackTitle}</strong><span>${storeLabel()} 정보 준비 중</span>`;
-      }
+    const button = document.getElementById('billingLifetimeButton');
+    if (!button) return;
+    const product = productById(LIFETIME_PRODUCT);
+    if (status?.active) {
+      button.disabled = true;
+      button.innerHTML = '<strong>평생 이용권</strong><span>구매 완료</span>';
+      return;
     }
+    button.disabled = !product;
+    button.innerHTML = product
+      ? `<strong>${product.title}</strong><span>${product.priceString} · 한 번만 결제</span>`
+      : `<strong>평생 이용권</strong><span>${storeLabel()} 정보 준비 중</span>`;
   }
 
   async function loadProducts() {
@@ -217,21 +205,19 @@
     loadingProducts = true;
     try {
       if (!storePlatform() || !plugin()) {
-        document.getElementById('billingPlatformNotice').textContent = '구독 구매는 iPhone·Android 앱에서 가능합니다.';
+        document.getElementById('billingPlatformNotice').textContent = '이용권 구매는 iPhone·Android 앱에서 가능합니다.';
         return;
       }
-      const manageButton = document.getElementById('billingManageButton');
-      if (manageButton) manageButton.textContent = `${storeLabel()} 구독 관리`;
       const support = await plugin().isBillingSupported();
       if (!support.isBillingSupported) throw new Error(`이 기기에서 ${storeLabel()} 결제를 사용할 수 없습니다.`);
       const result = await plugin().getProducts({
-        productIdentifiers: Object.values(PRODUCTS),
-        productType: 'subs',
+        productIdentifiers: [LIFETIME_PRODUCT],
+        productType: 'inapp',
       });
       products = result.products || [];
       renderProducts();
       document.getElementById('billingPlatformNotice').textContent = products.length
-        ? `결제는 ${storeLabel()} 계정으로 처리되며 설정에서 언제든 해지할 수 있습니다.`
+        ? `결제는 ${storeLabel()} 계정으로 한 번만 처리되며 자동 갱신이 없습니다.`
         : `${storeLabel()} 상품 정보를 불러오지 못했습니다. 상품 등록 상태를 확인해 주세요.`;
     } catch (error) {
       document.getElementById('billingPlatformNotice').textContent = error.message || `${storeLabel()} 상품 정보를 불러오지 못했습니다.`;
@@ -264,12 +250,12 @@
 
   async function currentStoreEntitlement() {
     if (!plugin() || !storePlatform()) return null;
-    const options = { productType: 'subs', appAccountToken: await accountToken() };
+    const options = { productType: 'inapp', appAccountToken: await accountToken() };
     // onlyCurrentEntitlements는 iOS 전용 옵션이다.
     if (storePlatform() === 'ios') options.onlyCurrentEntitlements = true;
     const result = await plugin().getPurchases(options);
     return (result.purchases || [])
-      .filter(item => Object.values(PRODUCTS).includes(item.productIdentifier) && item.isActive !== false)
+      .filter(item => item.productIdentifier === LIFETIME_PRODUCT)
       .sort((a, b) => new Date(b.expirationDate || 0) - new Date(a.expirationDate || 0))[0] || null;
   }
 
@@ -283,19 +269,18 @@
     return status;
   }
 
-  async function purchase(plan) {
-    const productId = PRODUCTS[plan];
-    if (!productById(productId) || !plugin()) return;
-    const button = document.getElementById(plan === 'monthly' ? 'billingMonthlyButton' : 'billingAnnualButton');
+  async function purchase() {
+    if (!productById(LIFETIME_PRODUCT) || !plugin()) return;
+    const button = document.getElementById('billingLifetimeButton');
     if (button) button.disabled = true;
     try {
       const transaction = await plugin().purchaseProduct({
-        productIdentifier: productId,
-        productType: 'subs',
+        productIdentifier: LIFETIME_PRODUCT,
+        productType: 'inapp',
         appAccountToken: await accountToken(),
       });
       await verifyTransaction(transaction);
-      window.showToast?.('구독이 활성화되었습니다', 3500);
+      window.showToast?.('평생 이용권이 활성화되었습니다', 3500);
     } catch (error) {
       if (!/cancel/i.test(String(error?.message || error))) {
         window.showToast?.(error?.message || '구매를 완료하지 못했습니다.', 4000);
@@ -313,7 +298,7 @@
     try {
       await plugin().restorePurchases();
       const transaction = await currentStoreEntitlement();
-      if (!transaction) throw new Error('복원할 활성 구독이 없습니다.');
+      if (!transaction) throw new Error('복원할 구매 내역이 없습니다.');
       await verifyTransaction(transaction);
       window.showToast?.('구매를 복원했습니다', 3500);
     } catch (error) {
@@ -321,16 +306,11 @@
     }
   }
 
-  async function manage() {
-    try { await plugin()?.manageSubscriptions(); }
-    catch (error) { window.showToast?.(error?.message || '구독 관리 화면을 열지 못했습니다.', 3500); }
-  }
-
   async function open() {
     window.closeAccountMenu?.();
     document.getElementById('billingModalOverlay').classList.add('show');
     window.syncBodyScrollLock?.();
-    document.getElementById('billingPlatformNotice').textContent = '구독 상태를 확인하고 있습니다…';
+    document.getElementById('billingPlatformNotice').textContent = '이용권 상태를 확인하고 있습니다…';
     await refreshStatus(true);
     await loadProducts();
   }
@@ -352,7 +332,7 @@
   }
 
   window.PilotLogbookBilling = {
-    open, close, closeNotice, openFromNotice, purchase, restore, manage,
+    open, close, closeNotice, openFromNotice, purchase, restore,
     refreshStatus, recordImports, renderStatus, onAuthChanged, syncStoreEntitlement,
   };
 })();

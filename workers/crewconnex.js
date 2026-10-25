@@ -20,10 +20,11 @@ const MAX_REQUEST_BYTES = 4096;
 const AUTO_IMPORT_FREE_LIMIT = 50;
 const APP_BUNDLE_ID = 'com.rufnekcrew.flylog';
 const ANDROID_PACKAGE_NAME = 'com.rufnek.pilotlogbook';
-const SUBSCRIPTION_PRODUCTS = new Set([
-  'com.rufnekcrew.flylog.autoimport.monthly',
-  'com.rufnekcrew.flylog.autoimport.annual',
-]);
+// 구독이 아니라 한 번 결제로 끝나는 평생 이용권이다
+// (애플: 비소모성, 구글: 관리형 제품).
+const LIFETIME_PRODUCT_ID = 'com.rufnekcrew.flylog.autoimport.lifetime';
+// 만료가 없는 권한을 기존 entitlement 스키마(expires_at)에 담기 위한 먼 미래 값(2100-01-01).
+const LIFETIME_EXPIRES_AT = 4102444800000;
 
 let firebaseCertCache = { certificates: null, expiresAt: 0 };
 
@@ -282,7 +283,7 @@ function decodeJwsPayload(jws) {
   return JSON.parse(new TextDecoder().decode(decodeBase64Url(part)));
 }
 
-async function fetchSubscriptionFromApple(env, transactionId, fetchImpl = fetch) {
+async function fetchTransactionFromApple(env, transactionId, fetchImpl = fetch) {
   const token = await createAppStoreToken(env);
   const paths = [
     'https://api.storekit.itunes.apple.com',
@@ -290,7 +291,7 @@ async function fetchSubscriptionFromApple(env, transactionId, fetchImpl = fetch)
   ];
   let lastResponse;
   for (const base of paths) {
-    const response = await fetchImpl(`${base}/inApps/v1/subscriptions/${encodeURIComponent(transactionId)}`, {
+    const response = await fetchImpl(`${base}/inApps/v1/transactions/${encodeURIComponent(transactionId)}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     });
     lastResponse = response;
@@ -300,22 +301,20 @@ async function fetchSubscriptionFromApple(env, transactionId, fetchImpl = fetch)
   throw new Error(`Apple verification failed (${lastResponse?.status || 0})`);
 }
 
-export function selectActiveAppleSubscription(body, nowMs = Date.now()) {
-  const candidates = [];
-  for (const group of body?.data || []) {
-    if (![1, 4].includes(Number(group?.status))) continue;
-    for (const item of group?.lastTransactions || []) {
-      try {
-        const info = decodeJwsPayload(item?.signedTransactionInfo);
-        if (info.bundleId !== APP_BUNDLE_ID) continue;
-        if (!SUBSCRIPTION_PRODUCTS.has(info.productId)) continue;
-        if (Number(info.expiresDate || 0) <= nowMs || info.revocationDate) continue;
-        candidates.push(info);
-      } catch (_) { /* malformed entries are ignored */ }
-    }
+// 평생 이용권은 만료일이 없다. 환불(revocationDate)된 거래만 걸러낸다.
+export function selectAppleLifetimePurchase(body) {
+  let info;
+  try {
+    info = decodeJwsPayload(body?.signedTransactionInfo);
+  } catch (_) {
+    return null;
   }
-  candidates.sort((a, b) => Number(b.expiresDate || 0) - Number(a.expiresDate || 0));
-  return candidates[0] || null;
+  if (info.bundleId !== APP_BUNDLE_ID) return null;
+  if (info.productId !== LIFETIME_PRODUCT_ID) return null;
+  if (info.revocationDate) return null;
+  const originalTransactionId = String(info.originalTransactionId || info.transactionId || '');
+  if (!originalTransactionId) return null;
+  return { productId: info.productId, originalTransactionId };
 }
 
 // ─── Google Play 구독 검증 ──────────────────────────────────────────────
@@ -359,10 +358,11 @@ async function createGooglePlayToken(env, fetchImpl = fetch, nowMs = Date.now())
   return body.access_token;
 }
 
-async function fetchSubscriptionFromGoogle(env, purchaseToken, fetchImpl = fetch) {
+async function fetchProductPurchaseFromGoogle(env, purchaseToken, fetchImpl = fetch) {
   const token = await createGooglePlayToken(env, fetchImpl);
   const url = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/'
-    + `${ANDROID_PACKAGE_NAME}/purchases/subscriptionsv2/tokens/${encodeURIComponent(purchaseToken)}`;
+    + `${ANDROID_PACKAGE_NAME}/purchases/products/${encodeURIComponent(LIFETIME_PRODUCT_ID)}`
+    + `/tokens/${encodeURIComponent(purchaseToken)}`;
   const response = await fetchImpl(url, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
   });
@@ -370,29 +370,17 @@ async function fetchSubscriptionFromGoogle(env, purchaseToken, fetchImpl = fetch
   return response.json();
 }
 
-// 해지 예약(CANCELED)도 만료 전까지는 이용할 수 있다. 보류·일시정지·만료는 제외.
-const GOOGLE_ACTIVE_STATES = new Set([
-  'SUBSCRIPTION_STATE_ACTIVE',
-  'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
-  'SUBSCRIPTION_STATE_CANCELED',
-]);
-
-export function selectActiveGoogleSubscription(body, nowMs = Date.now()) {
-  if (!GOOGLE_ACTIVE_STATES.has(String(body?.subscriptionState || ''))) return null;
-  const candidates = [];
-  for (const item of body?.lineItems || []) {
-    if (!SUBSCRIPTION_PRODUCTS.has(item?.productId)) continue;
-    const expiresDate = Date.parse(item?.expiryTime || '');
-    if (!expiresDate || expiresDate <= nowMs) continue;
-    candidates.push({ productId: item.productId, expiresDate });
-  }
-  candidates.sort((a, b) => b.expiresDate - a.expiresDate);
-  const best = candidates[0];
-  if (!best) return null;
-  // purchaseToken은 갱신 때마다 바뀌므로, 갱신에도 유지되는 주문번호 앞부분을 식별자로 쓴다.
-  // (GPA.1234-5678-9012-34567..3 → GPA.1234-5678-9012-34567)
-  const orderId = String(body?.latestOrderId || '').split('..')[0];
-  return { ...best, originalTransactionId: orderId, testPurchase: Boolean(body?.testPurchase) };
+// purchaseState 0=구매 완료, 1=취소, 2=보류. 취소·보류는 권한을 주지 않는다.
+export function selectGoogleLifetimePurchase(body) {
+  if (Number(body?.purchaseState) !== 0) return null;
+  const orderId = String(body?.orderId || '');
+  if (!orderId) return null;
+  // purchaseType 0=테스트 구매(라이선스 테스터), 1=프로모션, 2=리워드
+  return {
+    productId: LIFETIME_PRODUCT_ID,
+    originalTransactionId: orderId,
+    testPurchase: Number(body?.purchaseType) === 0,
+  };
 }
 
 // iOS는 숫자 거래번호, Android는 Play 구매 토큰을 보낸다.
@@ -405,27 +393,24 @@ export function parsePurchaseRequest(body) {
   return /^\d{6,32}$/.test(transactionId) ? { platform: 'ios', transactionId } : null;
 }
 
-async function verifyAndStoreSubscription(env, uid, purchase, fetchImpl) {
+async function verifyAndStorePurchase(env, uid, purchase, fetchImpl) {
   if (!env.BILLING_DB) throw new Error('Billing database unavailable');
   let productId;
-  let expiresDate;
   let originalTransactionId;
   let environment;
   if (purchase.platform === 'android') {
-    const subscription = selectActiveGoogleSubscription(
-      await fetchSubscriptionFromGoogle(env, purchase.purchaseToken, fetchImpl));
-    if (!subscription) throw new Error('Active subscription not found');
-    productId = subscription.productId;
-    expiresDate = subscription.expiresDate;
-    originalTransactionId = subscription.originalTransactionId || purchase.purchaseToken;
-    environment = subscription.testPurchase ? 'Sandbox' : 'Production';
+    const verified = selectGoogleLifetimePurchase(
+      await fetchProductPurchaseFromGoogle(env, purchase.purchaseToken, fetchImpl));
+    if (!verified) throw new Error('Purchase not found');
+    productId = verified.productId;
+    originalTransactionId = verified.originalTransactionId;
+    environment = verified.testPurchase ? 'Sandbox' : 'Production';
   } else {
-    const verified = await fetchSubscriptionFromApple(env, purchase.transactionId, fetchImpl);
-    const subscription = selectActiveAppleSubscription(verified.body);
-    if (!subscription) throw new Error('Active subscription not found');
-    productId = subscription.productId;
-    expiresDate = Number(subscription.expiresDate);
-    originalTransactionId = String(subscription.originalTransactionId || subscription.transactionId || '');
+    const verified = await fetchTransactionFromApple(env, purchase.transactionId, fetchImpl);
+    const purchased = selectAppleLifetimePurchase(verified.body);
+    if (!purchased) throw new Error('Purchase not found');
+    productId = purchased.productId;
+    originalTransactionId = purchased.originalTransactionId;
     environment = verified.environment;
   }
   if (!originalTransactionId) throw new Error('Missing original transaction');
@@ -450,7 +435,7 @@ async function verifyAndStoreSubscription(env, uid, purchase, fetchImpl) {
     uid,
     productId,
     originalTransactionId,
-    expiresDate,
+    LIFETIME_EXPIRES_AT,
     environment,
     Date.now(),
   ).run();
@@ -929,7 +914,7 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       try {
         return new Response(JSON.stringify(await readBillingStatus(env, verifiedUser.uid, verifiedUser.email)), { status: 200, headers: cors });
       } catch (_) {
-        return fail(503, '구독 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
+        return fail(503, '이용권 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
       }
     }
 
@@ -939,10 +924,10 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       const purchase = parsePurchaseRequest(body);
       if (!purchase) return fail(400, '구매 정보를 확인할 수 없습니다.', 'INVALID_TRANSACTION');
       try {
-        const status = await verifyAndStoreSubscription(env, verifiedUser.uid, purchase, dependencies.fetchImpl || fetch);
+        const status = await verifyAndStorePurchase(env, verifiedUser.uid, purchase, dependencies.fetchImpl || fetch);
         return new Response(JSON.stringify(status), { status: 200, headers: cors });
       } catch (_) {
-        return fail(400, '활성 구독을 확인하지 못했습니다. 스토어 계정을 확인해 주세요.', 'SUBSCRIPTION_NOT_ACTIVE');
+        return fail(400, '구매 내역을 확인하지 못했습니다. 스토어 계정을 확인해 주세요.', 'PURCHASE_NOT_FOUND');
       }
     }
 
@@ -963,10 +948,10 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
     try {
       currentBilling = await readBillingStatus(env, verifiedUser.uid, verifiedUser.email);
     } catch (_) {
-      if (billingEnforced(env)) return fail(503, '구독 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
+      if (billingEnforced(env)) return fail(503, '이용권 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.', 'BILLING_UNAVAILABLE');
     }
     if (billingEnforced(env) && !currentBilling?.active && currentBilling?.remaining <= 0) {
-      return fail(402, `무료 자동 가져오기 ${AUTO_IMPORT_FREE_LIMIT}편을 모두 사용했습니다. 구독 후 무제한으로 이용할 수 있습니다.`, 'FREE_LIMIT_REACHED');
+      return fail(402, `무료 자동 가져오기 ${AUTO_IMPORT_FREE_LIMIT}편을 모두 사용했습니다. 평생 이용권을 구매하면 무제한으로 이용할 수 있습니다.`, 'FREE_LIMIT_REACHED');
     }
 
     if (!env.CREWCONNEX_RATE_LIMITER || typeof env.CREWCONNEX_RATE_LIMITER.limit !== 'function') {

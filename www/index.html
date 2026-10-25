@@ -1600,7 +1600,7 @@
     <button class="drawer-item" onclick="drawerRun(() => openModal())"><span class="drawer-ico">➕</span><span>비행 입력</span></button>
 
     <div class="drawer-group-title">계정</div>
-    <button class="drawer-item" onclick="drawerRun(() => PilotLogbookBilling.open())"><span class="drawer-ico">✈️</span><span>구독 현황</span></button>
+    <button class="drawer-item" onclick="drawerRun(() => PilotLogbookBilling.open())"><span class="drawer-ico">✈️</span><span>이용권 현황</span></button>
     <button class="drawer-item" onclick="drawerRun(openAccountMenu)"><span class="drawer-ico">👤</span><span>계정 및 도움말</span></button>
   </nav>
 </div>
@@ -1623,10 +1623,10 @@
         <button class="add-btn" onclick="openModal()">+ 입력</button>
       </div>
     </div>
-    <button class="billing-overview-card" id="billingOverviewCard" type="button" onclick="PilotLogbookBilling.open()" aria-label="자동 가져오기 이용 현황과 구독 보기">
+    <button class="billing-overview-card" id="billingOverviewCard" type="button" onclick="PilotLogbookBilling.open()" aria-label="자동 가져오기 이용 현황과 이용권 보기">
       <div class="billing-overview-top">
         <span><strong class="billing-overview-title" id="billingOverviewTitle">✈️ 자동 가져오기 무료 이용</strong><span class="billing-overview-used" id="billingOverviewUsed">0 / 50편 사용</span></span>
-        <span class="billing-overview-link">구독 자세히 ›</span>
+        <span class="billing-overview-link">이용권 자세히 ›</span>
       </div>
       <div class="billing-progress-track" role="progressbar" aria-label="자동 가져오기 무료 사용량" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="billingProgressTrack"><div class="billing-progress-fill" id="billingProgressFill"></div></div>
       <div class="billing-overview-remaining" id="billingOverviewRemaining">50편 남음</div>
@@ -2173,7 +2173,7 @@
       </div>
 
       <div class="account-menu-list">
-        <button class="account-menu-button" onclick="PilotLogbookBilling.open()"><span>✈️</span><span><b>자동 가져오기 구독</b><small data-billing-status style="display:block;color:var(--text3);font-size:10px;margin-top:2px">상태 확인 중</small></span><span class="account-arrow">›</span></button>
+        <button class="account-menu-button" onclick="PilotLogbookBilling.open()"><span>✈️</span><span><b>자동 가져오기 이용권</b><small data-billing-status style="display:block;color:var(--text3);font-size:10px;margin-top:2px">상태 확인 중</small></span><span class="account-arrow">›</span></button>
         <button class="account-menu-button" onclick="openInfoPage('faq.html','자주 묻는 질문')"><span>❓</span><span>자주 묻는 질문</span><span class="account-arrow">›</span></button>
         <button class="account-menu-button" onclick="openInfoPage('privacy.html','개인정보처리방침')"><span>🛡️</span><span>개인정보처리방침</span><span class="account-arrow">›</span></button>
         <button class="account-menu-button" onclick="openInfoPage('terms.html','이용약관')"><span>📄</span><span>이용약관 및 무료·유료 정책</span><span class="account-arrow">›</span></button>
@@ -2215,12 +2215,12 @@
       <ul class="billing-benefits">
         <li>새로 저장한 고유 비행만 1편으로 계산됩니다.</li>
         <li>같은 비행 재가져오기와 덮어쓰기는 추가 계산되지 않습니다.</li>
-        <li>구독 중에는 CrewConnex 자동 가져오기를 무제한 이용합니다.</li>
+        <li>이용권을 구매하면 CrewConnex 자동 가져오기를 무제한 이용합니다.</li>
         <li>수동 입력·수정·통계·출력 기능은 계속 무료입니다.</li>
       </ul>
       <div class="billing-notice-actions">
         <button class="billing-secondary" style="margin-top:0" onclick="PilotLogbookBilling.closeNotice()">확인</button>
-        <button class="submit-btn" onclick="PilotLogbookBilling.openFromNotice()">구독 자세히</button>
+        <button class="submit-btn" onclick="PilotLogbookBilling.openFromNotice()">이용권 자세히</button>
       </div>
     </div>
   </div>
@@ -2231,7 +2231,7 @@
   <div class="modal" style="max-height:82vh">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <div class="modal-title">✈️ 자동 가져오기 구독</div>
+      <div class="modal-title">✈️ 자동 가져오기 이용권</div>
       <button class="modal-close" onclick="PilotLogbookBilling.close()">✕</button>
     </div>
     <div class="modal-body">
@@ -2241,21 +2241,18 @@
       </div>
       <ul class="billing-benefits">
         <li>처음 50편은 결제 없이 자동 가져오기</li>
-        <li>구독 중 CrewConnex 자동 가져오기 무제한</li>
+        <li>이용권 구매 후 CrewConnex 자동 가져오기 무제한</li>
         <li>기존 기록·수동 입력·출력 기능은 계속 무료</li>
       </ul>
       <div id="billingActivePanel" style="display:none;margin-top:14px">
         <div id="billingExpiry" style="font-size:12px;color:var(--success);line-height:1.6"></div>
-        <button id="billingManageButton" class="billing-secondary" onclick="PilotLogbookBilling.manage()">App Store 구독 관리</button>
-      </div>
-      <div id="billingPurchasePanel">
-        <div class="billing-plan-grid">
-          <button id="billingMonthlyButton" class="billing-plan" onclick="PilotLogbookBilling.purchase('monthly')" disabled><strong>월간 구독</strong><span>App Store 정보 준비 중</span></button>
-          <button id="billingAnnualButton" class="billing-plan" onclick="PilotLogbookBilling.purchase('annual')" disabled><strong>연간 구독</strong><span>App Store 정보 준비 중</span></button>
-        </div>
         <button class="billing-secondary" onclick="PilotLogbookBilling.restore()">이전 구매 복원</button>
       </div>
-      <div id="billingPlatformNotice" style="font-size:11px;color:var(--text3);line-height:1.6;text-align:center;margin-top:12px">구독 상태를 확인하고 있습니다…</div>
+      <div id="billingPurchasePanel">
+        <button id="billingLifetimeButton" class="billing-plan" onclick="PilotLogbookBilling.purchase()" disabled><strong>평생 이용권</strong><span>스토어 정보 준비 중</span></button>
+        <button class="billing-secondary" onclick="PilotLogbookBilling.restore()">이전 구매 복원</button>
+      </div>
+      <div id="billingPlatformNotice" style="font-size:11px;color:var(--text3);line-height:1.6;text-align:center;margin-top:12px">이용권 상태를 확인하고 있습니다…</div>
     </div>
   </div>
 </div>
@@ -2288,7 +2285,7 @@
       <div id="ccPaneAuto">
         <div style="padding:10px 12px;margin-bottom:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:11px;color:var(--text2)">
           <b data-billing-status style="color:var(--text)">자동 가져오기 사용량 확인 중</b>
-          <span style="float:right;text-decoration:underline;cursor:pointer" onclick="PilotLogbookBilling.open()">구독 보기</span>
+          <span style="float:right;text-decoration:underline;cursor:pointer" onclick="PilotLogbookBilling.open()">이용권 보기</span>
         </div>
         <div class="form-row single">
           <div class="form-group">

@@ -19,7 +19,19 @@ test('billing UI uses StoreKit localized product data and supports restore', () 
   assert.match(billing, /if \(!status\?\.active\) await syncStoreEntitlement\(\)/);
   assert.match(billing, /appAccountToken:\s*await accountToken\(\)/);
   assert.match(html, /이전 구매 복원/);
-  assert.match(html, /App Store 구독 관리/);
+  // 자동 갱신이 없으므로 구독 관리 화면으로 보내면 안 된다
+  assert.doesNotMatch(billing, /manageSubscriptions/);
+  assert.doesNotMatch(html, /구독 관리/);
+});
+
+test('auto-import unlock is a one-time lifetime purchase, not a subscription', () => {
+  assert.match(billing, /LIFETIME_PRODUCT = 'com\.rufnekcrew\.flylog\.autoimport\.lifetime'/);
+  assert.match(billing, /productType: 'inapp'/);
+  assert.doesNotMatch(billing, /productType: 'subs'/);
+  assert.match(html, /billingLifetimeButton/);
+  // 만료일 표시는 평생 이용권에 맞지 않는다
+  assert.doesNotMatch(billing, /formatDate\(status\.expiresAt\)/);
+  for (const source of [html, terms, faq]) assert.doesNotMatch(source, /자동 갱신 구독/);
 });
 
 test('billing works on both stores — Play sends the purchase token', () => {
@@ -31,10 +43,10 @@ test('billing works on both stores — Play sends the purchase token', () => {
   assert.match(billing, /'Google Play' : 'App Store'/);
 });
 
-test('free import and subscription policy is consistent at 50 flights', () => {
+test('free import and purchase policy is consistent at 50 flights', () => {
   for (const source of [html, terms, faq]) assert.match(source, /50편/);
   for (const source of [html, terms, faq]) assert.doesNotMatch(source, /100편/);
-  assert.match(terms, /월간 또는 연간 자동 갱신 구독/);
+  assert.match(terms, /평생 이용권/);
 });
 
 test('main screen shows automatic import usage and milestone guidance', () => {

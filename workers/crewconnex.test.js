@@ -6,8 +6,8 @@ import {
   handleRequest,
   parseRosterHtml,
   parsePurchaseRequest,
-  selectActiveAppleSubscription,
-  selectActiveGoogleSubscription,
+  selectAppleLifetimePurchase,
+  selectGoogleLifetimePurchase,
   verifyFirebaseIdToken,
 } from './crewconnex.js';
 
@@ -178,78 +178,6 @@ test('Automatic import usage key is stable and identifies a unique flight', () =
   );
 });
 
-test('Apple subscription selection only accepts active 날고적고 products', () => {
-  const now = Date.now();
-  const jws = payload => `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`;
-  const active = selectActiveAppleSubscription({
-    data: [{
-      status: 1,
-      lastTransactions: [{ signedTransactionInfo: jws({
-        bundleId: 'com.rufnekcrew.flylog',
-        productId: 'com.rufnekcrew.flylog.autoimport.annual',
-        transactionId: '200000000000001',
-        originalTransactionId: '200000000000000',
-        expiresDate: now + 86_400_000,
-      }) }],
-    }],
-  }, now);
-  assert.equal(active.productId, 'com.rufnekcrew.flylog.autoimport.annual');
-
-  const expired = selectActiveAppleSubscription({
-    data: [{ status: 1, lastTransactions: [{ signedTransactionInfo: jws({
-      bundleId: 'com.rufnekcrew.flylog',
-      productId: 'com.rufnekcrew.flylog.autoimport.monthly',
-      expiresDate: now - 1,
-    }) }] }],
-  }, now);
-  assert.equal(expired, null);
-
-  const otherApp = selectActiveAppleSubscription({
-    data: [{ status: 1, lastTransactions: [{ signedTransactionInfo: jws({
-      bundleId: 'com.example.other',
-      productId: 'com.rufnekcrew.flylog.autoimport.monthly',
-      expiresDate: now + 86_400_000,
-    }) }] }],
-  }, now);
-  assert.equal(otherApp, null);
-});
-
-test('Google Play subscription selection accepts active and cancelled-but-unexpired purchases', () => {
-  const now = Date.now();
-  const future = new Date(now + 86_400_000).toISOString();
-
-  const active = selectActiveGoogleSubscription({
-    subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
-    latestOrderId: 'GPA.1234-5678-9012-34567..3',
-    lineItems: [{ productId: 'com.rufnekcrew.flylog.autoimport.annual', expiryTime: future }],
-  }, now);
-  assert.equal(active.productId, 'com.rufnekcrew.flylog.autoimport.annual');
-  // 갱신 때마다 바뀌는 ..N 꼬리를 떼어 구독 식별자를 안정적으로 유지한다
-  assert.equal(active.originalTransactionId, 'GPA.1234-5678-9012-34567');
-
-  // 해지 예약 상태라도 만료 전까지는 이용할 수 있어야 한다
-  assert.ok(selectActiveGoogleSubscription({
-    subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
-    latestOrderId: 'GPA.1111-2222-3333-44444',
-    lineItems: [{ productId: 'com.rufnekcrew.flylog.autoimport.monthly', expiryTime: future }],
-  }, now));
-
-  assert.equal(selectActiveGoogleSubscription({
-    subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
-    lineItems: [{ productId: 'com.rufnekcrew.flylog.autoimport.monthly', expiryTime: future }],
-  }, now), null);
-
-  assert.equal(selectActiveGoogleSubscription({
-    subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
-    lineItems: [{ productId: 'com.rufnekcrew.flylog.autoimport.monthly', expiryTime: new Date(now - 1).toISOString() }],
-  }, now), null);
-
-  assert.equal(selectActiveGoogleSubscription({
-    subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
-    lineItems: [{ productId: 'com.example.other.monthly', expiryTime: future }],
-  }, now), null);
-});
-
 test('purchase requests are routed to the right store', () => {
   assert.deepEqual(parsePurchaseRequest({ transactionId: '200000000000001' }),
     { platform: 'ios', transactionId: '200000000000001' });
@@ -258,4 +186,51 @@ test('purchase requests are routed to the right store', () => {
   assert.equal(parsePurchaseRequest({ purchaseToken: 'too-short' }), null);
   assert.equal(parsePurchaseRequest({ transactionId: 'not-a-number' }), null);
   assert.equal(parsePurchaseRequest({}), null);
+});
+
+test('Apple lifetime purchase is accepted only for this app and product', () => {
+  const jws = payload => `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`;
+  const base = {
+    bundleId: 'com.rufnekcrew.flylog',
+    productId: 'com.rufnekcrew.flylog.autoimport.lifetime',
+    transactionId: '200000000000001',
+    originalTransactionId: '200000000000000',
+  };
+
+  const ok = selectAppleLifetimePurchase({ signedTransactionInfo: jws(base) });
+  assert.equal(ok.productId, 'com.rufnekcrew.flylog.autoimport.lifetime');
+  // 갱신이 없으므로 originalTransactionId가 영구 식별자다
+  assert.equal(ok.originalTransactionId, '200000000000000');
+
+  // 환불된 거래는 권한을 주지 않는다
+  assert.equal(selectAppleLifetimePurchase({
+    signedTransactionInfo: jws({ ...base, revocationDate: Date.now() }),
+  }), null);
+
+  assert.equal(selectAppleLifetimePurchase({
+    signedTransactionInfo: jws({ ...base, productId: 'com.rufnekcrew.flylog.autoimport.monthly' }),
+  }), null);
+
+  assert.equal(selectAppleLifetimePurchase({
+    signedTransactionInfo: jws({ ...base, bundleId: 'com.example.other' }),
+  }), null);
+
+  assert.equal(selectAppleLifetimePurchase({ signedTransactionInfo: 'not-a-jws' }), null);
+});
+
+test('Google lifetime purchase requires a completed purchase state', () => {
+  const ok = selectGoogleLifetimePurchase({ purchaseState: 0, orderId: 'GPA.1234-5678-9012-34567' });
+  assert.equal(ok.originalTransactionId, 'GPA.1234-5678-9012-34567');
+  assert.equal(ok.productId, 'com.rufnekcrew.flylog.autoimport.lifetime');
+  assert.equal(ok.testPurchase, false);
+
+  // 라이선스 테스터 구매는 Sandbox로 기록한다
+  assert.equal(selectGoogleLifetimePurchase({
+    purchaseState: 0, orderId: 'GPA.1111', purchaseType: 0,
+  }).testPurchase, true);
+
+  // 1=취소, 2=보류
+  assert.equal(selectGoogleLifetimePurchase({ purchaseState: 1, orderId: 'GPA.1111' }), null);
+  assert.equal(selectGoogleLifetimePurchase({ purchaseState: 2, orderId: 'GPA.1111' }), null);
+  assert.equal(selectGoogleLifetimePurchase({ purchaseState: 0 }), null);
 });

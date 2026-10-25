@@ -32,8 +32,8 @@
 > • 자격 관리 — 최근 이착륙 횟수와 자격 유효기간을 확인합니다.
 > • 백업 — 로그인 계정으로 동기화하고, 엑셀·CSV로 가져오거나 내보냅니다.
 >
-> 자동 가져오기는 처음 50편까지 무료이며, 이후에는 구독으로 무제한 이용할 수 있습니다.
-> 수동 입력, 엑셀 가져오기, 통계, 자격 관리 등 나머지 기능은 구독 없이 모두 사용할 수 있습니다.
+> 자동 가져오기는 처음 50편까지 무료이며, 이후에는 평생 이용권(1회 결제)으로 무제한 이용할 수 있습니다.
+> 수동 입력, 엑셀 가져오기, 통계, 자격 관리 등 나머지 기능은 이용권 없이 모두 사용할 수 있습니다.
 >
 > 날고적고는 기록과 계산을 돕는 보조 도구이며, 항공사·항공당국이 발행하는 공식 기록이 아닙니다.
 
@@ -41,14 +41,14 @@
 
 **개인정보처리방침 URL** https://rufnek737.github.io/pilot-logbook/privacy.html
 
-## 구독 상품 (애플과 동일 ID)
+## 인앱 상품 (애플과 동일 ID)
 
-| 상품 ID | 기간 | 가격 |
+| 상품 ID | 유형 | 가격 |
 |---|---|---|
-| `com.rufnekcrew.flylog.autoimport.monthly` | 월 | ₩1,900 |
-| `com.rufnekcrew.flylog.autoimport.annual` | 년 | ₩14,000 |
+| `com.rufnekcrew.flylog.autoimport.lifetime` | 평생 이용권 (1회 결제) | ₩9,900 |
 
-각 상품에 기본 요금제 1개씩. 서버는 `androidpublisher` subscriptionsv2로 검증한다.
+Play는 관리형 제품, 애플은 비소모성 상품으로 만든다.
+서버는 `androidpublisher` purchases.products / App Store Server API transactions로 검증한다.
 
 ## 데이터 보안 양식 답변
 
