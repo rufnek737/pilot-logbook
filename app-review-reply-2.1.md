@@ -114,7 +114,15 @@ the current usage and a **평생 이용권** button that starts the standard Sto
 **1. Screen recording**
 
 A screen recording captured on a physical iPhone running the latest iOS is attached. It
-begins with launching the app and shows sign-in, the flight log, adding a flight manually,
-statistics and credited time, the In-App Purchase sheet, and the account deletion flow.
+begins with launching the app and shows, in order: sign-in with the demo account, the
+flight log list, opening a record, adding a flight manually and saving it, the statistics
+screen, the currency/recency screen, the In-App Purchase sheet, and the account deletion
+flow (shown up to the final confirmation, which was not completed so the demo account
+remains available to App Review).
+
+The recording was made with build 4, which is identical to the submitted build except for
+two corrections made after the previous submission: the launch screen now shows the app's
+current name (FlyRecord / 날고적고) instead of an outdated working title, and a watermark
+left over from a stock video asset was removed from the sign-in background.
 
 Please let us know if any further information would be helpful.
