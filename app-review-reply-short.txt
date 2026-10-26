@@ -1,0 +1,30 @@
+This text is also in the App Review Information Notes field.
+
+1. SCREEN RECORDING
+Attached, made on a physical iPhone on the latest iOS. It starts with launching the app and shows sign-in, the flight log, adding and saving a flight, statistics, recency, the In-App Purchase flow, and account deletion (stopped at the final confirmation so the demo account stays usable). It used a development build, so StoreKit runs in sandbox and asks for a sandbox account; the product ID and localized price load correctly, as shown.
+
+2. PURPOSE AND AUDIENCE
+A personal electronic flight logbook for commercial airline pilots. Pilots must log every flight - number, route, block times, role (PIC/SIC), night and instrument time, landing type, recency - and most still do it by hand. The log is used for licence renewals, recency checks and job applications.
+FlyRecord records a flight in one screen, calculates credited time from duty codes, sums any date range, flags entries that distort those totals, and tracks landing recency and licence expiry. Interface is Korean; initial market South Korea.
+It is independent, not affiliated with or endorsed by any airline or aviation authority, and the app and its Terms say it is a supporting tool, not an official record.
+
+3. SETUP AND MAIN FEATURES
+Sign in with the demo account in App Review Information.
+- Flight log (home): tap a card to edit. "+" adds a flight manually - the primary flow, needing no external service.
+- Menu: Excel/CSV import (sample on request); statistics by date range and duty code; record check for missing instrument time and duplicates; currency (take-offs, landings, licence expiry).
+- Account deletion: profile chip (top right) > account menu > delete account. Requires the password and a typed confirmation; deletes the account and all synced records permanently.
+
+4. EXTERNAL SERVICES
+Firebase Authentication and Cloud Firestore (Google LLC) for sign-in and syncing the user's own records; Cloudflare Workers (our backend) for the import in item 6 and receipt verification; App Store Server API and Google Play Developer API for purchase verification; CrewConnex, the user's own airline crew portal (item 6). No advertising or analytics SDK and no AI service; the advertising identifier is not used.
+
+5. REGIONAL DIFFERENCES
+None. Behaviour is identical everywhere; the interface is Korean only. The optional import in item 6 is limited to pilots employed by the supported airline - a property of employment, not region. Everything else, including the In-App Purchase, works the same worldwide.
+
+6. REGULATED INDUSTRY / THIRD-PARTY MATERIAL
+FlyRecord provides no aviation service and does not issue, certify or replace any official document. It records and totals data the pilot already holds, as a paper logbook does, so no licence is required to publish it.
+Optional feature: pilots at the supported airline may import their own recent flights. The user enters their own employee credentials for their airline's crew portal, and our backend signs in AS THAT USER and retrieves ONLY THAT USER'S OWN roster. Credentials are used for that one request and are not stored. No airline material is copied or redistributed.
+The demo account is not an airline account, so this feature alone cannot be exercised in review. Every other feature works fully with it.
+
+7. IN-APP PURCHASE
+One product: com.rufnekcrew.flylog.autoimport.lifetime - non-consumable, one-time payment, not a subscription, no auto-renewal. It unlocks unlimited use of the optional import in item 6; the first 50 imported flights are free on every account. Everything else stays free: manual entry, file import, viewing and editing records, statistics, record check, currency, backup, printing and PDF. Existing records are never locked behind the purchase.
+To reach it: open the menu and tap the pass item, or tap the usage card on the home screen. The sheet shows usage and a button that starts the standard StoreKit purchase, plus a restore button.
