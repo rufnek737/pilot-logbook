@@ -28,3 +28,6 @@ www/cordova.js
 www/cordova_plugins.js
 
 .DS_Store
+
+# 사업자 서류 (개인정보 포함 — 커밋 금지)
+사업자서류/
