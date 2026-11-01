@@ -2,6 +2,86 @@
 
 ---
 
+## 2026-11-01 (iOS 4.8 거절 → Sign in with Apple 구현, 빌드 5)
+
+### 두 번째 거절 — Guideline 4.8 Design: Login Services
+
+10/28 심사(iPad Air 11-inch M3, 빌드 1.0(4))에서 **다른 사유로** 거절됐다.
+10/26의 2.1 정보 요청은 해결됐고 이번이 새 지적이다.
+
+> 서드파티 로그인을 제공하면서, (1) 수집을 이름·이메일로 제한하고
+> (2) 이메일을 모든 당사자에게 비공개로 유지할 수 있으며
+> (3) 동의 없이 광고 목적 수집을 하지 않는 **동등한 로그인 수단**이 없다.
+
+Google 로그인을 제공하면서 Sign in with Apple이 없던 것이 원인.
+**이메일/비밀번호가 있어도 소용없다** — (2) 이메일 비공개(Private Relay)를 충족하지 못한다.
+인앱 결제는 계속 `심사 준비됨`이라 손댈 필요 없었다.
+
+iOS에서 Google 로그인을 빼는 선택지는 버렸다. 안드로이드에서 Google로 가입한 사용자가
+같은 Firebase 계정에 iOS로 못 들어오게 되기 때문이다.
+
+### 구현
+
+- `capacitor.config.json` — `SocialLogin.providers.apple` **false → true**.
+  이 플러그인은 앱 크기를 줄이려 제공자를 config로 켜고 끄며, **꺼진 제공자는 런타임에서 차단**한다.
+- `ios/App/App/App.entitlements` 신설(`com.apple.developer.applesignin`),
+  pbxproj의 Debug/Release 양쪽에 `CODE_SIGN_ENTITLEMENTS` 연결.
+- 로그인 화면에 Apple 버튼. Apple HIG상 동등 이상 노출이어야 해서 Google 위에 뒀고,
+  서비스 ID를 쓰지 않으므로 **iOS 네이티브에서만** 보이게 했다(웹/안드로이드는 숨김).
+- **nonce**: 플러그인이 nonce를 그대로 Apple에 넘긴다. Apple은 토큰에 SHA-256 해시를 담으므로
+  **Apple에는 해시를, Firebase에는 원본**을 줘야 한다. 안 맞추면 `auth/invalid-credential`.
+- **계정 삭제 시 Apple 토큰 취소** — Apple 요구사항. compat 래퍼에 `revokeAccessToken`이 없어
+  `auth._delegate`로 호출한다(브라우저에서 실제 존재 확인). Apple 재인증 분기도 함께 추가.
+
+### 콘솔 작업 (커밋 대상 아님)
+
+- Apple Developer → App ID `com.rufnekcrew.flylog`에 **Sign In with Apple** 활성화
+  (Enable as a primary App ID)
+- Firebase Authentication → **Apple 공급업체 사용 설정**.
+  "서비스 ID(Apple에는 필요하지 않음)"이라 네이티브 전용이면 비워도 된다.
+- Firebase 프로젝트에 **iOS 앱 등록**(`com.rufnekcrew.flylog`, App Store ID 6823952877)
+
+### 실기기에서만 잡히는 문제 2개
+
+빌드해서 눌러봐야만 나오는 것들이었다. 하나라도 남았으면
+"Apple 로그인 버튼이 작동하지 않는다"로 또 거절됐을 것이다.
+
+1. **`Apple Sign-In provider is disabled in capacitor.config`**
+   → `providers.apple: false`가 원인. config를 확인하지 않고 `initialize()`만 하면 된다고 본 것이 실수.
+2. **`The audience in ID Token [com.rufnekcrew.flylog] does not match the expected audience`**
+   → Firebase 프로젝트에 **iOS 앱이 등록돼 있지 않았다.** 네이티브 Apple 토큰의 `aud`는 번들 ID인데,
+   Firebase는 이를 등록된 Apple 클라이언트와 대조한다. 안드로이드는 `google-services.json`이 있어
+   문제가 없었고, iOS는 네이티브 Firebase SDK 대신 웹 SDK를 WebView에서 써서 지금까지 드러나지 않았다.
+
+실기기 검증 완료: Apple 시트 노출 → 이메일 가리기 선택지 → 로그인 성공 →
+**Apple 재인증을 거친 회원 탈퇴까지** 동작 확인.
+
+### 빌드 5
+
+`CURRENT_PROJECT_VERSION` 4 → 5. 아카이브·업로드 성공(Delivery UUID `25d1f6e5-...`),
+처리 완료 후 버전 페이지 빌드를 **4 → 5로 교체·저장**.
+커밋 `9c313a3`(구현), `4463da7`(빌드 번호).
+
+**⚠️ 아직 제출하지 않았다.** 제출 건 화면에서 두 항목 모두 `심사 준비됨`이고
+우상단 **`앱 심사에 다시 제출`** 버튼이 활성 상태로 남아 있다. 그 버튼을 눌러야 심사에 들어간다.
+(`심사 업데이트`는 버전을 제출 건에 밀어 넣는 것까지다. 4.8은 지적대로 고친 것이라 회신문은 불필요.)
+
+### 그 외 — air time 자동 입력 논의 (1.0.1 과제)
+
+계기시간을 자동으로 채우려면 **air flight time**이 필요한데, CrewConnex **웹에는 없고**
+(컬럼이 `Date|Remark|From|To|STD|STA|AC|BLH|AC Reg|Crew`뿐) **앱에만 있다**.
+
+- 앱의 공유(PDF)에는 `blockhours: 2:43 flighttime: 2:16`과 편조가 직책까지 들어 있고,
+  프로토타입 파서로 완전히 파싱됨을 확인했다.
+- 그러나 **공유가 하루치 듀티 단위만 된다.** 비행마다 PDF를 넘기는 건 수동 입력과 다를 바 없고,
+  월 단위로 몰아서 채우면 로그가 최신이 아니게 되어 국토부 점검에서 문제가 된다.
+  → **PDF 방식은 폐기.**
+- 남은 길은 **앱의 백엔드 API**뿐이다. 프록시(Proxyman) 캡처로 엔드포인트·인증을 확인해야 하며,
+  인증서 피닝에 막히면 거기서 끝이다. 찾아도 문서화되지 않은 API라 예고 없이 깨질 수 있다.
+- 야간시간 자동 계산(일몰·일출 기반)은 사용자가 불필요하다고 해서 보류.
+
+---
+
 ## 2026-10-27 저녁 (Play 차단 원인 확정 — 통신판매업 신고 외 방법 없음)
 
 ### Play 지원 티켓으로 확정된 내용
