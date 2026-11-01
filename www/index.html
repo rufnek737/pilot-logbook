@@ -1087,6 +1087,17 @@
     }
     .google-btn:hover { opacity: .9; }
     .google-btn svg { flex-shrink: 0; }
+    /* Sign in with Apple — iOS에서만 노출한다(웹/안드로이드는 서비스 ID 미설정). */
+    .apple-btn {
+      display: none; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 14px; border-radius: 12px; margin-bottom: 10px;
+      background: #000; color: #fff;
+      border: none; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .apple-btn.show { display: flex; }
+    .apple-btn:hover { opacity: .9; }
+    .apple-btn svg { flex-shrink: 0; }
     .auth-input {
       width: 100%; margin-bottom: 10px; padding: 13px 14px;
       background: var(--surface2); border: 1px solid var(--border);
@@ -1456,6 +1467,9 @@
       </div>
       <button class="auth-btn-primary" onclick="signInWithEmail()">로그인</button>
       <div class="auth-divider"><span>또는</span></div>
+      <button class="apple-btn" onclick="signInWithApple()"><svg width="18" height="18" viewBox="0 0 384 512" aria-hidden="true"><path fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+        Apple로 로그인
+      </button>
       <button class="google-btn" onclick="signInWithGoogle()">
         <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/><path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.3-7.7 2.3-6.2 0-11.5-4.2-13.4-9.9l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
         Google로 로그인
@@ -1470,6 +1484,9 @@
       <input type="password" id="signupPasswordConfirm" class="auth-input" placeholder="비밀번호 확인" autocomplete="new-password" />
       <button class="auth-btn-primary" onclick="signUpWithEmail()">가입하기</button>
       <div class="auth-divider"><span>또는</span></div>
+      <button class="apple-btn" onclick="signInWithApple()"><svg width="18" height="18" viewBox="0 0 384 512" aria-hidden="true"><path fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+        Apple로 로그인
+      </button>
       <button class="google-btn" onclick="signInWithGoogle()">
         <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/><path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 0 0 0 24c0 3.9.9 7.5 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.3-7.7 2.3-6.2 0-11.5-4.2-13.4-9.9l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>
         Google로 로그인
@@ -2609,6 +2626,78 @@ async function resetPassword() {
   }
 }
 
+// ─── Sign in with Apple ──────────────────────────────────────────
+// Guideline 4.8: Google 로그인을 제공하는 앱은 이메일 비공개가 가능한
+// 로그인 수단을 동등하게 제공해야 한다. iOS 네이티브에서만 노출한다.
+function isIosNative() {
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform()
+            && window.Capacitor.getPlatform() === 'ios');
+}
+
+function showAppleButtonsIfIos() {
+  if (!isIosNative()) return;
+  document.querySelectorAll('.apple-btn').forEach(b => b.classList.add('show'));
+}
+
+// Apple은 nonce의 SHA-256 해시를 토큰에 담는다. Apple에는 해시를,
+// Firebase에는 원본을 넘겨야 검증이 통과한다.
+async function makeAppleNonce() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const raw = Array.from(bytes, b => ('0' + b.toString(16)).slice(-2)).join('');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  const hashed = Array.from(new Uint8Array(digest), b => ('0' + b.toString(16)).slice(-2)).join('');
+  return { raw, hashed };
+}
+
+async function signInWithApple() {
+  const btns = Array.from(document.querySelectorAll('.apple-btn'));
+  const original = btns.map(b => b.innerHTML);
+  btns.forEach(b => { b.disabled = true; b.textContent = '로그인 중...'; });
+  try {
+    if (!isIosNative()) throw new Error('Apple 로그인은 iOS에서만 지원합니다.');
+    const SocialLogin = window.Capacitor.Plugins.SocialLogin;
+    if (!SocialLogin) throw new Error('Apple 로그인 모듈을 사용할 수 없습니다. 앱을 최신 버전으로 업데이트해 주세요.');
+
+    const nonce = await makeAppleNonce();
+    await SocialLogin.initialize({ apple: { redirectUrl: '' } });
+    const res = await SocialLogin.login({
+      provider: 'apple',
+      options: { scopes: ['name', 'email'], nonce: nonce.hashed },
+    });
+
+    const result = res && res.result;
+    const idToken = result && result.idToken;
+    if (!idToken) throw new Error('Apple 인증 토큰을 받지 못했습니다. 다시 시도해 주세요.');
+
+    const provider = new firebase.auth.OAuthProvider('apple.com');
+    const credential = provider.credential({ idToken, rawNonce: nonce.raw });
+    const cred = await auth.signInWithCredential(credential);
+
+    // Apple은 최초 1회만 이름을 준다. 그때 받아두지 않으면 영영 못 받는다.
+    const profile = result.profile || {};
+    const name = [profile.givenName, profile.familyName].filter(Boolean).join(' ').trim();
+    if (name && cred.user && !cred.user.displayName) {
+      try { await cred.user.updateProfile({ displayName: name }); } catch (_) {}
+    }
+    // 계정 삭제 시 Apple 토큰 취소에 쓸 인가 코드를 보관한다(세션 한정).
+    const authCode = result.authorizationCode
+      || (result.accessToken && result.accessToken.token) || '';
+    if (authCode) {
+      try { sessionStorage.setItem('appleAuthCode', authCode); } catch (_) {}
+    }
+  } catch (e) {
+    const code = e && e.code;
+    const msg = (e && (e.message || e.errorMessage)) || '';
+    const cancelled = code === 'auth/cancelled-popup-request'
+      || /1001|cancel/i.test(String(code) + msg);
+    if (!cancelled) alert('[Apple 로그인 오류] ' + (msg || JSON.stringify(e)));
+    console.error('Apple 로그인 오류:', e);
+  } finally {
+    btns.forEach((b, i) => { b.disabled = false; b.innerHTML = original[i]; });
+  }
+}
+
 async function signInWithGoogle() {
   const GOOGLE_BTN_HTML = `<svg width="20" height="20" viewBox="0 0 48 48" style="margin-right:8px;vertical-align:middle"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Google로 로그인`;
   const btn = document.querySelector('.google-btn');
@@ -2754,6 +2843,8 @@ function updateDeleteAccountButton() {
   document.getElementById('deleteAccountButton').disabled = !confirmed;
 }
 
+let _appleRevokeCode = '';
+
 async function reauthenticateForAccountDeletion(user) {
   const providers = (user.providerData || []).map(p => p.providerId);
   if (providers.includes('password')) {
@@ -2794,6 +2885,32 @@ async function reauthenticateForAccountDeletion(user) {
       provider.setCustomParameters({ prompt: 'select_account' });
       await user.reauthenticateWithPopup(provider);
     }
+    return;
+  }
+
+  if (providers.includes('apple.com')) {
+    if (!isIosNative()) {
+      const e = new Error('Apple 계정 탈퇴는 iOS 앱에서만 진행할 수 있습니다.');
+      e.code = 'auth/provider-not-supported';
+      throw e;
+    }
+    const SocialLogin = window.Capacitor.Plugins.SocialLogin;
+    if (!SocialLogin) throw new Error('Apple 본인 확인 모듈을 사용할 수 없습니다.');
+    const nonce = await makeAppleNonce();
+    await SocialLogin.initialize({ apple: { redirectUrl: '' } });
+    const res = await SocialLogin.login({
+      provider: 'apple',
+      options: { scopes: ['name', 'email'], nonce: nonce.hashed },
+    });
+    const result = res && res.result;
+    const idToken = result && result.idToken;
+    if (!idToken) throw new Error('Apple 인증 토큰을 받지 못했습니다. 다시 시도해 주세요.');
+    const provider = new firebase.auth.OAuthProvider('apple.com');
+    await user.reauthenticateWithCredential(
+      provider.credential({ idToken, rawNonce: nonce.raw }));
+    // 탈퇴 시 Apple 토큰을 취소하려면 방금 받은 인가 코드가 필요하다.
+    _appleRevokeCode = result.authorizationCode
+      || (result.accessToken && result.accessToken.token) || '';
     return;
   }
 
@@ -2847,7 +2964,26 @@ async function deleteAccountPermanently() {
     cloudDeleted = true;
 
     button.textContent = '로그인 계정 삭제 중...';
+    // Apple 요구사항: Sign in with Apple 계정을 지울 때는 토큰도 함께 취소해야 한다.
+    if ((user.providerData || []).some(p => p.providerId === 'apple.com')) {
+      const code = _appleRevokeCode || (() => {
+        try { return sessionStorage.getItem('appleAuthCode') || ''; } catch (_) { return ''; }
+      })();
+      if (code) {
+        // compat 래퍼에는 revokeAccessToken이 없어 모듈러 인스턴스로 호출한다.
+        const modularAuth = auth._delegate || auth;
+        try {
+          if (typeof modularAuth.revokeAccessToken === 'function') {
+            await modularAuth.revokeAccessToken(code);
+          } else {
+            console.warn('Apple 토큰 취소 API를 찾지 못했습니다.');
+          }
+        } catch (revokeError) { console.warn('Apple 토큰 취소 실패:', revokeError); }
+      }
+    }
     await user.delete();
+    _appleRevokeCode = '';
+    try { sessionStorage.removeItem('appleAuthCode'); } catch (_) {}
 
     try {
       if (window.PilotLogbookLocalFiles) await window.PilotLogbookLocalFiles.deleteForOwner(uid);
@@ -3133,6 +3269,11 @@ auth.getRedirectResult().then((result) => {
 });
 
 // Auth 상태 감지
+// iOS에서만 Apple 로그인 버튼을 띄운다. Capacitor가 늦게 붙는 경우가 있어 양쪽에 건다.
+showAppleButtonsIfIos();
+window.addEventListener('load', showAppleButtonsIfIos, { once: true });
+document.addEventListener('deviceready', showAppleButtonsIfIos, { once: true });
+
 auth.onAuthStateChanged(user => {
   currentUser = user;
   window.PilotLogbookBilling?.onAuthChanged(user);
