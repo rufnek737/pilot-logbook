@@ -864,6 +864,147 @@ async function tryFetch(url, jar, referer) {
   }
 }
 
+// ─── PDC CrewConnex 앱 백엔드 (crewconnexapp.jejuair.net, JSON-RPC 2.0) ──────
+// roster.aspx(웹)와 다른 백엔드. 웹엔 없는 air flighttime(계기시간)·blockhours가 여기 있다.
+// 모든 호출은 POST /pdccrew2, body {method, jsonrpc:"2.0", id, params}.
+// 인증은 login으로 받은 JWT를 params.authentication 에 실어 보낸다(OpenID·인증서 불필요).
+// 전체 API 맵은 메모리 crewconnex-app-api 참고.
+const PDC_BASE = 'https://crewconnexapp.jejuair.net';
+const PDC_RPC  = `${PDC_BASE}/pdccrew2`;
+
+let _pdcRpcId = 0;
+
+// JWT payload의 sub(=crewCode, 본인 한글 이름)를 UTF-8로 안전하게 꺼낸다.
+// atob만 쓰면 한글이 깨져 서버가 'not a valid crewmember'를 돌려준다.
+export function pdcCrewCodeFromToken(token) {
+  const part = String(token || '').split('.')[1] || '';
+  const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = b64 + '==='.slice((b64.length + 3) % 4);
+  const bin = atob(padded);
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  const payload = JSON.parse(new TextDecoder().decode(bytes));
+  return payload.sub || '';
+}
+
+async function pdcRpc(method, params, auth, fetchImpl = fetch) {
+  _pdcRpcId += 1;
+  const body = { method, jsonrpc: '2.0', id: String(_pdcRpcId), params: { ...params, timeOutput: 'iso' } };
+  if (auth) body.params.authentication = auth;
+  const res = await fetchImpl(PDC_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (json && json.error) {
+    const e = new Error(String(json.error.message || json.error.code || 'RPC error'));
+    e.pdcCode = json.error.code;
+    throw e;
+  }
+  let result = json ? json.result : null;
+  if (typeof result === 'string') { try { result = JSON.parse(result); } catch (_) {} }
+  // 실패는 result에 {code,message}로 오기도 한다(성공 응답엔 result:"OK"만 있고 code는 없다).
+  if (result && typeof result === 'object' && !Array.isArray(result)
+      && 'code' in result && 'message' in result) {
+    const e = new Error(String(result.message));
+    e.pdcCode = result.code;
+    throw e;
+  }
+  return result;
+}
+
+async function pdcLogin(username, password, fetchImpl = fetch) {
+  const result = await pdcRpc('login', { username, password, crewmemberLogin: true }, null, fetchImpl);
+  const auth = result && result.authentication;
+  if (!auth) {
+    const e = new Error('PDC_NO_TOKEN');
+    e.pdcLoginFailed = true;
+    throw e;
+  }
+  return { auth, crewCode: pdcCrewCodeFromToken(auth) };
+}
+
+// "ICN-KIX 7C 1303" → { from:'ICN', to:'KIX', flight:'7C1303' }
+function parsePdcActivityId(id) {
+  const m = String(id || '').match(/^([A-Z]{3})-([A-Z]{3})\s+(.+)$/);
+  if (!m) return null;
+  return { from: m[1], to: m[2], flight: m[3].replace(/\s+/g, '').toUpperCase() };
+}
+
+function pdcNamed(list, label) {
+  const e = (list || []).find(x => x && x.label === label);
+  return e ? String(e.val == null ? '' : e.val).trim() : '';
+}
+
+// {base,local,utc} 시각에서 local "HH:MM"만 꺼낸다. (local은 "2026-11-04T09:02Z" 형태)
+function pdcLocalTime(t) {
+  const m = ((t && t.local) || '').match(/T(\d{2}:\d{2})/);
+  return m ? m[1] : '';
+}
+
+// 앱 직책 라벨을 roster.aspx 파서가 쓰는 표기로 정규화 → 기존 posToDuty가 그대로 처리한다.
+function normPdcPos(pos) {
+  const p = String(pos || '').trim();
+  if (/^Capt/i.test(p) || /^SFO$/i.test(p)) return 'Capt';   // "Capt (PIC)"·SFO → Capt (기존과 동일)
+  if (/^3(PC|NC)$/i.test(p)) return p.toUpperCase();
+  if (/^3(F|FO)$/i.test(p)) return '3F';
+  return p;                                                   // FO/PUR/JC1/FA/MECH 등은 그대로
+}
+
+// getDutyInfo 결과 → 비행 배열(기존 shape + flightTime). 순수 함수(테스트용).
+export function parsePdcDutyInfo(info) {
+  const flights = [];
+  const acts = (info && info.activityInfoList) || [];
+  const crewList = (((info && info.crewInfoList) || [])[0] || {}).crewList || [];
+  const crew = crewList.map(m => {
+    const ni = m.namedInfoList || [];
+    return { position: normPdcPos(pdcNamed(ni, 'Pos')), empNo: pdcNamed(ni, 'Emp. No'), name: pdcNamed(ni, 'CrewCode') };
+  }).filter(c => c.empNo || c.name);
+
+  for (const a of acts) {
+    if (a.blockType !== 'FDP') continue;                 // 지상(GND)·휴식(HTL) 등 제외
+    const route = parsePdcActivityId(a.activityIdentification);
+    if (!route) continue;                                // 비행 leg만 (MED 등 제외)
+    const ni = a.namedInfoList || [];
+    flights.push({
+      date: ((a.start && a.start.local) || '').slice(0, 10),
+      flight: route.flight,
+      from: a.fromStation || route.from,
+      to: a.toStation || route.to,
+      stdLocal: pdcLocalTime(a.start),
+      staLocal: pdcLocalTime(a.end),
+      acType: 'B737-800',                                // 앱은 기종 미제공 → 기본값(추후 보정)
+      acReg: pdcNamed(ni, 'AcReg') || a.aircraftReg || '',  // 앱은 편대번호(예 553), HL#### 아님
+      blh: pdcNamed(ni, 'blockhours'),
+      flightTime: pdcNamed(ni, 'flighttime'),            // ← 계기시간 소스(웹엔 없던 데이터)
+      crew,
+    });
+  }
+  return flights;
+}
+
+// 앱 백엔드로 로스터(오늘 ±5일) + 비행별 flighttime 가져오기. 기존 {flights, crew} shape 반환.
+export async function fetchPdcRoster(username, password, fetchImpl = fetch, now = new Date()) {
+  const { auth, crewCode } = await pdcLogin(username, password, fetchImpl);
+  const { start, end } = rosterWindow(now);
+  const cal = await pdcRpc('getCalendarBlocks',
+    { crewCode, dayDefinition: 'Base', blockType: 'PerDay', from: start, to: end }, auth, fetchImpl);
+  const blocks = (cal && cal.calendarBlocks) || [];
+  const dutyIds = [...new Set(blocks
+    .filter(b => b.blockType === 'FDP' && /^fdp\(/.test(b.dutyId || '') && /-/.test(b.label1 || ''))
+    .map(b => b.dutyId))];
+
+  let flights = [];
+  for (const dutyId of dutyIds) {
+    const info = await pdcRpc('getDutyInfo', { dutyId }, auth, fetchImpl);
+    flights = flights.concat(parsePdcDutyInfo(info));
+  }
+  // rosterWindow 범위(날짜 문자열)로 거른다 — getCalendarBlocks가 이미 한정하지만 leg가 걸칠 수 있다.
+  flights = flights.filter(f => f.date >= start && f.date <= end);
+  const crew = flights.find(f => f.crew && f.crew.length > 0)?.crew || [];
+  return { flights, crew };
+}
+
 // ─── Cloudflare Workers 핸들러 (Netlify와 다른 부분) ───────────────────────
 export async function handleRequest(request, env = {}, dependencies = {}) {
     const origin = request.headers.get('origin') || '';
@@ -967,12 +1108,13 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
     }
 
     let password;
+    let backend;
     try {
       const requestBody = await request.text();
       if (new TextEncoder().encode(requestBody).byteLength > MAX_REQUEST_BYTES) {
         return fail(413, '요청 내용이 너무 큽니다.', 'REQUEST_TOO_LARGE');
       }
-      ({ username, password } = JSON.parse(requestBody || '{}'));
+      ({ username, password, backend } = JSON.parse(requestBody || '{}'));
     } catch (_) {
       return fail(400, '잘못된 요청입니다.', 'INVALID_REQUEST');
     }
@@ -980,6 +1122,20 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
     password = typeof password === 'string' ? password : '';
     if (!username || !password || username.length > 128 || password.length > 256) {
       return fail(400, '아이디/비밀번호를 확인해 주세요.', 'INVALID_CREDENTIALS');
+    }
+
+    // 앱 백엔드(pdccrew2) 경로 — flighttime 포함. roster.aspx 경로는 아래에 그대로 둔다(diff용).
+    if (backend === 'pdc') {
+      try {
+        const parsed = await fetchPdcRoster(username, password);
+        if (parsed.flights.length > 0) return ok(parsed);
+        return fail(404, '로그인 성공, 최근 5일 이내 비행을 찾을 수 없습니다.', 'NO_RECENT_FLIGHTS');
+      } catch (e) {
+        if (e && (e.pdcLoginFailed || e.pdcCode === 401 || /login|password|crewmember|자격|인증/i.test(e.message || ''))) {
+          return fail(401, 'CrewConnex 로그인 실패 — 아이디/비밀번호를 확인해 주세요.', 'CREWCONNEX_LOGIN_FAILED');
+        }
+        return fail(502, 'CrewConnex 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'UPSTREAM_ERROR');
+      }
     }
 
     const UA  = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';

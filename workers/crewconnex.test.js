@@ -3,7 +3,10 @@ import test from 'node:test';
 import {
   applyDutyCode,
   autoImportFlightKey,
+  fetchPdcRoster,
   handleRequest,
+  parsePdcDutyInfo,
+  pdcCrewCodeFromToken,
   parseRosterHtml,
   parsePurchaseRequest,
   selectAppleLifetimePurchase,
@@ -233,4 +236,152 @@ test('Google lifetime purchase requires a completed purchase state', () => {
   assert.equal(selectGoogleLifetimePurchase({ purchaseState: 1, orderId: 'GPA.1111' }), null);
   assert.equal(selectGoogleLifetimePurchase({ purchaseState: 2, orderId: 'GPA.1111' }), null);
   assert.equal(selectGoogleLifetimePurchase({ purchaseState: 0 }), null);
+});
+
+// ─── PDC CrewConnex 앱 백엔드(pdccrew2) 파싱 ───────────────────────────────
+// 실데이터 구조를 익명화한 fixture(동료 개인정보 제외). 실제 응답으로 라이브 검증 후 작성.
+
+// JWT(HS256 아님, 서명 무의미 — sub만 읽으므로) — sub은 한글 crewCode. UTF-8 디코드 확인용.
+function fakePdcToken(sub) {
+  const b64url = obj => Buffer.from(JSON.stringify(obj), 'utf8').toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub, scope: 'app', user_type: 'c' })}.sig`;
+}
+
+// getDutyInfo 응답 1건(2 leg 왕복, 둘 다 비행 완료라 flighttime 존재)
+function dutyInfoFixture() {
+  return {
+    activityInfoList: [
+      {
+        activityIdentification: 'ICN-KIX 7C 1303', aircraftReg: '553', blockType: 'FDP',
+        dutyCode: '7C 1303', fromStation: 'ICN', toStation: 'KIX',
+        start: { local: '2026-11-04T09:02Z' }, end: { local: '2026-11-04T11:04Z' },
+        namedInfoList: [
+          { label: 'AcReg', val: '553' }, { label: 'Turn Time', val: '0:46' },
+          { label: 'blockhours', val: '2:02' }, { label: 'flighttime', val: '1:28' },
+        ],
+      },
+      {
+        activityIdentification: 'KIX-ICN 7C 1304', aircraftReg: '553', blockType: 'FDP',
+        dutyCode: '7C 1304', fromStation: 'KIX', toStation: 'ICN',
+        start: { local: '2026-11-04T11:50Z' }, end: { local: '2026-11-04T13:41Z' },
+        namedInfoList: [
+          { label: 'AcReg', val: '553' },
+          { label: 'blockhours', val: '1:51' }, { label: 'flighttime', val: '1:30' },
+        ],
+      },
+    ],
+    crewInfoList: [{
+      crewList: [
+        { fullName: 'TESTER, PILOT', namedInfoList: [
+          { label: 'CrewCode', val: '홍길동' }, { label: 'Emp. No', val: '1700001' }, { label: 'Pos', val: 'Capt (PIC)' },
+        ]},
+        { fullName: 'TESTER, FIRST', namedInfoList: [
+          { label: 'CrewCode', val: '김부기' }, { label: 'Emp. No', val: '1800002' }, { label: 'Pos', val: 'FO' },
+        ]},
+      ],
+    }],
+    result: 'OK',
+  };
+}
+
+test('PDC: JWT sub(한글 crewCode)를 UTF-8로 올바르게 디코드한다', () => {
+  assert.equal(pdcCrewCodeFromToken(fakePdcToken('강경태')), '강경태');
+});
+
+test('PDC: getDutyInfo를 기존 비행 shape + flightTime으로 파싱한다', () => {
+  const flights = parsePdcDutyInfo(dutyInfoFixture());
+  assert.equal(flights.length, 2);
+
+  const out = flights[0];
+  assert.equal(out.date, '2026-11-04');
+  assert.equal(out.flight, '7C1303');
+  assert.equal(out.from, 'ICN');
+  assert.equal(out.to, 'KIX');
+  assert.equal(out.stdLocal, '09:02');
+  assert.equal(out.staLocal, '11:04');
+  assert.equal(out.blh, '2:02');
+  assert.equal(out.flightTime, '1:28');        // ← 웹엔 없던 계기시간
+  assert.equal(flights[1].flightTime, '1:30');
+  assert.equal(out.acReg, '553');
+
+  // 승무원 직책이 기존 posToDuty가 읽는 표기로 정규화된다
+  assert.equal(out.crew[0].name, '홍길동');
+  assert.equal(out.crew[0].position, 'Capt');  // "Capt (PIC)" → Capt
+  assert.equal(out.crew[1].position, 'FO');
+});
+
+test('PDC: 지상근무(GND)/비행 아닌 leg는 비행으로 집계하지 않는다', () => {
+  const ground = {
+    activityInfoList: [{
+      activityIdentification: '', blockType: 'GND', dutyCode: 'MED',
+      fromStation: 'GMP', toStation: 'GMP', start: { local: '2026-11-07T09:00Z' }, end: { local: '2026-11-07T18:00Z' },
+      namedInfoList: [{ label: 'Activity Type', val: 'Physical Examination' }],
+    }],
+    crewInfoList: [{ crewList: [] }],
+  };
+  assert.equal(parsePdcDutyInfo(ground).length, 0);
+});
+
+test('PDC: applyDutyCode가 앱 crew에서 본인 직책으로 PIC/SIC를 채운다', () => {
+  const result = { flights: parsePdcDutyInfo(dutyInfoFixture()), crew: [] };
+  const withDuty = applyDutyCode(result, '홍길동');
+  assert.equal(withDuty.flights[0].dutyCode, 'C');
+  assert.equal(withDuty.flights[0].role, 'PIC');
+  assert.equal(withDuty.flights[0].flightTime, '1:28');  // flightTime은 그대로 보존
+});
+
+test('PDC: 로그인→getCalendarBlocks→getDutyInfo 오케스트레이션(중복 제거·창 필터)', async () => {
+  const token = fakePdcToken('홍길동');
+  const calendar = {
+    calendarBlocks: [
+      // 비행(FDP) — 수집 대상
+      { blockType: 'FDP', dutyId: 'fdp(1001)', day: '2026-11-04', label1: ' ICN-KIX-ICN' },
+      // 멀티데이 비행이 continuation으로 두 번 나와도 dutyId로 중복 제거
+      { blockType: 'FDP', dutyId: 'fdp(1002)', day: '2026-11-05', label1: ' ICN-DPS' },
+      { blockType: 'FDP', dutyId: 'fdp(1002)', day: '2026-11-06', label1: ' ICN-DPS' },
+      // 비행 아님 — 제외
+      { blockType: 'OFF', dutyId: 'cra(2001)', day: '2026-11-03', label1: 'OFF' },
+      { blockType: 'GND', dutyId: 'fdp(3001)', day: '2026-11-07', label1: 'MED' },   // 대시 없음
+    ],
+    from: '2026-10-30', to: '2026-11-09', result: 'OK',
+  };
+  const duties = {
+    'fdp(1001)': dutyInfoFixture(),  // 11-04 왕복 2편
+    'fdp(1002)': {
+      activityInfoList: [{
+        activityIdentification: 'ICN-DPS 7C 5303', aircraftReg: '821', blockType: 'FDP',
+        fromStation: 'ICN', toStation: 'DPS',
+        start: { local: '2026-11-05T13:00Z' }, end: { local: '2026-11-05T20:10Z' },
+        namedInfoList: [{ label: 'blockhours', val: '7:10' }, { label: 'flighttime', val: '6:52' }],
+      }],
+      crewInfoList: [{ crewList: [] }],
+    },
+  };
+  const calls = [];
+  const fakeFetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    calls.push(body.method);
+    let result;
+    if (body.method === 'login') result = { authentication: token };
+    else if (body.method === 'getCalendarBlocks') result = calendar;
+    else if (body.method === 'getDutyInfo') result = duties[body.params.dutyId];
+    else result = { code: 404, message: 'unexpected' };
+    return { json: async () => ({ jsonrpc: '2.0', result }) };
+  };
+
+  const now = new Date('2026-11-04T06:00:00Z');   // 창 = 10-30 ~ 11-09, 결정적
+  const { flights, crew } = await fetchPdcRoster('홍길동', 'pw', fakeFetch, now);
+
+  assert.deepEqual(calls, ['login', 'getCalendarBlocks', 'getDutyInfo', 'getDutyInfo']); // 중복 fdp(1002) 1회만
+  assert.equal(flights.length, 3);                 // 1303, 1304, 5303
+  assert.deepEqual(flights.map(f => f.flight), ['7C1303', '7C1304', '7C5303']);
+  assert.equal(flights[2].flightTime, '6:52');
+  assert.equal(crew[0].name, '홍길동');
+});
+
+test('PDC: 로그인 응답에 토큰이 없으면 로그인 실패로 처리한다', async () => {
+  const fakeFetch = async () => ({ json: async () => ({ result: {} }) });
+  await assert.rejects(() => fetchPdcRoster('u', 'p', fakeFetch, new Date('2026-11-04')),
+    err => err && err.pdcLoginFailed === true);
 });
