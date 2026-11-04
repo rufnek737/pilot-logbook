@@ -146,6 +146,12 @@ export async function verifyFirebaseIdToken(token, projectId, options = {}) {
   return { ...payload, uid: payload.sub };
 }
 
+// 운영 오리진 + 로컬 개발 미리보기(localhost/127.0.0.1 아무 포트). 인증은 Firebase가 따로 한다.
+function isAllowedOrigin(origin) {
+  if (ALLOWED_ORIGINS.has(origin)) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '');
+}
+
 function responseHeaders(origin) {
   const headers = {
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
@@ -156,7 +162,7 @@ function responseHeaders(origin) {
     'Vary': 'Origin',
     'X-Content-Type-Options': 'nosniff',
   };
-  if (ALLOWED_ORIGINS.has(origin)) headers['Access-Control-Allow-Origin'] = origin;
+  if (isAllowedOrigin(origin)) headers['Access-Control-Allow-Origin'] = origin;
   return headers;
 }
 
@@ -1036,7 +1042,7 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       headers: cors,
     });
 
-    if (!ALLOWED_ORIGINS.has(origin)) {
+    if (!isAllowedOrigin(origin)) {
       return fail(403, '허용되지 않은 앱 환경입니다.', 'ORIGIN_NOT_ALLOWED');
     }
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
