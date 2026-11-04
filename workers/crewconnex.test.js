@@ -4,6 +4,7 @@ import {
   applyDutyCode,
   autoImportFlightKey,
   fetchPdcRoster,
+  instrumentTimeFromFlightTime,
   handleRequest,
   parsePdcDutyInfo,
   pdcCrewCodeFromToken,
@@ -384,4 +385,25 @@ test('PDC: 로그인 응답에 토큰이 없으면 로그인 실패로 처리한
   const fakeFetch = async () => ({ json: async () => ({ result: {} }) });
   await assert.rejects(() => fetchPdcRoster('u', 'p', fakeFetch, new Date('2026-11-04')),
     err => err && err.pdcLoginFailed === true);
+});
+
+test('PDC: 계기시간은 air flight time을 5분 미만으로 내리되 경계값은 -5한다', () => {
+  // 사용자 규칙: 그 값보다 작은 가장 큰 5의 배수
+  assert.equal(instrumentTimeFromFlightTime('1:28'), '1:25');  // 28→25
+  assert.equal(instrumentTimeFromFlightTime('1:29'), '1:25');  // 29→25
+  assert.equal(instrumentTimeFromFlightTime('1:30'), '1:25');  // 30(배수)→25
+  assert.equal(instrumentTimeFromFlightTime('1:25'), '1:20');  // 25(배수)→20
+  assert.equal(instrumentTimeFromFlightTime('1:26'), '1:25');  // 26→25
+  assert.equal(instrumentTimeFromFlightTime('2:00'), '1:55');  // 60(배수)→55, 시 경계 넘김
+  assert.equal(instrumentTimeFromFlightTime('6:52'), '6:50');  // 52→50
+  assert.equal(instrumentTimeFromFlightTime(''), '');
+  assert.equal(instrumentTimeFromFlightTime('bad'), '');
+});
+
+test('PDC: 파싱 결과에 계기시간(instrumentTime)이 함께 채워진다', () => {
+  const flights = parsePdcDutyInfo(dutyInfoFixture());
+  assert.equal(flights[0].flightTime, '1:28');
+  assert.equal(flights[0].instrumentTime, '1:25');
+  assert.equal(flights[1].flightTime, '1:30');
+  assert.equal(flights[1].instrumentTime, '1:25');
 });

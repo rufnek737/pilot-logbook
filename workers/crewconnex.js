@@ -942,6 +942,17 @@ function pdcLocalTime(t) {
   return m ? m[1] : '';
 }
 
+// air flight time(H:MM) → 계기시간. "그 값보다 작은 가장 큰 5의 배수"로 내린다.
+// 28분→25, 29분→25(5 미만은 내림), 25분→20, 30분→25(5의 배수는 -5), 1:00(60분)→0:55.
+export function instrumentTimeFromFlightTime(hmm) {
+  const m = String(hmm || '').match(/^(\d+):([0-5]\d)$/);
+  if (!m) return '';
+  const total = Number(m[1]) * 60 + Number(m[2]);
+  if (total <= 0) return '';
+  const rounded = Math.floor((total - 1) / 5) * 5;   // 경계값(5의 배수)은 한 칸 아래로 떨어진다
+  return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')}`;
+}
+
 // 앱 직책 라벨을 roster.aspx 파서가 쓰는 표기로 정규화 → 기존 posToDuty가 그대로 처리한다.
 function normPdcPos(pos) {
   const p = String(pos || '').trim();
@@ -977,6 +988,7 @@ export function parsePdcDutyInfo(info) {
       acReg: pdcNamed(ni, 'AcReg') || a.aircraftReg || '',  // 앱은 편대번호(예 553), HL#### 아님
       blh: pdcNamed(ni, 'blockhours'),
       flightTime: pdcNamed(ni, 'flighttime'),            // ← 계기시간 소스(웹엔 없던 데이터)
+      instrumentTime: instrumentTimeFromFlightTime(pdcNamed(ni, 'flighttime')),  // 5분 내림
       crew,
     });
   }
