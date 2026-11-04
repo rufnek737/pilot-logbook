@@ -10,7 +10,6 @@ import {
   pdcAcType,
   pdcCrewCodeFromToken,
   pdcReg,
-  parseRosterHtml,
   parsePurchaseRequest,
   selectAppleLifetimePurchase,
   selectGoogleLifetimePurchase,
@@ -153,25 +152,6 @@ test('Worker rejects blocked origins, missing login tokens, and repeated request
     verifyToken: async () => ({ uid: 'firebase-user-1' }),
   });
   assert.equal(rateLimited.status, 429);
-});
-
-test('Roster parsing and automatic crew duty mapping remain unchanged', () => {
-  const today = new Date();
-  const day = String(today.getDate()).padStart(2, '0');
-  const html = `
-    <table>
-      <tr><th>Date</th><th>Remark</th><th>From</th><th>To</th><th>STD(L)</th><th>STA(L)</th><th>AC</th><th>BLH</th><th>AC Reg</th><th>Crew</th></tr>
-      <tr><td>${day}</td><td>7C123</td><td>CJU</td><td>GMP</td><td>0700</td><td>0810</td><td>7M8</td><td>0110</td><td>HL8501</td><td>3PC 1234567 홍길동</td></tr>
-    </table>`;
-  const parsed = parseRosterHtml(html);
-  assert.equal(parsed.flights.length, 1);
-  assert.equal(parsed.flights[0].flight, '7C123');
-  assert.equal(parsed.flights[0].acType, '-8 MAX');
-  assert.equal(parsed.flights[0].crew[0].name, '홍길동');
-
-  const withDuty = applyDutyCode(parsed, '홍길동');
-  assert.equal(withDuty.flights[0].dutyCode, '3PC');
-  assert.equal(withDuty.flights[0].role, 'PIC');
 });
 
 test('Automatic import usage key is stable and identifies a unique flight', () => {

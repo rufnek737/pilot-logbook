@@ -6137,7 +6137,7 @@ async function loginCrewConnex() {
         'Authorization': `Bearer ${firebaseIdToken}`,
         'Content-Type': 'application/json',
       },
-      body:    JSON.stringify({ username, password, backend: 'pdc' }),
+      body:    JSON.stringify({ username, password }),
     });
     const data = await resp.json();
 
