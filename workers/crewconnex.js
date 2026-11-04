@@ -968,20 +968,27 @@ function normPdcPos(pos) {
   return p;                                                   // FO/PUR/JC1/FA/MECH 등은 그대로
 }
 
-// 제주항공 737 기번은 모두 HL8xxx. pdc는 편대번호(기번 뒤 3자리, 예 "593")만 주므로 복원한다.
+// NG(737-800) 전체 기번. 제주항공 운항기술팀 Aircraft Specifications(2026-08-13 기준).
+// 제주항공 NG는 더 늘지 않으며, 이 목록 밖 기번은 전부 MAX(737-8)다.
+const PDC_NG_REGS = new Set([
+  'HL7213', 'HL8031', 'HL8032', 'HL8034', 'HL8050', 'HL8051', 'HL8061', 'HL8062', 'HL8063', 'HL8064',
+  'HL8087', 'HL8089', 'HL8090', 'HL8295', 'HL8301', 'HL8302', 'HL8303', 'HL8304', 'HL8305', 'HL8321',
+  'HL8322', 'HL8331', 'HL8332', 'HL8333', 'HL8334', 'HL8335', 'HL8336', 'HL8337', 'HL8339', 'HL8527', 'HL8539',
+]);
+// pdc는 편대번호(보통 기번 뒤 3자리, 예 "593")만 준다. NG 역조회용 last3 → 전체 기번 맵.
+// MAX는 전부 HL8xxx라 뒤 3자리로 복원되지만, NG에는 HL7213처럼 HL8이 아닌 예외가 있어 맵이 필요하다.
+const PDC_NG_BY_LAST3 = new Map([...PDC_NG_REGS].map(r => [r.slice(-3), r]));
+
+// 편대번호 → 전체 기번(HL####). "593"→HL8593, "031"→HL8031, "213"→HL7213(NG 예외).
 export function pdcReg(fleetNo) {
   const s = String(fleetNo || '').trim().toUpperCase();
-  if (/^HL\d{4}$/.test(s)) return s;                 // 이미 전체 기번이면 그대로
+  if (/^HL\d{4}$/.test(s)) return s;                       // 이미 전체 기번
   const m = s.match(/^(\d{3,4})$/);
-  if (!m) return s;                                  // 숫자 형태가 아니면 원본 유지
-  return m[1].length === 4 ? `HL${m[1]}` : `HL8${m[1]}`;  // "593"→HL8593, "8593"→HL8593
+  if (!m) return s;                                        // 숫자 형태가 아니면 원본 유지
+  if (m[1].length === 4) return `HL${m[1]}`;              // 전체 숫자면 HL 접두
+  return PDC_NG_BY_LAST3.get(m[1]) || `HL8${m[1]}`;       // 3자리: NG 역조회, 없으면 HL8(=MAX)
 }
 
-// NG(737-800) 기번 목록. 제주항공 NG는 더 늘지 않으며, 목록 밖 기번은 전부 MAX(737-8).
-// (사용자 제공 기번으로 채운다.)
-const PDC_NG_REGS = new Set([
-  // 예: 'HL8093', 'HL8232', ...  ← 여기에 NG 737-800 기번을 넣는다
-]);
 export function pdcAcType(reg) {
   return PDC_NG_REGS.has(String(reg || '').toUpperCase()) ? 'B737-800' : 'B737-8';
 }

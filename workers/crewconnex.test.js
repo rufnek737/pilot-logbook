@@ -411,12 +411,25 @@ test('PDC: 파싱 결과에 계기시간(instrumentTime)이 함께 채워진다'
   assert.equal(flights[1].instrumentTime, '1:25');
 });
 
-test('PDC: 편대번호를 전체 기번(HL8xxx)으로 복원하고 NG 외에는 MAX로 판정한다', () => {
-  assert.equal(pdcReg('593'), 'HL8593');     // 3자리 → HL8 접두
-  assert.equal(pdcReg('8593'), 'HL8593');    // 4자리 → HL 접두
-  assert.equal(pdcReg('HL8593'), 'HL8593');  // 이미 전체 기번
-  assert.equal(pdcReg(''), '');
-
-  // NG 목록이 비어 있으면 모두 MAX. (NG 기번은 사용자 제공 후 PDC_NG_REGS에 추가)
+test('PDC: 편대번호→전체 기번 복원 + NG 목록 역조회로 기종 판정', () => {
+  // MAX(HL8xxx, NG 목록 밖): HL8 접두로 복원, 기종 MAX
+  assert.equal(pdcReg('593'), 'HL8593');
   assert.equal(pdcAcType('HL8593'), 'B737-8');
+  assert.equal(pdcReg('553'), 'HL8553');
+  assert.equal(pdcAcType('HL8553'), 'B737-8');
+
+  // NG(HL8xxx): last3 역조회로 복원, 기종 NG
+  assert.equal(pdcReg('031'), 'HL8031');
+  assert.equal(pdcAcType('HL8031'), 'B737-800');
+  assert.equal(pdcReg('321'), 'HL8321');      // 8321은 스펙시트상 NG
+  assert.equal(pdcAcType('HL8321'), 'B737-800');
+
+  // NG 예외(HL7213): pdc "213" → HL8213이 아니라 HL7213으로 복원되고 NG로 판정
+  assert.equal(pdcReg('213'), 'HL7213');
+  assert.equal(pdcAcType('HL7213'), 'B737-800');
+
+  // 전체 기번/숫자 입력도 처리
+  assert.equal(pdcReg('8593'), 'HL8593');
+  assert.equal(pdcReg('HL8593'), 'HL8593');
+  assert.equal(pdcReg(''), '');
 });
