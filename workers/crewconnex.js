@@ -968,6 +968,24 @@ function normPdcPos(pos) {
   return p;                                                   // FO/PUR/JC1/FA/MECH 등은 그대로
 }
 
+// 제주항공 737 기번은 모두 HL8xxx. pdc는 편대번호(기번 뒤 3자리, 예 "593")만 주므로 복원한다.
+export function pdcReg(fleetNo) {
+  const s = String(fleetNo || '').trim().toUpperCase();
+  if (/^HL\d{4}$/.test(s)) return s;                 // 이미 전체 기번이면 그대로
+  const m = s.match(/^(\d{3,4})$/);
+  if (!m) return s;                                  // 숫자 형태가 아니면 원본 유지
+  return m[1].length === 4 ? `HL${m[1]}` : `HL8${m[1]}`;  // "593"→HL8593, "8593"→HL8593
+}
+
+// NG(737-800) 기번 목록. 제주항공 NG는 더 늘지 않으며, 목록 밖 기번은 전부 MAX(737-8).
+// (사용자 제공 기번으로 채운다.)
+const PDC_NG_REGS = new Set([
+  // 예: 'HL8093', 'HL8232', ...  ← 여기에 NG 737-800 기번을 넣는다
+]);
+export function pdcAcType(reg) {
+  return PDC_NG_REGS.has(String(reg || '').toUpperCase()) ? 'B737-800' : 'B737-8';
+}
+
 // getDutyInfo 결과 → 비행 배열(기존 shape + flightTime). 순수 함수(테스트용).
 export function parsePdcDutyInfo(info) {
   const flights = [];
@@ -983,6 +1001,7 @@ export function parsePdcDutyInfo(info) {
     const route = parsePdcActivityId(a.activityIdentification);
     if (!route) continue;                                // 비행 leg만 (MED 등 제외)
     const ni = a.namedInfoList || [];
+    const reg = pdcReg(pdcNamed(ni, 'AcReg') || a.aircraftReg);  // 편대번호 → 전체 기번
     flights.push({
       date: ((a.start && a.start.local) || '').slice(0, 10),
       flight: route.flight,
@@ -990,8 +1009,8 @@ export function parsePdcDutyInfo(info) {
       to: a.toStation || route.to,
       stdLocal: pdcLocalTime(a.start),
       staLocal: pdcLocalTime(a.end),
-      acType: 'B737-800',                                // 앱은 기종 미제공 → 기본값(추후 보정)
-      acReg: pdcNamed(ni, 'AcReg') || a.aircraftReg || '',  // 앱은 편대번호(예 553), HL#### 아님
+      acType: pdcAcType(reg),                            // NG 목록 밖이면 MAX(B737-8)
+      acReg: reg,
       blh: pdcNamed(ni, 'blockhours'),
       flightTime: pdcNamed(ni, 'flighttime'),            // ← 계기시간 소스(웹엔 없던 데이터)
       instrumentTime: instrumentTimeFromFlightTime(pdcNamed(ni, 'flighttime')),  // 5분 내림

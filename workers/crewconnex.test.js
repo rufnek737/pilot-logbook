@@ -7,7 +7,9 @@ import {
   instrumentTimeFromFlightTime,
   handleRequest,
   parsePdcDutyInfo,
+  pdcAcType,
   pdcCrewCodeFromToken,
+  pdcReg,
   parseRosterHtml,
   parsePurchaseRequest,
   selectAppleLifetimePurchase,
@@ -304,7 +306,8 @@ test('PDC: getDutyInfo를 기존 비행 shape + flightTime으로 파싱한다', 
   assert.equal(out.blh, '2:02');
   assert.equal(out.flightTime, '1:28');        // ← 웹엔 없던 계기시간
   assert.equal(flights[1].flightTime, '1:30');
-  assert.equal(out.acReg, '553');
+  assert.equal(out.acReg, 'HL8553');   // 편대번호 553 → 전체 기번 HL8553
+  assert.equal(out.acType, 'B737-8');  // NG 목록 밖 → MAX
 
   // 승무원 직책이 기존 posToDuty가 읽는 표기로 정규화된다
   assert.equal(out.crew[0].name, '홍길동');
@@ -406,4 +409,14 @@ test('PDC: 파싱 결과에 계기시간(instrumentTime)이 함께 채워진다'
   assert.equal(flights[0].instrumentTime, '1:25');
   assert.equal(flights[1].flightTime, '1:30');
   assert.equal(flights[1].instrumentTime, '1:25');
+});
+
+test('PDC: 편대번호를 전체 기번(HL8xxx)으로 복원하고 NG 외에는 MAX로 판정한다', () => {
+  assert.equal(pdcReg('593'), 'HL8593');     // 3자리 → HL8 접두
+  assert.equal(pdcReg('8593'), 'HL8593');    // 4자리 → HL 접두
+  assert.equal(pdcReg('HL8593'), 'HL8593');  // 이미 전체 기번
+  assert.equal(pdcReg(''), '');
+
+  // NG 목록이 비어 있으면 모두 MAX. (NG 기번은 사용자 제공 후 PDC_NG_REGS에 추가)
+  assert.equal(pdcAcType('HL8593'), 'B737-8');
 });
