@@ -6137,7 +6137,7 @@ async function loginCrewConnex() {
         'Authorization': `Bearer ${firebaseIdToken}`,
         'Content-Type': 'application/json',
       },
-      body:    JSON.stringify({ username, password }),
+      body:    JSON.stringify({ username, password, backend: 'pdc' }),
     });
     const data = await resp.json();
 
@@ -6150,7 +6150,7 @@ async function loginCrewConnex() {
         return;
       }
       const errMsg = data.error || '로그인 실패';
-      if (errMsg.includes('로그인 성공') && errMsg.includes('Roster')) {
+      if (data.code === 'NO_RECENT_FLIGHTS' || (errMsg.includes('로그인 성공') && errMsg.includes('Roster'))) {
         statusEl.style.color = 'var(--success)';
         statusEl.textContent = '✅ 로그인 성공, 최근 5일 이내 비행이 없습니다';
       } else {
@@ -6422,7 +6422,9 @@ function _mergeCrewConnexFlight(f, previous) {
     crewInfo,
     remarks: crewInfo, // 구버전 호환용 편조 사본
     night: previous?.night || '',
-    ifr: previous?.ifr || '',
+    // 계기시간: 사용자가 이미 입력/수정한 값은 보존하고, 비어 있으면 앱 백엔드의
+    // air flight time 기반 자동 산출값(5분 내림)을 채운다.
+    ifr: previous?.ifr || f.instrumentTime || '',
     ald: previous?.ald || '',
     ldt: previous?.ldt ?? (previous ? ldtOf(previous) : 'M'), // 신규 가져오기 기본값은 메뉴얼
     toPf: previous?.toPf ?? 'PF',

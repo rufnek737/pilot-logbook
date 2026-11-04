@@ -1136,17 +1136,19 @@ export async function handleRequest(request, env = {}, dependencies = {}) {
       return fail(400, '아이디/비밀번호를 확인해 주세요.', 'INVALID_CREDENTIALS');
     }
 
-    // 앱 백엔드(pdccrew2) 경로 — flighttime 포함. roster.aspx 경로는 아래에 그대로 둔다(diff용).
+    // 앱 백엔드(pdccrew2) 경로 — flighttime 포함. 예상치 못한 오류는 아래 roster.aspx로 폴백한다.
     if (backend === 'pdc') {
       try {
         const parsed = await fetchPdcRoster(username, password);
         if (parsed.flights.length > 0) return ok(parsed);
         return fail(404, '로그인 성공, 최근 5일 이내 비행을 찾을 수 없습니다.', 'NO_RECENT_FLIGHTS');
       } catch (e) {
+        // 자격증명 오류는 바로 반환(같은 ID/PW라 roster.aspx도 실패한다).
         if (e && (e.pdcLoginFailed || e.pdcCode === 401 || /login|password|crewmember|자격|인증/i.test(e.message || ''))) {
           return fail(401, 'CrewConnex 로그인 실패 — 아이디/비밀번호를 확인해 주세요.', 'CREWCONNEX_LOGIN_FAILED');
         }
-        return fail(502, 'CrewConnex 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'UPSTREAM_ERROR');
+        // 백엔드 장애·응답 형식 변화 등은 기존 roster.aspx 경로로 폴백(가져오기가 끊기지 않게).
+        console.log('[PDC_FALLBACK] ' + String(e && e.message || e).slice(0, 120));
       }
     }
 
