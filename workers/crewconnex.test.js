@@ -413,3 +413,26 @@ test('PDC: 편대번호→전체 기번 복원 + NG 목록 역조회로 기종 �
   assert.equal(pdcReg('HL8593'), 'HL8593');
   assert.equal(pdcReg(''), '');
 });
+
+test('PDC: 미래편(activityIdentification 빈값)도 fromStation/dutyCode로 가져온다', () => {
+  // 비행 전이라 activityIdentification·flighttime 없음. dutyCode·fromStation은 있음.
+  const future = {
+    activityInfoList: [{
+      activityIdentification: '', blockType: 'FDP', dutyCode: '7C 5303',
+      fromStation: 'ICN', toStation: 'DPS',
+      start: { local: '2026-11-08T13:00Z' }, end: { local: '2026-11-08T20:10Z' },
+      namedInfoList: [],   // 미래편은 blockhours/flighttime 없음
+    }],
+    crewInfoList: [{ crewList: [] }],
+  };
+  const flights = parsePdcDutyInfo(future);
+  assert.equal(flights.length, 1);
+  assert.equal(flights[0].flight, '7C5303');   // dutyCode로 복원
+  assert.equal(flights[0].from, 'ICN');
+  assert.equal(flights[0].to, 'DPS');
+  assert.equal(flights[0].stdLocal, '13:00');
+  assert.equal(flights[0].staLocal, '20:10');
+  assert.equal(flights[0].blh, '7:10');         // 예정시각으로 블록 산출
+  assert.equal(flights[0].flightTime, '');      // 아직 없음
+  assert.equal(flights[0].instrumentTime, '');
+});

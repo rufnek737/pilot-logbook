@@ -2,67 +2,53 @@
 
 ---
 
-## 2026-11-04 (CrewConnex cutover 완료 + iOS 1.0.1/빌드6 업로드)
+## 2026-11-04 (CrewConnex 자동 계기시간 완성 + 양쪽 1.0.1 갱신 준비, Play 승인)
 
-### CrewConnex B안 cutover 완료
-roster.aspx 경로를 Worker에서 완전 제거(약 537줄). 이제 가져오기는 앱 백엔드
-pdccrew2 단독. 기번·기종(NG 목록 역조회), 계기시간(5분 내림 자동), PIC/SIC 모두 pdc에서.
-배포 Version eb239950, 스모크 테스트 통과(프리플라이트 204, 미인증 401).
-삭제 함수: parseRosterHtml, tryFetch, findRosterUrl, fetchRosterPeriod/AdjacentPeriods/
-mergeRosterResults, extractHiddenFields/PeriodOptions/TableRows/CrewFromRow, stripHtml/mapAc/
-fmtTime, 쿠키 jar 헬퍼, MONTH_NAMES, BASE. 메모리 crewconnex-roster-internals 삭제(폐경로).
+핵심: CrewConnex 가져오기를 **앱 백엔드(pdccrew2)** 로 전면 전환해 그동안 수동 입력하던
+**계기시간을 자동화**했고, iOS·안드로이드 둘 다 갱신 빌드를 준비해뒀다.
+
+### Google Play 승인 → 애플 기다렸다 동시 공개
+제출 이틀 만에 변경사항 11개 전부 통과. `1.0 (3) - 첫 출시` / 178개국 / ko-KR / 앱 콘텐츠 6건 / 생산성.
+**관리형 게시를 켜 둔 덕에 자동 공개되지 않고 "게시 준비됨"에서 대기.**
+사용자 결정: **세 곳(App Store/Play/마케팅 사이트) 버전을 맞추려 애플 승인까지 기다렸다 같은 날 공개.**
+사이트에 두 스토어 버튼이 다 들어가 있어(`f57e10a`) 한쪽만 공개하면 죽은 링크가 생긴다.
+
+### CrewConnex 앱 백엔드 리버스 엔지니어링 (B안)
+웹 로스터(roster.aspx)엔 계기시간이 없고 앱(crewconnexapp.jejuair.net)엔 있다 → 앱 백엔드 분석.
+built-in 브라우저로 로그인 후 fetch/XHR 후킹해 트래픽 확인:
+- **`POST /pdccrew2` JSON-RPC 2.0**, 인증은 login으로 받은 JWT(ID/PW 로그인, OpenID·인증서 불필요).
+- `login{username,password,crewmemberLogin:true}` → `result.authentication`(JWT). crewCode=JWT.sub(한글, **UTF-8 디코드 필수**).
+- `getCalendarBlocks` → dutyId 열거, `getDutyInfo` → namedInfoList의 `flighttime`/`blockhours`, crewList의 `Pos`로 직책.
+- 전체 API 맵은 메모리 `crewconnex-app-api`. A안(더블 로그인) 대신 **B안(단일 백엔드)** 선택.
+
+### 구현 + 검증
+- Worker에 `pdcLogin`/`fetchPdcRoster`/`parsePdcDutyInfo`. 기존 비행 shape + `flightTime`·`instrumentTime`.
+- **계기시간 규칙**: air time을 "그 값보다 작은 가장 큰 5의 배수"로 내림(28→25, 30→25, 25→20).
+- **기번/기종**: 앱은 편대번호(뒤 3자리)만·기종 미제공. 운항기술팀 스펙시트의 **NG 31대 목록** 역조회 → `593`→HL8593(MAX), `031`→HL8031(NG), `213`→HL7213(NG 예외). 목록 밖은 전부 MAX(B737-8).
+- **PIC/SIC**: 본인 `Pos`(Capt (PIC)/FO)로 자동.
+- 앱(www): 응답 `instrumentTime`을 계기(ifr) 칸에 자동 입력(비어 있을 때만, 수정값 보존).
+- **CORS 버그**: 미리보기 오리진 `http://localhost:4173`(포트)가 허용목록 불일치 → "Failed to fetch". `isAllowedOrigin`으로 localhost 아무 포트 허용.
+- 라이브 검증: 실제 응답으로 11/1·11/4편 계기시간 산출 확인(2:16→2:15, 1:28→1:25).
+- **미래편 보강**: 비행 전 편은 getDutyInfo의 activityIdentification이 비어 파싱에서 누락됐다. fromStation/toStation+dutyCode로 복원하고 blh는 예정시각으로 산출(배포 2a672773).
+
+### cutover — roster.aspx 완전 제거
+pdc 단독 확정. Worker에서 약 **537줄 삭제**(parseRosterHtml, tryFetch, findRosterUrl, fetchRosterPeriod/AdjacentPeriods/mergeRosterResults, extractHiddenFields/PeriodOptions/TableRows/CrewFromRow, stripHtml/mapAc/fmtTime, 쿠키 jar 헬퍼, MONTH_NAMES, BASE, HTML 로그인 흐름). 유지: posToDuty·applyDutyCode·rosterWindow. 폴백 제거. 메모리 `crewconnex-roster-internals` 삭제.
+Worker 배포 eb239950, 스모크 통과. 전체 테스트 53개 통과.
 
 ### 폰 영향
-Worker는 서버라 **기존 설치 앱도 즉시 pdc로 가져온다**(백엔드 플래그 무시하고 항상 pdc).
-→ 지금 폰에서 가져와도 기번·기종 정확. 단 **계기시간 자동입력은 새 www(빌드6)** 가 있어야 한다
-(옛 www는 응답의 instrumentTime을 안 읽음).
+Worker는 서버라 **기존 설치 앱도 즉시 pdc로 가져온다** → 지금 폰에서도 기번·기종 정확. 단 **계기시간 자동입력은 새 번들(iOS 빌드6 / 안드 vc4)** 필요.
 
-### iOS 1.0.1 / 빌드 6 업로드 (심사 통과 후 즉시 갱신용)
-- MARKETING_VERSION 1.0→1.0.1, CURRENT_PROJECT_VERSION 5→6, npx cap sync ios.
-- 아카이브→export→altool 업로드 성공(Delivery UUID 9d751461…). Apple 처리 대기.
-- ⚠️ **업로드 키는 `QS53NUHWUF` + issuer 7c1c9cef**가 맞다(PD2TJSVAU4는 401). WORKLOG 1426 정정.
-- 빌드5(1.0) 심사 중이라 1.0.1 버전 생성·제출은 1.0 승인·출시 후 가능. 빌드6은 미리 올려둠.
+### iOS·안드로이드 1.0.1 갱신 준비 (오늘 수정분 포함)
+첫 출시(iOS 1.0·빌드5 심사중 / Play 1.0(3) 게시대기)와 별개로 CrewConnex 업데이트를 양쪽 준비:
+- **iOS 1.0.1 / 빌드6**: cap sync→아카이브→export→altool 업로드 성공(UUID 9d751461…). ⚠️ 업로드 키 **QS53NUHWUF** + issuer 7c1c9cef(PD2TJSVAU4는 401).
+- **안드로이드 1.0.1 / vc4**: cap sync→AAB 빌드 완료(`날고적고-빌드4-1.0.1.aab`, www 바이트 동일).
+- **앞으로 안드로이드는 iOS와 항상 같은 버전으로 함께 수정.**
+- Play 업로드는 1.0(3) 첫 출시를 흔들지 않도록 **첫 출시 후**에(iOS 빌드6도 올려두고 제출 보류).
 
----
-
-## 2026-11-04 (Google Play 승인 — 애플 기다렸다 동시 공개하기로)
-
-### Play 승인
-
-제출 이틀 만에 변경사항 11개가 전부 통과했다.
-
-```
-게시 개요   변경사항이 게시 준비됨
-            [변경사항 11개 게시] 버튼 활성
-            "검토 중인 변경사항" 섹션은 사라짐
-```
-
-승인 내역: 프로덕션 `1.0 (3) - 첫 출시` 전체 출시 / 국가·지역 178개 / 스토어 등록정보 ko-KR /
-앱 콘텐츠 6건(콘텐츠 등급·타겟층·개인정보처리방침·광고 선언·데이터 보안·건강 앱) / 카테고리 생산성.
-
-11/2에 **관리형 게시를 켜 둔 덕에 자동 공개되지 않았다.** 꺼져 있었다면 승인 즉시
-안드로이드만 단독으로 스토어에 올라갔을 것이다.
-
-### 공개 보류 결정
-
-사용자 결정: **애플 승인까지 기다렸다가 양쪽을 같은 날 공개한다.**
-
-이유는 세 곳(App Store / Play / 마케팅 사이트) 버전을 맞춘다는 원칙이다.
-마케팅 사이트에 두 스토어 버튼이 모두 들어가 있어(`f57e10a`) 한쪽만 공개하면
-죽은 링크가 하나 생긴다. 애플이 거절될 경우에도 둘 다 미공개인 편이 수습하기 쉽다.
-
-### iOS 현황
-
-```
-앱 버전 1.0 / 빌드 5   WAITING_FOR_REVIEW   제출 11/1 21:19 KST (D+3)
-```
-
-아직 심사 대기. `IN_REVIEW`로도 넘어가지 않았다.
+**출시 순서**: ① iOS 1.0 승인→출시 + Play 1.0(3) 게시 ② iOS 1.0.1(빌드6)+Play 1.0.1(vc4) 갱신 제출 ③ 마케팅 사이트 배포.
 
 ### 곁다리
-
-Chrome 확장이 한 번 끊겨 `tabs_context_mcp({createIfEmpty: true})`로 세션 탭 그룹을
-새로 만들어 다시 붙였다. 이 증상이 반복되므로 iOS는 가급적 `review-status.py`(API)로 보는 게 낫다.
+Chrome 확장이 자주 끊겨 `tabs_context_mcp({createIfEmpty:true})`로 재접속. iOS 상태는 `review-status.py`(API)가 빠름. 매일 09시 작업 `flyrecord-review-status`에 출시 순서·altool 키 반영.
 
 ---
 

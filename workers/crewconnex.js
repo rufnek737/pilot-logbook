@@ -567,6 +567,16 @@ function pdcLocalTime(t) {
   return m ? m[1] : '';
 }
 
+// 블록시간(H:MM)을 start/end 예정시각으로 산출. local이 "...Z"로 잘못 붙지만 차이 계산엔 무관.
+function pdcBlockFromTimes(start, end) {
+  const s = start && start.local, e = end && end.local;
+  if (!s || !e) return '';
+  const ms = Date.parse(e) - Date.parse(s);
+  if (!(ms > 0)) return '';
+  const m = Math.round(ms / 60000);
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}
+
 // air flight time(H:MM) → 계기시간. "그 값보다 작은 가장 큰 5의 배수"로 내린다.
 // 28분→25, 29분→25(5 미만은 내림), 25분→20, 30분→25(5의 배수는 -5), 1:00(60분)→0:55.
 export function instrumentTimeFromFlightTime(hmm) {
@@ -624,20 +634,25 @@ export function parsePdcDutyInfo(info) {
 
   for (const a of acts) {
     if (a.blockType !== 'FDP') continue;                 // 지상(GND)·휴식(HTL) 등 제외
+    // 과거편은 activityIdentification("ICN-KIX 7C 1303")에 편명이 있지만, 미래편은 비어 있다.
+    // 그 경우 fromStation/toStation + dutyCode("7C 5303")로 복원한다.
     const route = parsePdcActivityId(a.activityIdentification);
-    if (!route) continue;                                // 비행 leg만 (MED 등 제외)
+    const from = (route && route.from) || a.fromStation || '';
+    const to = (route && route.to) || a.toStation || '';
+    const flight = (route && route.flight) || String(a.dutyCode || '').replace(/\s+/g, '').toUpperCase();
+    if (!from || !to || from === to || !/\d/.test(flight)) continue;  // 실제 비행 leg만
     const ni = a.namedInfoList || [];
     const reg = pdcReg(pdcNamed(ni, 'AcReg') || a.aircraftReg);  // 편대번호 → 전체 기번
     flights.push({
       date: ((a.start && a.start.local) || '').slice(0, 10),
-      flight: route.flight,
-      from: a.fromStation || route.from,
-      to: a.toStation || route.to,
+      flight,
+      from,
+      to,
       stdLocal: pdcLocalTime(a.start),
       staLocal: pdcLocalTime(a.end),
       acType: pdcAcType(reg),                            // NG 목록 밖이면 MAX(B737-8)
       acReg: reg,
-      blh: pdcNamed(ni, 'blockhours'),
+      blh: pdcNamed(ni, 'blockhours') || pdcBlockFromTimes(a.start, a.end),  // 미래편은 예정시각으로 산출
       flightTime: pdcNamed(ni, 'flighttime'),            // ← 계기시간 소스(웹엔 없던 데이터)
       instrumentTime: instrumentTimeFromFlightTime(pdcNamed(ni, 'flighttime')),  // 5분 내림
       crew,
