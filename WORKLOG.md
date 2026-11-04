@@ -2,6 +2,29 @@
 
 ---
 
+## 2026-11-04 (CrewConnex cutover 완료 + iOS 1.0.1/빌드6 업로드)
+
+### CrewConnex B안 cutover 완료
+roster.aspx 경로를 Worker에서 완전 제거(약 537줄). 이제 가져오기는 앱 백엔드
+pdccrew2 단독. 기번·기종(NG 목록 역조회), 계기시간(5분 내림 자동), PIC/SIC 모두 pdc에서.
+배포 Version eb239950, 스모크 테스트 통과(프리플라이트 204, 미인증 401).
+삭제 함수: parseRosterHtml, tryFetch, findRosterUrl, fetchRosterPeriod/AdjacentPeriods/
+mergeRosterResults, extractHiddenFields/PeriodOptions/TableRows/CrewFromRow, stripHtml/mapAc/
+fmtTime, 쿠키 jar 헬퍼, MONTH_NAMES, BASE. 메모리 crewconnex-roster-internals 삭제(폐경로).
+
+### 폰 영향
+Worker는 서버라 **기존 설치 앱도 즉시 pdc로 가져온다**(백엔드 플래그 무시하고 항상 pdc).
+→ 지금 폰에서 가져와도 기번·기종 정확. 단 **계기시간 자동입력은 새 www(빌드6)** 가 있어야 한다
+(옛 www는 응답의 instrumentTime을 안 읽음).
+
+### iOS 1.0.1 / 빌드 6 업로드 (심사 통과 후 즉시 갱신용)
+- MARKETING_VERSION 1.0→1.0.1, CURRENT_PROJECT_VERSION 5→6, npx cap sync ios.
+- 아카이브→export→altool 업로드 성공(Delivery UUID 9d751461…). Apple 처리 대기.
+- ⚠️ **업로드 키는 `QS53NUHWUF` + issuer 7c1c9cef**가 맞다(PD2TJSVAU4는 401). WORKLOG 1426 정정.
+- 빌드5(1.0) 심사 중이라 1.0.1 버전 생성·제출은 1.0 승인·출시 후 가능. 빌드6은 미리 올려둠.
+
+---
+
 ## 2026-11-04 (Google Play 승인 — 애플 기다렸다 동시 공개하기로)
 
 ### Play 승인
