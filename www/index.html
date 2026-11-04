@@ -6427,8 +6427,10 @@ function _mergeCrewConnexFlight(f, previous) {
     ifr: previous?.ifr || f.instrumentTime || '',
     ald: previous?.ald || '',
     ldt: previous?.ldt ?? (previous ? ldtOf(previous) : 'M'), // 신규 가져오기 기본값은 메뉴얼
-    toPf: previous?.toPf ?? 'PF',
-    ldgPf: previous?.ldgPf ?? 'PF',
+    // 3NC(3 SET 순항 교대 기장)는 본인이 이착륙을 하지 않으므로 T/O·L/D 기본 미수행(PM).
+    // 그 외는 기본 수행(PF). 사용자가 이미 설정한 값은 보존한다.
+    toPf: previous?.toPf ?? (f.dutyCode === '3NC' ? 'PM' : 'PF'),
+    ldgPf: previous?.ldgPf ?? (f.dutyCode === '3NC' ? 'PM' : 'PF'),
     personalMemo: getPersonalMemo(previous),
     source: 'crewconnex',
   };
