@@ -35,6 +35,12 @@ built-in 브라우저로 로그인 후 fetch/XHR 후킹해 트래픽 확인:
 pdc 단독 확정. Worker에서 약 **537줄 삭제**(parseRosterHtml, tryFetch, findRosterUrl, fetchRosterPeriod/AdjacentPeriods/mergeRosterResults, extractHiddenFields/PeriodOptions/TableRows/CrewFromRow, stripHtml/mapAc/fmtTime, 쿠키 jar 헬퍼, MONTH_NAMES, BASE, HTML 로그인 흐름). 유지: posToDuty·applyDutyCode·rosterWindow. 폴백 제거. 메모리 `crewconnex-roster-internals` 삭제.
 Worker 배포 eb239950, 스모크 통과. 전체 테스트 53개 통과.
 
+### 가져오기 다듬기 (사용자 피드백)
+- **미래편**: 비행 전 편은 getDutyInfo의 activityIdentification이 비어 파싱에서 누락됐다.
+  fromStation/toStation+dutyCode로 복원, blh는 예정시각(start/end)으로 산출. 배포 2a672773.
+- **3NC 기본값**: 순항 교대 기장(3NC)은 본인이 이착륙을 안 하므로 가져오기 시 T/O·L/D 기본
+  미수행(PM)으로. 그 외 듀티코드는 PF 유지, 사용자 설정값은 보존. 앱에서 라이브 검증.
+
 ### 폰 영향
 Worker는 서버라 **기존 설치 앱도 즉시 pdc로 가져온다** → 지금 폰에서도 기번·기종 정확. 단 **계기시간 자동입력은 새 번들(iOS 빌드6 / 안드 vc4)** 필요.
 
