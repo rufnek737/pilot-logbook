@@ -2,6 +2,49 @@
 
 ---
 
+## 2026-11-05 (iOS 1.0 심사 거절 → 카메라 권한 크래시 수정 → 빌드7 재제출)
+
+핵심: 애플이 **Guideline 2.1(a) Performance — 크래시**로 iOS 1.0(빌드5)을 거절. 원인은
+경력 증빙 첨부의 "사진 촬영" → **카메라 권한 설명 누락**. Info.plist 2줄 추가로 고쳐
+빌드7로 당일 재제출까지 완료.
+
+### 거절 사유 (해결 센터)
+- `2.1(a) Performance / App Completeness`: iPad Air 11"(M3), iPadOS 27.2에서
+  **"Take Photo" 버튼 탭 시 크래시**. 크래시로그(.ips)+스크린샷 첨부.
+- "재제출 건에서 추가 발견된 이슈" — 이전 지적(스크린샷 크기·구독 3.1.1 등)은 해소됐고 크래시만 남음.
+- 인앱결제(자동 가져오기 평생 이용권)는 "심사 준비됨" = 통과. 문제는 앱 바이너리뿐.
+
+### 근본 원인
+앱에 "사진 촬영" 기능을 따로 만든 게 아니라, **경력 증빙 서류 첨부**(`careerAttachmentInput`,
+accept에 image/jpeg·png 포함)를 탭하면 **iOS가 자동으로 "사진 촬영" 옵션**을 띄운다.
+심사관이 그걸 눌러 카메라 호출 → **Info.plist에 `NSCameraUsageDescription`이 없어 iOS가 강제 종료**.
+첨부파일은 파싱/OCR 없이 로컬 보관만 하는 기능(`addFiles`) — 사진/PDF 내용은 앱이 안 읽는다.
+
+### 수정 (방향 A — 사진 기능 유지)
+사용자 선택: 버튼이 "PDF·사진 첨부"라 사진 촬영은 의도된 기능 → 권한만 추가.
+- `ios/App/App/Info.plist`: `NSCameraUsageDescription` + `NSPhotoLibraryUsageDescription` 추가(plist lint 통과).
+- **안드로이드는 변경 없음**: Capacitor가 파일첨부 카메라를 인텐트로 위임해 `CAMERA` 권한 불필요.
+  오히려 선언하면 런타임 권한 요구가 생겨 깨진다. 공유 번들(www) 무변경이라 양쪽 내용 동일.
+- 커밋 `092a03a` 푸시.
+
+### 재제출 (버전 1.0 유지 — Play 1.0과 맞춤)
+프로젝트가 1.0.1/빌드6으로 돼 있었으나, 거절된 건 1.0이고 Play도 1.0이라 **1.0/빌드7로 되돌려** 재제출.
+www엔 이미 CrewConnex+크래시수정이 다 들어 있어 버전번호만 다를 뿐 내용 동일.
+- 프로젝트 `MARKETING_VERSION 1.0.1→1.0`, `CURRENT_PROJECT_VERSION 6→7`(Debug+Release).
+- cap sync→아카이브→export→**altool 업로드 성공**(UUID `bc4d293c…`). 키 QS53NUHWUF + issuer 7c1c9cef.
+- 빌드7 VALID 확인 후 **API PATCH**로 1.0 버전의 빌드를 5→7 교체.
+- 단, API로 빌드만 바꾸면 버전 상태가 REJECTED로 남아 "다시 제출" 버튼이 비활성 →
+  **버전 페이지의 "심사에 추가"**를 눌러야 심사 대기 상태로 리셋됨(다음에 재발 시 바로 이 버튼).
+- 해결 센터에 영문 회신(크래시 원인·수정 설명) 전송 후 **"앱 심사에 다시 제출"**.
+- 결과: 앱 버전 1.0·빌드7 + 인앱결제 둘 다 **WAITING_FOR_REVIEW**(제출 11-05 18:59). API 확정.
+
+### 다음
+애플 재심사 대기(재제출이라 보통 ~1일). 매일 09시 `flyrecord-review-status`가 추적.
+승인 후 출시 순서는 11-04 기록과 동일(iOS 1.0 출시+Play 1.0(3) 게시 → 1.0.1 갱신 → 사이트 배포).
+단 iOS 첫 출시가 빌드7(=CrewConnex 포함)이 되므로, 별도 1.0.1 iOS 갱신의 실익은 재검토.
+
+---
+
 ## 2026-11-04 (CrewConnex 자동 계기시간 완성 + 양쪽 1.0.1 갱신 준비, Play 승인)
 
 핵심: CrewConnex 가져오기를 **앱 백엔드(pdccrew2)** 로 전면 전환해 그동안 수동 입력하던
