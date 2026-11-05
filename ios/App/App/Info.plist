@@ -35,6 +35,10 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>경력 증빙 서류를 사진으로 촬영해 첨부하는 데 사용합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>경력 증빙 서류 사진을 보관함에서 선택해 첨부하는 데 사용합니다.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
