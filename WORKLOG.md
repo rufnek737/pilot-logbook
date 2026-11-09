@@ -2,6 +2,37 @@
 
 ---
 
+## 2026-11-09 (🚀 양대 스토어 1.0 동시 출시 + 발리편 계기 버그 해결 + 사이트 배포)
+
+핵심: **날고적고 1.0을 App Store·Google Play에 동시 공개**(첫 출시). 그 전에 "발리편 계기
+자동입력 안 됨" 버그를 추적해 **배포된 Worker가 구버전이었음 + 폰이 구 개발빌드**임을 확인,
+둘 다 고쳤다. 마케팅 사이트도 재배포.
+
+### 발리편(3NC 증강승무) 계기 미반영 — 원인 2개
+증상: 7C5303(ICN-DPS 3NC) 가져오니 블록(7:17)·기번·기종은 오는데 **계기만 빔**. 국내선(11/4)은 됐었음.
+- **원인 A — 배포된 Worker가 stale**: 서빙 버전이 `ab5cb76`(미래편/빈 activityIdentification 폴백) **16초 전** 코드였다. 완료된 증강편은 activityIdentification이 비어 구버전 파서가 스킵/누락. `wrangler deployments status`로 확인 → **재배포(cd2e41bb)**. 11/5에 고쳤다 믿은 "±5일 미래편"도 실은 미배포였음 → 같이 해결.
+  - ⚠️ 교훈: **git push ≠ 배포.** Worker는 `cd workers && npx wrangler deploy`. 메모리 [[fix-delivery-model]].
+- **원인 B — 폰이 구 개발빌드(빌드5)**: 라이브 데이터 직접 파싱으로 Worker는 계기 6:55(7C5303)·7:00(7C5304)를 **정확히 내보냄**을 확정. 그런데도 폰이 비어 = 앱 문제. 계기 자동입력(`ifr: previous?.ifr||f.instrumentTime`)은 11/4 빌드6부터, 빌드5엔 없음(3NC 기본값도 없어 T/O·L/D 체크로 뜸이 단서). 폰은 **내가 devicectl로 깐 개발빌드**라, 현재 www로 재빌드(Debug) → `xcrun devicectl device install`(USB 연결 필수, available(paired)) → **계기 자동입력 확인**.
+
+### 코드 수정
+- **CC_AUTO_FIELDS에 `ifr` 추가(f43aa27)**: CrewConnex가 flighttime을 착륙 뒤 늦게 올리는 경우, 재가져오기 시 "변경 없음"으로 스킵돼 빈 계기가 안 채워졌다. 변경감지에 계기를 넣어 **삭제 없이 재가져오기만으로** 반영.
+- **가져오기 뱃지 대비(da8115f)**: 신규/변경/동일 글자색이 밝은 하드코딩(#86efac 등)이라 라이트 모드에서 안 보임 → 테마 변수(--success/--warning/--text2)로.
+
+### 🚀 양대 스토어 1.0 동시 출시
+- Android `versionName 1.0.1→1.0` 통일(30b0296, vc4). www 바이트 애플 빌드7과 동일 검증.
+- **애플**: `POST /v1/appStoreVersionReleaseRequests` → `READY_FOR_SALE`.
+- **구글**: 게시 개요 "변경사항 게시" → 게시됨(관리형 게시, vc3 제출건 자동 취소).
+- 사용자 규칙 확정: **스토어 배포는 애플·구글 항상 같은 최신 버전으로 동시에** → 메모리 [[stores-same-latest-version]].
+
+### 마케팅 사이트(rufnekcrew-site, 별도 레포) 재배포
+- 날고적고 출시 반영(출시예정→스토어 버튼)·Descent 페이지가 **배포만 안 돼 있었음** → 재배포.
+- **듀티스왑에 스토어 버튼 추가**(App Store id6823129998 / Play com.rufnekcrewswap.app), 웹앱 열기 병행.
+- 배포법: `npm run build` → **루트에서** `npx wrangler deploy`(워커 rufnekcrew-site). 메모리 [[marketing-site-deploy]].
+
+**상태**: 🍎 1.0(빌드7) READY_FOR_SALE / 🤖 1.0(vc4) 게시됨 / 🌐 rufnekcrew.com 갱신. 오늘 자잘한 2개(f43aa27·da8115f)는 스토어 1.0엔 없음 → 1.0 출시 후 첫 업데이트에.
+
+---
+
 ## 2026-11-07 (애플 1.0 승인 + 구글 vc4 제출 — 양쪽 최신 1.0 배포 준비)
 
 핵심: 애플이 재제출한 **1.0(빌드7)을 승인**(수동 출시 대기). 구글은 승인돼 있던 vc3(CrewConnex 없음)
