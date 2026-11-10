@@ -34,3 +34,7 @@ www/cordova_plugins.js
 
 # 심사 제출용 녹화 (대용량)
 심사자료/
+
+# Play 서비스 계정 키는 ~/.playconsole 에 (repo 밖). 혹시 복사돼도 커밋 방지
+*-sa.json
+**/playconsole-*.json
