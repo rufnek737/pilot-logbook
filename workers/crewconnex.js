@@ -592,8 +592,9 @@ export function instrumentTimeFromFlightTime(hmm) {
 function normPdcPos(pos) {
   const p = String(pos || '').trim();
   if (/^Capt/i.test(p) || /^SFO$/i.test(p)) return 'Capt';   // "Capt (PIC)"·SFO → Capt (기존과 동일)
-  if (/^3(PC|NC)$/i.test(p)) return p.toUpperCase();
-  if (/^3(F|FO)$/i.test(p)) return '3F';
+  const m3 = p.match(/^3(PC|NC)\b/i);
+  if (m3) return ('3' + m3[1]).toUpperCase();   // "3PC (PIC)"·"3NC" → 3PC/3NC ((PIC) 꼬리표 대응)
+  if (/^3(F|FO)\b/i.test(p)) return '3F';
   return p;                                                   // FO/PUR/JC1/FA/MECH 등은 그대로
 }
 
