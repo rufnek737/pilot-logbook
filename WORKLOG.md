@@ -2,6 +2,44 @@
 
 ---
 
+## 2026-11-10 (로그 버그 2건 수정 + 1.0.1 양쪽 심사 제출 + Android 스토어 자동화)
+
+핵심: 발리 복귀편에서 사용자가 찾은 **로그 오류 2건**(3PC→C, 3NC 착륙 해당없음→MAN)을 고치고,
+양 스토어에 **1.0.1 동시 심사 제출**. 그리고 **Android 스토어 업로드를 Play Developer API로 자동화**해
+앞으로 파일 드롭 불필요하게 만듦.
+
+### 로그 버그 2건 (사용자 보고)
+- **3PC가 dutyCode "C"로 오인**: 3PC 편조는 `"3PC (PIC)"`처럼 `(PIC)` 꼬리표가 붙어 worker
+  `normPdcPos`의 `/^3(PC|NC)$/`가 `$` 때문에 매칭 실패 → posToDuty null → 앱이 기본값 'C'. 앵커를
+  `\b`로 바꾸고 "3PC"/"3NC"로 정규화(3F도). 3NC는 꼬리표 없어 멀쩡했던 것. **Worker 재배포(b9d51161)로
+  전 사용자 즉시 반영**(서버측).
+- **3NC 착륙 "해당없음"(ldt='')이 MAN으로 표기**: 앱 `ldtLabel`이 빈값을 'MAN'으로 떨어뜨림 → 빈값은
+  'NONE'으로. + 3NC 가져오기 기본 LDT를 '해당없음'으로. (커밋 25e91a6, Worker 테스트 16개 통과)
+- 폰 개발빌드 재설치 후 **사용자가 직접 폰에서 검증 완료**(3PC→3PC, 3NC 착륙→NONE).
+
+### 1.0.1 양쪽 심사 제출 (같은 www, 같은 버전 — 규칙)
+- iOS 1.0.1/빌드8, Android 1.0.1/vc5. www 바이트 동일 검증. 커밋 bce43f2.
+- **iOS는 100% 자동**: altool 업로드 → ASC API로 버전 생성·빌드8 연결·출시노트(ko)·reviewSubmissions
+  제출·releaseType=MANUAL까지. `scripts/submit*-ios-101.py` 패턴. → WAITING_FOR_REVIEW.
+- Android: vc5 AAB는 20MB라 사용자가 Play에 드롭 → 출시노트·검토 제출. → 검토 후 **출시 준비(승인)**.
+
+### 🤖 Android 스토어 업로드 자동화 (이제 드롭 불필요)
+- GCP `flyrecord-billing`의 기존 서비스 계정 **flyrecord-purchase-verifier**(androidpublisher 스코프,
+  결제검증에도 씀)에 **새 JSON 키 생성**(사용자 다운로드) → `~/.playconsole/flyrecord-sa.json`(chmod 600, repo 밖).
+- Play Console 사용자 및 권한에서 그 계정에 **"프로덕션으로 출시" 권한 추가**(⚠️ auto 모드가 assistant
+  클릭 차단 → 사용자가 직접 체크·저장).
+- `scripts/play_api.py` — openssl RS256 JWT→토큰→edits 생성→AAB 업로드→프로덕션 릴리스→commit. 접근
+  테스트 통과(edit 생성·프로덕션 트랙 읽기·취소). 커밋 bcafa92. gitignore 안전장치(`*-sa.json`). 메모리 [[fix-delivery-model]].
+
+### 곁다리
+- **홍보 문구** 작성(카톡·커뮤니티·회사 게시판용, 영문 포함). "제주항공 공식 앱 아님"·"본인 계정 연동" 안내 필수.
+  개인 신원(현직 기장) 표현 제거, 문의 info@rufnekcrew.com. descent·crewswap 세션에 자동화·규칙 공유.
+- **Play 이메일 알림**: "앱 게시 업데이트"가 꺼져 있어 승인 메일이 안 왔음 → 켬(hosihana2@gmail.com).
+
+**상태**: 🤖 구글 1.0.1(vc5) 출시 준비(승인) / 🍎 애플 1.0.1(빌드8) 심사 중. 애플 승인 시 동시 공개 예정.
+
+---
+
 ## 2026-11-09 (🚀 양대 스토어 1.0 동시 출시 + 발리편 계기 버그 해결 + 사이트 배포)
 
 핵심: **날고적고 1.0을 App Store·Google Play에 동시 공개**(첫 출시). 그 전에 "발리편 계기
