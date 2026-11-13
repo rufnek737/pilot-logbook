@@ -45,8 +45,42 @@ def api(method, path, token, body=None, headers=None):
     except urllib.error.HTTPError as e:
         return e.code, json.loads(e.read().decode() or "{}")
 
+def upload_bundle(tok, eid, aab_path):
+    url=f"https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/{PKG}/edits/{eid}/bundles?uploadType=media"
+    data=open(aab_path,"rb").read()
+    req=urllib.request.Request(url, data=data, method="POST",
+        headers={"Authorization":"Bearer "+tok,"Content-Type":"application/octet-stream"})
+    try:
+        r=urllib.request.urlopen(req); return r.status, json.loads(r.read().decode() or "{}")
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read().decode() or "{}")
+
+def submit_update(aab_path, notes_ko):
+    """edit 생성→AAB 업로드→프로덕션 트랙(완전출시)→commit. 관리형 게시라 승인 후 게시 대기."""
+    tok=access_token()
+    st,b=api("POST", f"/androidpublisher/v3/applications/{PKG}/edits", tok, body={})
+    if st!=200: return None, st, b
+    eid=b["id"]; print("  edit:", eid)
+    st,b=upload_bundle(tok, eid, aab_path)
+    if st!=200: return None, st, b
+    vc=b["versionCode"]; print("  업로드 versionCode:", vc)
+    st,b=api("PUT", f"/androidpublisher/v3/applications/{PKG}/edits/{eid}/tracks/production", tok, body={
+        "track":"production",
+        "releases":[{"versionCodes":[str(vc)],"status":"completed",
+                     "releaseNotes":[{"language":"ko-KR","text":notes_ko}]}]})
+    if st!=200: return vc, st, b
+    print("  프로덕션 트랙 설정 OK")
+    st,b=api("POST", f"/androidpublisher/v3/applications/{PKG}/edits/{eid}:commit", tok)
+    return vc, st, b
+
 import urllib.parse
-if __name__ == "__main__" and (len(sys.argv) < 2 or sys.argv[1] == "test"):
+if __name__ == "__main__" and len(sys.argv) >= 2 and sys.argv[1] == "upload":
+    aab=sys.argv[2]; notes=sys.argv[3] if len(sys.argv)>3 else "버그 수정 및 개선"
+    print("Android 업로드·제출:", aab)
+    vc, st, b = submit_update(aab, notes)
+    print(f"\n{'✅' if st==200 else '⚠️'} vc{vc} 제출 status={st}")
+    if st!=200: print(json.dumps(b, ensure_ascii=False)[:500])
+elif __name__ == "__main__" and (len(sys.argv) < 2 or sys.argv[1] == "test"):
     print("1) 액세스 토큰 발급…")
     tok = access_token(); print("   OK (len", len(tok), ")")
     print("2) edit 생성(쓰기 권한 확인)…")
