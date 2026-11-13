@@ -4385,13 +4385,40 @@ function printMonth(ym, language = printLanguage) {
       <div>LDG: <b>${actualLdg + simLdg}</b> (${isEnglish?'Actual':'실비행'} ${actualLdg} · SIM ${simLdg})</div>
     </div>`;
 
+  // iOS 네이티브 인쇄용 독립 HTML. WKWebView의 viewPrintFormatter()가 position:fixed 오버레이(#printView)를
+  // 백지로 렌더하는 문제 때문에, 라이브 웹뷰 대신 이 HTML을 UIMarkupTextPrintFormatter로 렌더한다.
+  const printHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{font-family:Arial,sans-serif;color:#111;margin:0}
+    h2{font-size:15px;margin:0 0 3px}
+    .sub{font-size:11px;color:#555;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse;font-size:9px}
+    th{background:#1e3a5f;color:#fff;padding:5px 3px;text-align:center;font-size:8px}
+    td{padding:4px 3px;border-bottom:1px solid #ddd;text-align:center}
+    tr:nth-child(even) td{background:#f5f8ff}
+    .summary{margin-top:12px;font-size:11px;line-height:1.9}
+    .summary b{color:#1e3a5f}
+  </style></head><body>
+    <h2>${label}</h2>
+    <div class="sub">Kyungtae Kang &middot; ${printDate}</div>
+    <table><thead><tr>
+      <th>#</th><th>${labels.date}</th><th>${labels.flight}</th><th>${labels.from}</th><th>${labels.to}</th>
+      <th>${labels.out}</th><th>${labels.in}</th><th>${labels.aircraft}</th><th>${labels.registration}</th><th>${labels.duty}</th>
+      <th>${labels.block}</th><th>${labels.night}</th><th>${labels.instrument}</th><th>T/O</th><th>LDG</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div class="summary">
+      ${labels.sectors}: <b>${sectors}</b> &nbsp; ${labels.total}: <b>${toHHMM(total)}</b> &nbsp; SIM: <b>${toHHMM(simTotal)}</b> &nbsp;
+      ${labels.night}: <b>${toHHMM(night)}</b> &nbsp; ${labels.instrument}: <b>${toHHMM(ifr)}</b> &nbsp;
+      T/O: <b>${to}</b> &nbsp; LDG: <b>${actualLdg + simLdg}</b> (${isEnglish?'Actual':'실비행'} ${actualLdg} &middot; SIM ${simLdg})
+    </div>
+  </body></html>`;
+
   // Attach button handlers after innerHTML is set
   document.getElementById('pv-back').addEventListener('click', closePrintView);
   document.getElementById('pv-print').addEventListener('click', function() {
     if (window.AndroidPrint) {
       window.AndroidPrint.print();
     } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iosPrint) {
-      window.webkit.messageHandlers.iosPrint.postMessage('print');
+      window.webkit.messageHandlers.iosPrint.postMessage(printHtml);  // 라이브 웹뷰 대신 HTML 직접 전달
     } else {
       window.print();
     }
