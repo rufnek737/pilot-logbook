@@ -2,6 +2,14 @@
 
 ---
 
+## 2026-11-17 (스케줄 확인: 1.0.2 양쪽 공개 상태)
+
+- 🍎 iOS: `앱 버전 1.0.2 READY_FOR_SALE 빌드 9` (11/13 제출분 COMPLETE).
+- 🤖 Android: 프로덕션 트랙 `6 (1.0.2)` status=completed (play_api.py test, 읽기만·edit 취소).
+- 🌐 마케팅 사이트 배포 여부는 이 확인에서 판단 불가 → 사용자 확인 필요.
+
+---
+
 ## 2026-11-11 (스케줄 확인: 1.0.1 양쪽 공개 상태)
 
 - 🍎 iOS: `앱 버전 1.0.1 READY_FOR_SALE 빌드 8` (11/10 제출분 COMPLETE). 1.0(빌드7)도 READY_FOR_SALE.
